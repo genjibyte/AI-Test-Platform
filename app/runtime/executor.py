@@ -78,4 +78,6 @@ def run_command(
         log_path=str(log_path) if log_path is not None else None,
         started_at=started_at,
         finished_at=finished_at,
+        stdout=out,
+        stderr=err,
     )

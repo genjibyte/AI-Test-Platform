@@ -19,6 +19,15 @@ class ExecRecord(BaseModel):
     started_at: str = ""
     finished_at: str = ""
 
+    # Full captured output (in-memory). Excluded when persisting to a Job's
+    # stages — only ``log_path`` is kept there to avoid DB bloat.
+    stdout: Optional[str] = None
+    stderr: Optional[str] = None
+
     @property
     def success(self) -> bool:
         return self.exit_code == 0 and not self.timed_out
+
+    def trimmed(self) -> dict:
+        """Dict form without bulky stdout/stderr, for persistence."""
+        return self.model_dump(exclude={"stdout", "stderr"})
