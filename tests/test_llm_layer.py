@@ -39,9 +39,23 @@ def test_factory_defaults_to_fake():
     assert isinstance(client, FakeLLMClient)
 
 
-def test_factory_real_provider_raises():
+def test_factory_unknown_provider_raises():
     with pytest.raises(NotImplementedError):
-        get_client(Settings(llm_provider="openai"))
+        get_client(Settings(llm_provider="does-not-exist"))
+
+
+def test_factory_openai_requires_key():
+    with pytest.raises(ValueError):
+        get_client(Settings(llm_provider="openai", llm_api_key=None))
+
+
+def test_factory_openai_constructs_with_key_no_network():
+    from app.llm.openai_client import OpenAIClient
+
+    client = get_client(
+        Settings(llm_provider="openai", llm_api_key="sk-test", llm_model="gpt-4o-mini")
+    )
+    assert isinstance(client, OpenAIClient)  # construction makes no network call
 
 
 def test_parse_plain_and_fenced_json():
