@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.api import health, jobs, report
+from app.api import context, health, jobs, report
 from app.config import get_settings
 from app.storage.db import init_db
 
@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(jobs.router)
     app.include_router(report.router)
+    app.include_router(context.router)
     return app
 
 
