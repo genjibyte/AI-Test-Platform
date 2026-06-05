@@ -12,8 +12,8 @@ from pydantic import BaseModel
 
 from app.common.response import ApiResponse
 from app.detect.maven_detector import detect as detect_maven
-from app.importer.git_importer import import_repo
-from app.models.job import Job, JobStatus
+from app.models.job import Job
+from app.pipeline.judge_pipeline import run_pipeline
 from app.runtime.workspace import Workspace
 from app.storage.job_repo import JobRepo
 
@@ -25,29 +25,12 @@ class CreateJobRequest(BaseModel):
     branch: Optional[str] = None
 
 
-def import_job(repo: JobRepo, job: Job) -> Job:
-    """Move a CREATED job through import. Returns the refreshed job."""
-    repo.update_status(job.id, JobStatus.IMPORTING)
-    workspace = Workspace(job.id)
-    record, commit = import_repo(job.git_url, workspace, branch=job.branch)
-
-    job = repo.get(job.id)
-    job.stages.append(record.trimmed())
-    if not record.success:
-        job.status = JobStatus.FAILED
-        job.error = "git import failed (see import.log)"
-    else:
-        job.commit_sha = commit
-    repo.save(job)
-    return job
-
-
 @router.post("/jobs")
 def create_job(req: CreateJobRequest) -> ApiResponse:
     repo = JobRepo()
     job = Job(git_url=req.git_url, branch=req.branch)
     repo.create(job)
-    job = import_job(repo, job)
+    job = run_pipeline(job, repo)
     return ApiResponse.ok(data=job.model_dump())
 
 

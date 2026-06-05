@@ -15,7 +15,7 @@ from app.models.job import (
 from app.storage.db import get_connection
 
 _COLUMNS = (
-    "id, git_url, branch, commit_sha, status, error, "
+    "id, git_url, branch, commit_sha, status, error, build_outcome, "
     "project_json, test_result_json, coverage_json, stages_json, "
     "created_at, updated_at"
 )
@@ -41,6 +41,7 @@ def _row_to_job(row: sqlite3.Row) -> Job:
         commit_sha=row["commit_sha"],
         status=JobStatus(row["status"]),
         error=row["error"],
+        build_outcome=row["build_outcome"],
         project=_loads(row["project_json"]),
         test_result=_loads(row["test_result_json"]),
         coverage=_loads(row["coverage_json"]),
@@ -59,7 +60,7 @@ class JobRepo:
         with self.conn:
             self.conn.execute(
                 f"INSERT INTO jobs ({_COLUMNS}) VALUES "
-                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     job.id,
                     job.git_url,
@@ -67,6 +68,7 @@ class JobRepo:
                     job.commit_sha,
                     job.status.value,
                     job.error,
+                    job.build_outcome,
                     _dumps(job.project),
                     _dumps(job.test_result),
                     _dumps(job.coverage),
@@ -83,14 +85,15 @@ class JobRepo:
         with self.conn:
             self.conn.execute(
                 "UPDATE jobs SET git_url=?, branch=?, commit_sha=?, status=?, "
-                "error=?, project_json=?, test_result_json=?, coverage_json=?, "
-                "stages_json=?, updated_at=? WHERE id=?",
+                "error=?, build_outcome=?, project_json=?, test_result_json=?, "
+                "coverage_json=?, stages_json=?, updated_at=? WHERE id=?",
                 (
                     job.git_url,
                     job.branch,
                     job.commit_sha,
                     job.status.value,
                     job.error,
+                    job.build_outcome,
                     _dumps(job.project),
                     _dumps(job.test_result),
                     _dumps(job.coverage),

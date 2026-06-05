@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     commit_sha        TEXT,
     status            TEXT NOT NULL,
     error             TEXT,
+    build_outcome     TEXT,
     project_json      TEXT,
     test_result_json  TEXT,
     coverage_json     TEXT,

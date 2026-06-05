@@ -57,6 +57,7 @@ class Job(BaseModel):
     commit_sha: Optional[str] = None
     status: JobStatus = JobStatus.CREATED
     error: Optional[str] = None
+    build_outcome: Optional[str] = None  # BuildOutcome value (P1-T06/T09)
 
     # Stage results, filled by later tasks (kept as opaque dicts here).
     project: Optional[dict[str, Any]] = None        # P1-T05
