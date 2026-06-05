@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.common.response import ApiResponse
+from app.detect.maven_detector import detect as detect_maven
 from app.importer.git_importer import import_repo
 from app.models.job import Job, JobStatus
 from app.runtime.workspace import Workspace
@@ -63,3 +64,15 @@ def get_job(job_id: str) -> ApiResponse:
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
     return ApiResponse.ok(data=job.model_dump())
+
+
+@router.get("/jobs/{job_id}/project")
+def get_project(job_id: str) -> ApiResponse:
+    repo = JobRepo()
+    job = repo.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="job not found")
+    project = detect_maven(Workspace(job.id).repo_dir)
+    job.project = project.model_dump()
+    repo.save(job)
+    return ApiResponse.ok(data=job.project)
