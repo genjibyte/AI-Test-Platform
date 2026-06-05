@@ -39,14 +39,20 @@ def get_client(settings: Optional[Settings] = None) -> LLMClient:
         from app.llm.fake_client import FakeLLMClient
 
         return FakeLLMClient(model=settings.llm_model or "fake-1")
-    if provider == "openai":
+    if provider in ("openai", "deepseek"):
         from app.llm.openai_client import OpenAIClient
 
+        # DeepSeek is OpenAI-compatible: same chat/completions shape, different
+        # default base URL + model.
+        if provider == "deepseek":
+            base_url = settings.llm_base_url or "https://api.deepseek.com"
+            model = settings.llm_model or "deepseek-chat"
+        else:
+            base_url = settings.llm_base_url
+            model = settings.llm_model
         return OpenAIClient(
-            api_key=settings.llm_api_key,
-            model=settings.llm_model,
-            base_url=settings.llm_base_url,
+            api_key=settings.llm_api_key, model=model, base_url=base_url
         )
     raise NotImplementedError(
-        f"real LLM provider '{provider}' is not wired yet; use 'fake' or 'openai'"
+        f"real LLM provider '{provider}' is not wired yet; use 'fake', 'openai', or 'deepseek'"
     )
