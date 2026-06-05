@@ -9,6 +9,9 @@ venv/
 # Runtime data (isolated workspaces, sqlite, logs)
 var/
 
+# Maven build output (e.g. inside samples/)
+target/
+
 # Env
 .env
 

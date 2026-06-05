@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional, Tuple, Union
 
 from app.build.maven_runner import (
+    ENCODING_ARGS,
     BuildOutcome,
     classify_outcome,
     resolve_maven,
@@ -27,6 +28,7 @@ def build_command(base: list[str], jacoco_version: str) -> list[str]:
     return [
         *base,
         "-B",
+        *ENCODING_ARGS,
         f"{plugin}:prepare-agent",
         "test",
         f"{plugin}:report",

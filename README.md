@@ -20,10 +20,17 @@ Python 3.10+ / FastAPI / SQLite。详见环境决策文档。
 
 ## 环境前置（实跑 Phase 1 判卷前必须）
 
-- **Maven**：当前宿主机未安装。T06 起需要 `mvn`（建议优先用目标仓库的 `mvnw` wrapper）。
-- **JDK**：当前仅 JDK 8，选黄金样例须挑 JDK 8 可构建的项目。
+- **Maven**：通过 `mvnw` wrapper / PATH / 或配置 `TESTAGENT_MAVEN_CMD` 指向 `mvn(.cmd)`。
+- **JDK**：JaCoCo/JUnit5 需可用 JDK（本机 JDK 17 已验证）。
+
+```powershell
+# 若 mvn 不在 PATH，指定可执行文件
+$env:TESTAGENT_MAVEN_CMD = "C:\path\to\apache-maven\bin\mvn.cmd"
+```
 
 > 仅运行下方骨架（health 接口）不需要 Maven/JDK。
+> 注意：若宿主机有会加密落盘文件的 DLP/安全代理，git 克隆出的源码可能被篡改，
+> 导致远程仓库无法构建。详见 `docs/06_PHASE1_GOLDEN_SAMPLE.md`。
 
 ## 快速开始
 
@@ -37,8 +44,15 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 curl http://localhost:8000/health
 
-# 运行测试
+# 运行单元/集成测试（快速，无需 Maven）
 pytest
+
+# 端到端真实判卷（需要 Maven）
+$env:TESTAGENT_MAVEN_CMD = "C:\path\to\mvn.cmd"; $env:TESTAGENT_E2E = "1"
+pytest tests/e2e -v
+
+# 对任意开源 Maven 仓库做真实端到端（干净主机）
+python -m scripts.run_judge https://github.com/<org>/<repo>.git main
 ```
 
 ## 目录结构

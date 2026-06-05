@@ -18,6 +18,10 @@ from app.runtime.workspace import Workspace
 
 DEFAULT_TEST_TIMEOUT = 1800  # 30 min
 
+# Force UTF-8 source encoding so a non-UTF-8 host default (e.g. GBK) does not
+# corrupt real-world sources. Set via -D, never by editing the pom.
+ENCODING_ARGS = ["-Dproject.build.sourceEncoding=UTF-8"]
+
 
 class BuildOutcome(str, enum.Enum):
     SUCCESS = "SUCCESS"
@@ -75,7 +79,7 @@ def run_mvn_test(
     base = resolve_maven(repo_dir)
     if base is None:
         return None, BuildOutcome.NO_MAVEN
-    cmd = [*base, "-B", "test", *(extra_args or [])]
+    cmd = [*base, "-B", *ENCODING_ARGS, "test", *(extra_args or [])]
     log = workspace.log_file("mvn-test.log")
     record = run_command("mvn-test", cmd, cwd=repo_dir, log_path=log, timeout=timeout)
     return record, classify_outcome(record)
