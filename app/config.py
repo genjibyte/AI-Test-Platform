@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,6 +25,10 @@ class Settings(BaseSettings):
     workspace_root: Path = Path("./var/workspace")
     # Root for persistent data: SQLite db, log index (P1-T02).
     data_dir: Path = Path("./var/data")
+
+    # Explicit path to a maven executable (mvn / mvn.cmd). Used when no project
+    # Maven Wrapper exists and `mvn` is not on PATH. Set via TESTAGENT_MAVEN_CMD.
+    maven_cmd: Optional[str] = None
 
     @property
     def db_path(self) -> Path:
