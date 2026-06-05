@@ -1,0 +1,12 @@
+[project]
+name = "testagent-lab"
+version = "0.1.0"
+description = "TestAgent Lab — AI 单测生成判卷场 (Phase 1: 判卷场)"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.setuptools]
+packages = ["app"]
