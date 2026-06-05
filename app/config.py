@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     # Maven Wrapper exists and `mvn` is not on PATH. Set via TESTAGENT_MAVEN_CMD.
     maven_cmd: Optional[str] = None
 
+    # LLM isolation layer (P2-T03). Defaults to the offline fake client; no real
+    # model is contacted until contracts are confirmed and a provider is wired.
+    llm_provider: str = "fake"            # TESTAGENT_LLM_PROVIDER
+    llm_model: Optional[str] = None       # TESTAGENT_LLM_MODEL
+    llm_api_key: Optional[str] = None     # TESTAGENT_LLM_API_KEY (never logged/committed)
+    llm_base_url: Optional[str] = None    # TESTAGENT_LLM_BASE_URL
+
     @property
     def db_path(self) -> Path:
         return self.data_dir / "testagent.db"
