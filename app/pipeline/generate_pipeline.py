@@ -15,12 +15,13 @@ Distinction (docs/07 A4 — never hide failures):
 - Only infrastructure / precondition problems (job not judged, workspace gone,
   target/context/write errors, Maven unavailable) short-circuit to GEN_FAILED.
 
-Phase 2 red-lines honored: no Fixer, no quality gate, no production-code edits,
-no auto-commit. Generation is decoupled from Phase 1 judging but reuses its
-baseline coverage.
+Phase 2 red-lines honored: no production-code edits, no auto-commit, and no
+auto-accept. Later opt-in compile repair and deterministic quality checks are
+surfaced as review metadata.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional, Sequence
 
 from app.context.context_collector import ContextError, build_snapshot
@@ -36,6 +37,7 @@ from app.generate.test_writer import TestWriteError, write_generated_test
 from app.llm.client import LLMClient, LLMRequestError, get_client
 from app.llm.schema import LLMOutputError
 from app.models.job import Job, JobStatus
+from app.repair.compile_repair import repair_compile_failure
 from app.runtime.workspace import Workspace
 from app.storage.job_repo import JobRepo
 from app.targeting.target_selector import resolve_target
@@ -69,6 +71,8 @@ def run_generation(
     target_method: Optional[str] = None,
     client: Optional[LLMClient] = None,
     maven_extra_args: Optional[Sequence[str]] = None,
+    repair_compile_failures: bool = False,
+    max_repair_rounds: int = 1,
 ) -> Job:
     bundle = _empty_bundle()
 
@@ -138,6 +142,71 @@ def run_generation(
     repo.save(job)
     if exec_result.gen_outcome == GenTestOutcome.NO_MAVEN:
         return _gen_fail(repo, job, bundle, "maven not available (set TESTAGENT_MAVEN_CMD)")
+
+    if repair_compile_failures and exec_result.gen_outcome == GenTestOutcome.COMPILE_FAILURE:
+        attempts = []
+        test_path = repo_dir / write.file_path
+        for round_no in range(1, max(0, max_repair_rounds) + 1):
+            try:
+                source = test_path.read_text(encoding="utf-8")
+            except OSError as exc:
+                attempts.append({
+                    "round": round_no,
+                    "changed": False,
+                    "error": f"read generated test failed: {exc}",
+                })
+                break
+            log_text = ""
+            if exec_result.log_path:
+                try:
+                    log_text = Path(exec_result.log_path).read_text(
+                        encoding="utf-8", errors="replace"
+                    )
+                except OSError:
+                    log_text = ""
+            repair = repair_compile_failure(
+                source,
+                log_text,
+                java_source_level=snapshot.build_constraints.java_source,
+            )
+            attempt = {
+                "round": round_no,
+                "changed": repair.changed,
+                "patches": [p.model_dump() for p in repair.patches],
+                "before_outcome": exec_result.gen_outcome.value,
+            }
+            attempts.append(attempt)
+            if not repair.changed:
+                break
+
+            test_path.write_text(repair.source, encoding="utf-8")
+            write.content = repair.source
+            bundle["write"] = write.model_dump()
+            exec_result = execute_generated_test(
+                repo_dir, workspace, fqcn_of(result), maven_extra_args=maven_extra_args
+            )
+            attempt["after_outcome"] = exec_result.gen_outcome.value
+            bundle["execution"] = exec_result.model_dump()
+            bundle["repair"] = {
+                "enabled": True,
+                "rounds": attempts,
+                "repair_rounds": len([a for a in attempts if a.get("changed")]),
+                "final_outcome": exec_result.gen_outcome.value,
+            }
+            job.generation = bundle
+            repo.save(job)
+            if exec_result.gen_outcome != GenTestOutcome.COMPILE_FAILURE:
+                break
+
+        if attempts and "repair" not in bundle:
+            bundle["repair"] = {
+                "enabled": True,
+                "rounds": attempts,
+                "repair_rounds": len([a for a in attempts if a.get("changed")]),
+                "final_outcome": exec_result.gen_outcome.value,
+            }
+            job.generation = bundle
+            repo.save(job)
 
     # --- COMPARE (baseline vs after) --------------------------------------
     repo.update_status(job.id, JobStatus.COMPARE)
