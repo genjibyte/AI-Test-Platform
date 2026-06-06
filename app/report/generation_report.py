@@ -20,6 +20,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from app.quality.test_quality_gate import evaluate_test_quality
+
 CONCLUSION = "NEED_HUMAN_REVIEW"  # invariant for all of Phase 2
 
 # GenTestOutcome values that imply the generated test compiled / executed.
@@ -49,11 +51,31 @@ def assemble_generation_report(generation: dict) -> dict:
     result = generation.get("result") or {}
     write = generation.get("write") or {}
     execution = generation.get("execution") or {}
+    repair = generation.get("repair") or {}
     delta = generation.get("coverage_delta")
 
     outcome = execution.get("gen_outcome")
     generated = bool(result.get("test_source"))
     written = bool(write.get("created"))
+
+    coverage = _coverage_view(delta)
+    grounding = {
+        "used_apis": result.get("used_apis", []),
+        "behavior_sources": result.get("behavior_sources", []),
+        "omitted_uncertain_cases": result.get("omitted_uncertain_cases", []),
+        "risk_flags": result.get("risk_flags", []),
+        "dependency_assumptions": result.get("dependency_assumptions", []),
+    }
+    production_code_touched = bool(write.get("production_code_touched", False))
+    quality = evaluate_test_quality(
+        write.get("content") or result.get("test_source") or "",
+        execution=execution,
+        coverage_delta=coverage,
+        production_code_touched=production_code_touched,
+        target_class=target.get("target_class") or result.get("target_class"),
+        target_method=target.get("target_method") or result.get("target_method"),
+        grounding=grounding,
+    )
 
     return {
         "target_class": target.get("target_class") or result.get("target_class"),
@@ -65,12 +87,21 @@ def assemble_generation_report(generation: dict) -> dict:
         "model": result.get("model"),
         "scenarios": result.get("scenarios", []),
         "mocks": result.get("mocks", []),
+        # v2 grounding metadata — what the model declared it grounded on / skipped /
+        # flagged as risky. Surfaced for the human reviewer (docs/07 P6).
+        "grounding": grounding,
         # execution facts
         "gen_outcome": outcome,
         "compiled": outcome in _COMPILED,
         "executed": outcome in _EXECUTED,
         "passed": outcome == "PASS",
         "build_outcome": execution.get("build_outcome"),
+        "repair": {
+            "enabled": bool(repair.get("enabled", False)),
+            "repair_rounds": repair.get("repair_rounds", 0),
+            "final_outcome": repair.get("final_outcome"),
+            "rounds": repair.get("rounds", []),
+        },
         "gen_counts": {
             "total": execution.get("gen_total", 0),
             "passed": execution.get("gen_passed", 0),
@@ -79,7 +110,8 @@ def assemble_generation_report(generation: dict) -> dict:
             "skipped": execution.get("gen_skipped", 0),
         },
         # coverage delta (P2-T08)
-        "coverage_delta": _coverage_view(delta),
+        "coverage_delta": coverage,
+        "quality_gate": quality.model_dump(),
         # patch preview: a NEW file, so the full content IS the diff
         "patch": {
             "file_path": write.get("file_path"),
@@ -89,7 +121,7 @@ def assemble_generation_report(generation: dict) -> dict:
         # invariants (docs/07 P2/P6) — never trusted, never touches prod code,
         # never an accept/reject verdict in Phase 2.
         "trusted": bool(result.get("trusted", False)),
-        "production_code_touched": bool(write.get("production_code_touched", False)),
+        "production_code_touched": production_code_touched,
         "error": generation.get("error"),
         "conclusion": CONCLUSION,
     }

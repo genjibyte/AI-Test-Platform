@@ -94,6 +94,11 @@ class BenchCaseResult(BaseModel):
     production_code_touched: Optional[bool] = None
     model: Optional[str] = None
     conclusion: Optional[str] = None
+    repair_rounds: Optional[int] = None
+    repair_final_outcome: Optional[str] = None
+    quality_gate_status: Optional[str] = None
+    quality_blockers: int = 0
+    quality_warnings: int = 0
     runtime_ms: int = 0
     error: Optional[str] = None
 
@@ -152,6 +157,10 @@ def aggregate(cases: List[BenchCaseResult]) -> dict:
         1 for c in cases if c.failure_type == "REPO_NOT_BUILDABLE"
     )
     runtimes = [c.runtime_ms for c in cases]
+    repair_round_values = [
+        c.repair_rounds for c in attempted if c.repair_rounds is not None
+    ]
+    quality_checked = [c for c in attempted if c.quality_gate_status is not None]
     return {
         "total_cases": n,
         "repos": len({c.repo_url for c in cases}),
@@ -178,8 +187,21 @@ def aggregate(cases: List[BenchCaseResult]) -> dict:
         ),
         "top_failure_types": dict(failures.most_common()),
         "avg_runtime_ms": int(sum(runtimes) / n) if n else 0,
-        # Phase 3/4 — not applicable yet:
-        "average_repair_rounds": None,
+        # Phase 3/4 review metrics. accept_rate stays null: the platform still
+        # does not auto-accept generated tests.
+        "average_repair_rounds": (
+            round(sum(repair_round_values) / len(repair_round_values), 2)
+            if repair_round_values else None
+        ),
+        "quality_gate_pass_rate": _rate(
+            quality_checked, lambda c: c.quality_gate_status == "PASS"
+        ),
+        "quality_gate_failures": sum(
+            1 for c in quality_checked if c.quality_gate_status == "FAIL"
+        ),
+        "quality_gate_reviews": sum(
+            1 for c in quality_checked if c.quality_gate_status == "REVIEW"
+        ),
         "accept_rate": None,
     }
 

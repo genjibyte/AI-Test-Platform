@@ -2,7 +2,8 @@
 
 Phase 1: 判卷场 (the judging arena) — import / detect / run / parse / report.
 Phase 2: minimal generator — target / context / LLM generate / execute / compare.
-Still NO Fixer (Phase 3), NO quality gate (Phase 4), NO complex frontend.
+Phase 2.5/3: real-repo benchmark, opt-in compile repair, and minimal quality gate.
+Still NO broad Fixer, NO auto-accept, NO complex frontend.
 See docs/05_PHASE1_BACKLOG.md and docs/09_PHASE2_BACKLOG.md.
 
 Run locally::

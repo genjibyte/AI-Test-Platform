@@ -67,6 +67,7 @@ def _pass(name="p", **kw):
         executed=True, passed=True, coverage_dropped=False, target_improved=True,
         coverage_status=COVERAGE_AVAILABLE,
         conclusion="NEED_HUMAN_REVIEW", runtime_ms=1000, failure_type=None,
+        quality_gate_status="PASS", quality_blockers=0, quality_warnings=0,
     )
     base.update(kw)
     return BenchCaseResult(**base)
@@ -77,26 +78,32 @@ def test_aggregate_rates_over_attempted():
         _pass("a"),
         _pass("b", gen_outcome="COMPILE_FAILURE", compiled=False, executed=False,
               passed=False, target_improved=None, coverage_dropped=None,
-              coverage_status=COVERAGE_UNAVAILABLE, failure_type="COMPILE_FAILURE"),
+              coverage_status=COVERAGE_UNAVAILABLE, failure_type="COMPILE_FAILURE",
+              quality_gate_status="FAIL", quality_blockers=1),
+        _pass("r", repair_rounds=1, coverage_status=COVERAGE_UNAVAILABLE,
+              target_improved=None, coverage_dropped=None),
         BenchCaseResult(name="c", repo_url="u2", target_class="D",
                         repo_judged=False, generation_status="REPO_NOT_BUILDABLE",
                         failure_type="REPO_NOT_BUILDABLE", runtime_ms=500),
     ]
     a = aggregate(cases)
-    assert a["total_cases"] == 3
+    assert a["total_cases"] == 4
     assert a["repos"] == 2 and a["buildable_repos"] == 1
     assert a["setup_failures"] == 0
     assert a["clone_failures"] == 0
     assert a["repo_build_failures"] == 1
-    assert a["generation_attempted"] == 2          # unbuildable excluded
-    assert a["compile_pass_rate"] == 0.5           # 1 of 2 attempted compiled
-    assert a["gen_test_pass_rate"] == 0.5
+    assert a["generation_attempted"] == 3          # unbuildable excluded
+    assert a["compile_pass_rate"] == 0.6667        # 2 of 3 attempted compiled
+    assert a["gen_test_pass_rate"] == 0.6667
     # only the PASS case has coverage available; compile-fail case is unavailable
     assert a["coverage_measured"] == 1
     assert a["coverage_improved_rate"] == 1.0      # over coverage-available cases
     assert a["need_human_review_rate"] == 1.0      # both attempted concluded review
     assert a["top_failure_types"] == {"COMPILE_FAILURE": 1, "REPO_NOT_BUILDABLE": 1}
-    assert a["average_repair_rounds"] is None       # Phase 3
+    assert a["average_repair_rounds"] == 1.0
+    assert a["quality_gate_pass_rate"] == 0.6667
+    assert a["quality_gate_failures"] == 1
+    assert a["quality_gate_reviews"] == 0
     assert a["accept_rate"] is None                 # Phase 4
 
 
@@ -125,6 +132,7 @@ def test_render_markdown_has_facts():
     md = render_markdown(report)
     assert "Phase 2.5 Mini-Benchmark Report" in md
     assert "compile_pass_rate" in md
+    assert "quality_gate_pass_rate" in md
     assert "setup_failures" in md
     assert "deepseek" not in md.lower()  # no hardcoded model
     assert "| a |" in md

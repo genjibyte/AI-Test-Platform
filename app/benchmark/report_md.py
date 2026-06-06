@@ -12,6 +12,10 @@ def _f(v) -> str:
     return "—" if v is None else (f"{v:+.4f}" if isinstance(v, float) else str(v))
 
 
+def _plain(v) -> str:
+    return "—" if v is None else str(v)
+
+
 def render_markdown(report: BenchReport) -> str:
     a = report.aggregate
     lines = [
@@ -38,20 +42,27 @@ def render_markdown(report: BenchReport) -> str:
         f"- need_human_review_rate: {_pct(a.get('need_human_review_rate'))}  "
         f"avg_runtime_ms: {a.get('avg_runtime_ms')}",
         f"- top_failure_types: {a.get('top_failure_types')}",
-        "- average_repair_rounds: — (Phase 3)  accept_rate: — (Phase 4)",
+        f"- average_repair_rounds: {_plain(a.get('average_repair_rounds'))}  "
+        f"quality_gate_pass_rate: {_pct(a.get('quality_gate_pass_rate'))}  "
+        f"quality_gate_failures: {a.get('quality_gate_failures', 0)}  "
+        "accept_rate: —",
         "",
         "## Per-case",
         "",
-        "| case | judged | compiled | passed | failure | coverage | "
+        "| case | judged | compiled | passed | failure | repair | quality | coverage | "
         "tgt_branch_Δ | improved | ms |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for c in report.cases:
         lines.append(
             f"| {c.name} | {c.repo_judged} | "
             f"{c.compiled if c.compiled is not None else '—'} | "
             f"{c.passed if c.passed is not None else '—'} | "
-            f"{c.failure_type or 'PASS'} | {c.coverage_status} | "
+            f"{c.failure_type or 'PASS'} | "
+            f"{c.repair_rounds if c.repair_rounds is not None else '—'} | "
+            f"{c.quality_gate_status or '—'}"
+            f" ({c.quality_blockers}/{c.quality_warnings}) | "
+            f"{c.coverage_status} | "
             f"{_f(c.target_branch_delta)} | "
             f"{c.target_improved if c.target_improved is not None else '—'} | "
             f"{c.runtime_ms} |"

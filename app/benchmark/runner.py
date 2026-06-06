@@ -110,6 +110,8 @@ def _completed_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
     cov = job.coverage or {}
     tests = job.test_result or {}
     cd = rep.get("coverage_delta") or {}
+    repair = rep.get("repair") or {}
+    quality = rep.get("quality_gate") or {}
     status = job.status.value
     execution = (job.generation or {}).get("execution") or {}
     log_text = _tail(execution.get("log_path"))
@@ -155,6 +157,11 @@ def _completed_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
         production_code_touched=rep.get("production_code_touched"),
         model=rep.get("model"),
         conclusion=rep.get("conclusion"),
+        repair_rounds=repair.get("repair_rounds") if repair.get("enabled") else None,
+        repair_final_outcome=repair.get("final_outcome"),
+        quality_gate_status=quality.get("status"),
+        quality_blockers=len(quality.get("blocking_issues") or []),
+        quality_warnings=len(quality.get("warnings") or []),
         runtime_ms=int((time.monotonic() - t0) * 1000),
         error=(job.generation or {}).get("error"),
     )
@@ -183,6 +190,8 @@ def run_case(
         case.target_method,
         client=client,
         maven_extra_args=maven_extra_args,
+        repair_compile_failures=get_settings().repair_compile_failures,
+        max_repair_rounds=get_settings().repair_max_rounds,
     )
     return _completed_result(case, job, t0)
 
