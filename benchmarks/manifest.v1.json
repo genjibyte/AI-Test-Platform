@@ -1,0 +1,76 @@
+{
+  "_comment": "FROZEN benchmark manifest v1 (Phase 2.6/4). Every case is pinned to an EXACT commit SHA so runs are reproducible and comparable across context/model versions (docs/23). The 3 'frozen' cases (Option, CSVRecord, WordUtils) are pinned to the exact commits used by var/benchmark/v2-pro-quality-final, so that v2 baseline stays a valid comparison point with ZERO re-run. The other 7 broaden coverage of the failure taxonomy that Context v3 targets (api-contract / exception-semantics / pure-function). Run with the docs/21 skip-flags incantation; coverage stays advisory (jacoco.skip). Buckets/frozen-status are documented in docs/23, not enforced here.",
+  "version": 1,
+  "cases": [
+    {
+      "name": "commons-cli Option",
+      "repo_url": "https://github.com/apache/commons-cli.git",
+      "commit": "ae44dcdffd28d6a1a32dc4e0801b715adcef162e",
+      "ref": "commons-cli @ ae44dcd (frozen: v2-pro-quality-final)",
+      "target_class": "org.apache.commons.cli.Option"
+    },
+    {
+      "name": "commons-cli Options",
+      "repo_url": "https://github.com/apache/commons-cli.git",
+      "commit": "ae44dcdffd28d6a1a32dc4e0801b715adcef162e",
+      "ref": "commons-cli @ ae44dcd",
+      "target_class": "org.apache.commons.cli.Options"
+    },
+    {
+      "name": "commons-cli CommandLine",
+      "repo_url": "https://github.com/apache/commons-cli.git",
+      "commit": "ae44dcdffd28d6a1a32dc4e0801b715adcef162e",
+      "ref": "commons-cli @ ae44dcd",
+      "target_class": "org.apache.commons.cli.CommandLine"
+    },
+    {
+      "name": "commons-csv CSVRecord",
+      "repo_url": "https://github.com/apache/commons-csv.git",
+      "commit": "8192d9d196a554d67d7d65b0a131001b9d1eb412",
+      "ref": "commons-csv @ 8192d9d (frozen: v2-pro-quality-final)",
+      "target_class": "org.apache.commons.csv.CSVRecord"
+    },
+    {
+      "name": "commons-csv CSVFormat",
+      "repo_url": "https://github.com/apache/commons-csv.git",
+      "commit": "8192d9d196a554d67d7d65b0a131001b9d1eb412",
+      "ref": "commons-csv @ 8192d9d",
+      "target_class": "org.apache.commons.csv.CSVFormat"
+    },
+    {
+      "name": "commons-text WordUtils",
+      "repo_url": "https://github.com/apache/commons-text.git",
+      "commit": "e910b53a90308dbd70d54b4f69843805b53fc0fa",
+      "ref": "commons-text @ e910b53 (frozen: v2-pro-quality-final)",
+      "target_class": "org.apache.commons.text.WordUtils"
+    },
+    {
+      "name": "commons-text StringEscapeUtils",
+      "repo_url": "https://github.com/apache/commons-text.git",
+      "commit": "e910b53a90308dbd70d54b4f69843805b53fc0fa",
+      "ref": "commons-text @ e910b53",
+      "target_class": "org.apache.commons.text.StringEscapeUtils"
+    },
+    {
+      "name": "commons-lang3 NumberUtils",
+      "repo_url": "https://github.com/apache/commons-lang.git",
+      "commit": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "ref": "rel/commons-lang-3.20.0",
+      "target_class": "org.apache.commons.lang3.math.NumberUtils"
+    },
+    {
+      "name": "commons-lang3 Validate",
+      "repo_url": "https://github.com/apache/commons-lang.git",
+      "commit": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "ref": "rel/commons-lang-3.20.0",
+      "target_class": "org.apache.commons.lang3.Validate"
+    },
+    {
+      "name": "commons-lang3 BooleanUtils",
+      "repo_url": "https://github.com/apache/commons-lang.git",
+      "commit": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "ref": "rel/commons-lang-3.20.0",
+      "target_class": "org.apache.commons.lang3.BooleanUtils"
+    }
+  ]
+}

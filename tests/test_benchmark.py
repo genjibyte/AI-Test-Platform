@@ -161,7 +161,7 @@ def test_run_benchmark_reports_clone_failure(tmp_path, monkeypatch):
         "app.benchmark.runner.get_client", lambda _settings: FakeLLMClient()
     )
 
-    def boom(_repo_url, _branch, _cache_dir):
+    def boom(_repo_url, _branch, _cache_dir, commit=None):
         raise TimeoutError("clone timed out")
 
     monkeypatch.setattr("app.benchmark.runner._ensure_mirror", boom)

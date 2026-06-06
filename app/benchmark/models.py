@@ -53,6 +53,8 @@ class BenchCase(BaseModel):
 
     repo_url: str
     branch: Optional[str] = None
+    commit: Optional[str] = None  # exact SHA pin (frozen manifest); reproducible
+    ref: Optional[str] = None     # human label for the pin (tag/baseline), advisory
     target_class: str
     target_method: Optional[str] = None
     name: Optional[str] = None

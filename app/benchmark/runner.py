@@ -39,17 +39,43 @@ from app.storage.db import get_connection, init_db
 from app.storage.job_repo import JobRepo
 
 
-def _ensure_mirror(repo_url: str, branch: Optional[str], cache_dir: Path) -> str:
-    """Shallow-clone the repo once; return a file:// URI for fast local re-clone."""
-    key = hashlib.sha1(f"{repo_url}@{branch or ''}".encode()).hexdigest()[:16]
+def _git(*args: str) -> None:
+    subprocess.run(
+        ["git", *args], check=True, capture_output=True, text=True, timeout=600
+    )
+
+
+def _ensure_mirror(
+    repo_url: str,
+    branch: Optional[str],
+    cache_dir: Path,
+    commit: Optional[str] = None,
+) -> str:
+    """Shallow-clone the repo once; return a file:// URI for fast local re-clone.
+
+    When ``commit`` is given (frozen manifest), pin to that exact SHA via an
+    init + shallow fetch-by-SHA, then put HEAD on a local ``pinned`` branch so a
+    downstream ``git clone`` of the mirror checks out exactly that revision.
+    Otherwise shallow-clone the (optional) branch tip as before. ``commit`` is
+    part of the cache key, so different pins on one repo get distinct mirrors.
+    """
+    key = hashlib.sha1(
+        f"{repo_url}@{branch or ''}@{commit or ''}".encode()
+    ).hexdigest()[:16]
     dest = cache_dir / key
     if not (dest / ".git").is_dir():
         dest.parent.mkdir(parents=True, exist_ok=True)
-        args = ["git", "clone", "--depth", "1"]
-        if branch:
-            args += ["--branch", branch]
-        args += [repo_url, str(dest)]
-        subprocess.run(args, check=True, capture_output=True, text=True, timeout=600)
+        if commit:
+            dest.mkdir(parents=True, exist_ok=True)
+            _git("init", "-q", str(dest))
+            _git("-C", str(dest), "fetch", "--depth", "1", repo_url, commit)
+            _git("-C", str(dest), "checkout", "-q", "-b", "pinned", "FETCH_HEAD")
+        else:
+            args = ["clone", "--depth", "1"]
+            if branch:
+                args += ["--branch", branch]
+            args += [repo_url, str(dest)]
+            _git(*args)
     return dest.as_uri()
 
 
@@ -234,11 +260,11 @@ def run_benchmark(
     mirrors: dict[tuple, str] = {}
     results: List[BenchCaseResult] = []
     for case in cases:
-        mkey = (case.repo_url, case.branch)
+        mkey = (case.repo_url, case.branch, case.commit)
         if mkey not in mirrors:
             try:
                 mirrors[mkey] = _ensure_mirror(
-                    case.repo_url, case.branch, workdir / "mirrors"
+                    case.repo_url, case.branch, workdir / "mirrors", commit=case.commit
                 )
             except (subprocess.SubprocessError, OSError) as exc:
                 results.append(
