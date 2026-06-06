@@ -130,7 +130,7 @@ def test_render_markdown_has_facts():
         aggregate=aggregate([_pass("a", target_branch_delta=0.5)]),
     )
     md = render_markdown(report)
-    assert "Phase 2.5 Mini-Benchmark Report" in md
+    assert "Real-Repo Benchmark Report" in md
     assert "compile_pass_rate" in md
     assert "quality_gate_pass_rate" in md
     assert "setup_failures" in md

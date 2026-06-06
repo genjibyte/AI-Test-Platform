@@ -70,6 +70,28 @@ def test_quality_gate_does_not_collapse_distinct_string_literals():
     assert "tautological_assertion" not in codes
 
 
+def test_quality_gate_ignores_comment_noise_for_unstable_apis():
+    result = evaluate_test_quality(
+        """
+        class T {
+            // Avoid Thread.sleep, URL, and file APIs in generated tests.
+            /* Also avoid Paths.get("tmp") in real test code. */
+            @Test void stable() {
+                assertEquals(2, new Calc().max(1, 2));
+            }
+        }
+        """,
+        execution={"gen_outcome": "PASS"},
+        target_class="com.example.Calc",
+        target_method="max",
+        grounding={"behavior_sources": ["Calc.max returns the larger input"]},
+    )
+    codes = {i.code for i in result.blocking_issues}
+    assert "thread_sleep" not in codes
+    assert "external_io" not in codes
+    assert result.status == "PASS"
+
+
 def test_quality_gate_blocks_unstable_and_internal_access():
     result = evaluate_test_quality(
         """

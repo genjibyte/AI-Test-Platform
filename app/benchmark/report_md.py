@@ -19,7 +19,7 @@ def _plain(v) -> str:
 def render_markdown(report: BenchReport) -> str:
     a = report.aggregate
     lines = [
-        "# Phase 2.5 Mini-Benchmark Report",
+        "# Real-Repo Benchmark Report",
         "",
         f"- provider: `{report.provider}`  model: `{report.model}`",
         f"- generated_at: {report.generated_at}",

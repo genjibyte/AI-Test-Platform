@@ -66,6 +66,48 @@ _INTERNAL_ACCESS_RE = re.compile(
 )
 
 
+def _strip_java_comments(text: str) -> str:
+    """Remove Java line/block comments while preserving strings and newlines."""
+    out: list[str] = []
+    i = 0
+    quote: Optional[str] = None
+    escape = False
+    while i < len(text):
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+        if quote:
+            out.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in {"'", '"'}:
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and nxt == "/":
+            while i < len(text) and text[i] not in "\r\n":
+                i += 1
+            continue
+        if ch == "/" and nxt == "*":
+            i += 2
+            while i < len(text) - 1:
+                if text[i] == "*" and text[i + 1] == "/":
+                    i += 2
+                    break
+                out.append("\n" if text[i] in "\r\n" else " ")
+                i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def _strip_strings(text: str) -> str:
     return _STRING_RE.sub('""', text)
 
@@ -190,10 +232,11 @@ def evaluate_test_quality(
     execution = execution or {}
     coverage_delta = coverage_delta or {}
     grounding = grounding or {}
-    stripped = _strip_strings(source)
+    code = _strip_java_comments(source)
+    stripped = _strip_strings(code)
     assertions = _assertion_names(stripped)
     weak = [a for a in assertions if a in _WEAK_ASSERTIONS]
-    tautologies = _tautological_evidence(source)
+    tautologies = _tautological_evidence(code)
     test_methods = len(_TEST_RE.findall(stripped))
 
     blocking: list[QualityIssue] = []
