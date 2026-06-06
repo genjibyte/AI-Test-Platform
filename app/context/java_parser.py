@@ -27,6 +27,8 @@ _MODIFIERS = {
     "synchronized", "native", "default", "strictfp", "transient", "volatile",
 }
 _TYPE_KINDS = ("class", "interface", "enum", "record")
+_JAVADOC_LIMIT = 4000
+_JAVADOC_TAG_LIMIT = 240
 
 
 def _mask(source: str) -> str:
@@ -92,6 +94,59 @@ def _strip_generics(text: str) -> str:
         prev = text
         text = re.sub(r"<[^<>]*>", " ", text)
     return text
+
+
+def _clean_javadoc(raw: str) -> Optional[str]:
+    """Return a compact Javadoc body from the last /** ... */ before a member."""
+    matches = list(re.finditer(r"/\*\*(.*?)\*/", raw, re.DOTALL))
+    if not matches:
+        return None
+    body = matches[-1].group(1)
+    lines = []
+    for line in body.splitlines():
+        line = re.sub(r"^\s*\*\s?", "", line).strip()
+        if line:
+            lines.append(line)
+    text = " ".join(lines).strip()
+    return text[:_JAVADOC_LIMIT] if text else None
+
+
+def _javadoc_tag(javadoc: Optional[str], tag: str) -> Optional[str]:
+    if not javadoc:
+        return None
+    m = re.search(rf"@{tag}\s+(.*?)(?=\s+@\w+\s+|$)", javadoc)
+    if not m:
+        return None
+    text = " ".join(m.group(1).split())
+    if len(text) > _JAVADOC_TAG_LIMIT:
+        text = text[:_JAVADOC_TAG_LIMIT].rstrip() + "..."
+    return text or None
+
+
+def _javadoc_throws(javadoc: Optional[str]) -> List[str]:
+    if not javadoc:
+        return []
+    out: List[str] = []
+    for m in re.finditer(r"@(throws|exception)\s+(.*?)(?=\s+@\w+\s+|$)", javadoc):
+        text = " ".join(m.group(2).split())
+        if len(text) > _JAVADOC_TAG_LIMIT:
+            text = text[:_JAVADOC_TAG_LIMIT].rstrip() + "..."
+        if text:
+            out.append(text)
+    return out
+
+
+def _body_throws(source: str) -> List[str]:
+    """Best-effort exception classes thrown directly in this method body."""
+    masked = _mask(source)
+    seen = set()
+    out: List[str] = []
+    for m in re.finditer(r"\bthrow\s+new\s+([\w.$]+)\b", masked):
+        name = m.group(1)
+        if name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
 
 
 def _split_top_level(text: str) -> List[str]:
@@ -178,9 +233,14 @@ def _classify_member(masked_seg: str, orig_seg: str, class_name: str):
                 signature=" ".join(before.split()), source=orig_seg.strip(),
             )
         return_type = non_mod[-1] if non_mod else "void"
+        header_source = orig_seg[:len(masked_seg)]
+        javadoc = _clean_javadoc(header_source)
         return JavaMethod(
             modifiers=modifiers, return_type=return_type, name=name,
             params=params, throws=throws,
+            javadoc_return=_javadoc_tag(javadoc, "return"),
+            javadoc_throws=_javadoc_throws(javadoc),
+            body_throws=_body_throws(orig_seg),
             signature=" ".join(before.split()), source=orig_seg.strip(),
         )
     # field (no parens)

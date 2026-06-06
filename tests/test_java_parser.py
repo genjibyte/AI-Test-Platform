@@ -17,7 +17,16 @@ public class OrderService {
         this.repo = repo;
     }
 
+    /**
+     * Totals item values.
+     *
+     * @return the sum of all item values
+     * @throws IllegalStateException when the {@code repo} is closed
+     */
     public int total(List<Integer> items) throws IllegalStateException {
+        if (items == null) {
+            throw new NullPointerException("items");
+        }
         int s = 0;
         for (int i : items) { s += i; }
         return s;
@@ -66,6 +75,11 @@ def test_only_public_protected_methods():
     total = next(m for m in s.methods if m.name == "total")
     assert total.return_type == "int"
     assert total.throws == ["IllegalStateException"]
+    assert total.javadoc_return == "the sum of all item values"
+    assert total.javadoc_throws == [
+        "IllegalStateException when the {@code repo} is closed"
+    ]
+    assert total.body_throws == ["NullPointerException"]
     assert total.params[0].name == "items"
     assert "return s;" in total.source
 

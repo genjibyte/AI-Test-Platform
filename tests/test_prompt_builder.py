@@ -1,7 +1,7 @@
-"""Prompt/Context v2 tests (P2-T04 v2).
+"""Prompt/Context v3 tests (P2-T04 v3).
 
-Each assertion pins a v2 rule to the real Phase 2.5 failure bucket it targets
-(docs/15, docs/16). Pure-text over a synthetic snapshot — no model, no I/O.
+Each assertion pins a v2/v3 rule to the real benchmark failure bucket it targets
+(docs/15, docs/16, docs/21). Pure-text over a synthetic snapshot — no model, no I/O.
 """
 from app.generate.prompt_builder import (
     build_prompt,
@@ -25,6 +25,12 @@ def _ctx(**over):
         methods=[
             JavaMethod(return_type="Builder", name="builder",
                        params=[JavaParam(type="String", name="opt")],
+                       throws=["IllegalArgumentException"],
+                       javadoc_return="a builder for the option",
+                       javadoc_throws=[
+                           "IllegalArgumentException if opt is blank"
+                       ],
+                       body_throws=["UnsupportedOperationException"],
                        signature="static Builder builder", source=""),
         ],
     )
@@ -90,7 +96,17 @@ def test_bucket5_oracle_grounding_and_skip():
     sys = build_system_prompt(_ctx())
     assert "Derive every expected value from EVIDENCE" in sys
     assert "omitted_uncertain_cases" in sys
+    assert "assertThrows" in sys
     assert "tautological" in sys
+
+
+def test_v3_method_contract_evidence_rendered():
+    p = build_user_prompt(_ctx())
+    assert "method-contract evidence" in p
+    assert "builder(String opt) throws IllegalArgumentException" in p
+    assert "@return a builder for the option" in p
+    assert "@throws IllegalArgumentException if opt is blank" in p
+    assert "body throws: UnsupportedOperationException" in p
 
 
 def test_api_grounding_only_context_apis():

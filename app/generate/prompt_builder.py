@@ -1,10 +1,15 @@
-"""Prompt/Context v2 builder (P2-T04, v2).
+"""Prompt/Context v3 builder (P2-T04, v3).
 
-Renders the bounded Context Snapshot (docs/07 §P4) into a stable prompt. v2 is
-designed against the REAL Phase 2.5 benchmark failures (docs/15, docs/16), not
-generic "be careful" advice. The rules are split into a SYSTEM block (role +
-hard rules) and a USER block (the grounded context + output contract); the same
-snapshot always yields the same prompt (deterministic, snapshot-testable).
+Renders the bounded Context Snapshot (docs/07 §P4) into a stable prompt. v3
+inherits the REAL Phase 2.5 benchmark failure rules (docs/15, docs/16) and adds
+contract grounding for the Phase 2.6 oracle/API failures (docs/21). The rules
+are split into a SYSTEM block (role + hard rules) and a USER block (grounded
+context + output contract); the same snapshot always yields the same prompt.
+
+v3 keeps the v2 failure-bucket rules and adds method-contract grounding for the
+real Phase 2.6 failures: declared throws, Javadoc @throws/@return, and direct
+``throw new`` facts are rendered as compact evidence instead of dumping whole
+method bodies for whole-class targets.
 
 Each rule maps to an observed failure bucket:
   1 import/static-import missing (assertNotSame, Stream)  -> SELF-CONTAINED imports
@@ -12,6 +17,7 @@ Each rule maps to an observed failure bucket:
   3 Java source-level (method-local enum)                 -> no method-local types
   4 mock final class (DeprecatedAttributes)               -> conditional mock rule
   5 oracle/expected wrong (WordUtils)                      -> derive-then-assert / skip
+  6 exception/API contract wrong (CSVRecord/Option)       -> contract evidence
 """
 from __future__ import annotations
 
@@ -24,29 +30,29 @@ SYSTEM_PROMPT = (
     "\n"
     "Hard rules (a violation makes the test worthless):\n"
     "[API grounding]\n"
-    "- Use ONLY types, methods, constructors and constants that appear in the "
-    "context. Never invent methods, overloads, parameters or fields. If a case "
-    "needs an API not shown, SKIP it and list it in omitted_uncertain_cases.\n"
+    "- Use ONLY types, methods, constructors and constants shown. Never invent "
+    "methods, overloads, parameters or fields; SKIP unknown APIs into "
+    "omitted_uncertain_cases.\n"
     "- Reference nested types as Owner.Nested (e.g. Option.Builder), never bare.\n"
     "[Imports]\n"
     "- test_source must be ONE self-contained compilable file: a package "
-    "declaration and EVERY import it uses, including a static import for each "
-    "JUnit assertion you call (e.g. import static "
-    "org.junit.jupiter.api.Assertions.assertNotSame;).\n"
+    "declaration and EVERY import, including static import for each JUnit "
+    "assertion (e.g. Assertions.assertNotSame).\n"
     "[Build and language]\n"
     "- Never declare an enum/class/interface inside a method body. A helper type "
     "must be a private static nested type of the test class.\n"
     "- Obey Java level. For Java 8/1.8, do not use Java 9+ APIs "
     "(List.of/Set.of/Map.of/Stream.ofNullable); use Java 8-compatible code.\n"
     "- Do NOT mock final classes or value objects, and do NOT mock any type "
-    "unless a neighbor test mocks it. Mockito mocks final types only with the "
-    "inline mock-maker, which you must not assume; prefer real instances.\n"
+    "unless a neighbor test mocks it. Do not assume Mockito inline mock-maker; "
+    "prefer real instances.\n"
     "- No network, no absolute file paths, no sleeping/time/randomness.\n"
     "[Oracle grounding]\n"
-    "- Derive every expected value from EVIDENCE (the target method source or a "
-    "neighbor test example): reason through the method's logic, then assert. If "
-    "you cannot derive the expected value from the context, SKIP that case (add "
-    "it to omitted_uncertain_cases) — never guess an output.\n"
+    "- Derive every expected value from EVIDENCE (target source or neighbor "
+    "test). If not derivable, SKIP into omitted_uncertain_cases; never guess.\n"
+    "- Exception oracles need method-contract evidence: throws, Javadoc "
+    "@throws, body throw, or neighbor test. Use assertThrows only then; "
+    "otherwise SKIP into omitted_uncertain_cases.\n"
     "- No tautological assertions such as assertEquals(x, callThatReturnsX()).\n"
     "- Assert observable behavior, not implementation details.\n"
     "[Test strategy]\n"
@@ -55,7 +61,7 @@ SYSTEM_PROMPT = (
     "smoke tests.\n"
 )
 
-# --- Output contract (advertised to the model). v2 adds grounding metadata. ---
+# --- Output contract (advertised to the model). v2+ grounding metadata. ---
 OUTPUT_CONTRACT = (
     "Return ONLY a single JSON object, no prose, no markdown fences, with keys:\n"
     '  "test_source": string    // FULL self-contained JUnit5 test class (package + all imports)\n'
@@ -91,11 +97,26 @@ def _methods_block(context: ContextSnapshot) -> str:
     methods = context.class_structure.methods
     if not methods:
         return "(none)"
-    return "\n".join(
-        f"- {m.return_type} {m.name}(" + ", ".join(
-            f"{p.type} {p.name}" for p in m.params) + ")"
-        for m in methods
-    )
+    rows = []
+    for m in methods:
+        sig = (
+            f"- {m.return_type} {m.name}("
+            + ", ".join(f"{p.type} {p.name}" for p in m.params)
+            + ")"
+        )
+        if m.throws:
+            sig += " throws " + ", ".join(m.throws)
+        facts = []
+        if m.javadoc_return:
+            facts.append(f"@return {m.javadoc_return}")
+        for jt in m.javadoc_throws:
+            facts.append(f"@throws {jt}")
+        if m.body_throws:
+            facts.append("body throws: " + ", ".join(m.body_throws))
+        if facts:
+            sig += "\n  contract: " + " | ".join(facts)
+        rows.append(sig)
+    return "\n".join(rows)
 
 
 def _nested_block(context: ContextSnapshot) -> str:
@@ -162,7 +183,8 @@ def build_user_prompt(context: ContextSnapshot) -> str:
         + ("\n".join(context.imports) if context.imports else "(none)"),
         "# Fields\n" + _fields_block(context),
         "# Constructors\n" + _ctors_block(context),
-        "# Public/Protected methods (use ONLY these)\n" + _methods_block(context),
+        "# Public/Protected methods and method-contract evidence (use ONLY these)\n"
+        + _methods_block(context),
         "# Nested types (reference as Owner.Nested)\n" + _nested_block(context),
         "# Target method source (derive oracles from this)\n"
         + (context.target_method_source or "(not provided — whole-class target)"),

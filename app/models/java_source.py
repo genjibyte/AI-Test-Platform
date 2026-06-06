@@ -37,6 +37,9 @@ class JavaMethod(BaseModel):
     name: str
     params: List[JavaParam] = Field(default_factory=list)
     throws: List[str] = Field(default_factory=list)
+    javadoc_return: Optional[str] = None
+    javadoc_throws: List[str] = Field(default_factory=list)
+    body_throws: List[str] = Field(default_factory=list)
     signature: str
     source: str
 
