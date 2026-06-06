@@ -33,12 +33,12 @@ It checks generated test source plus existing execution/coverage facts:
   external file/network APIs;
 - reflection/internal implementation access;
 - missing obvious target reference;
-- model-declared risk flags;
 - missing `behavior_sources` for oracle review.
+- model-declared `risk_flags` as reviewer advisories, without changing status.
 
 The gate returns:
 
-- `PASS`: no blocker and no warning;
+- `PASS`: no blocker and no warning; advisories may still be present;
 - `REVIEW`: warnings only;
 - `FAIL`: at least one blocking quality issue.
 
@@ -87,7 +87,7 @@ Current targeted result:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_quality_gate.py tests\test_generation_report.py tests\test_benchmark.py -q
-# 30 passed
+# 34 passed
 ```
 
 ## 6. Next Use
