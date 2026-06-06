@@ -1,0 +1,20 @@
+{
+  "_comment": "Phase 2.5 mini-benchmark spec. 3 small single-module JUnit5 Maven repos. Whole-class targets (no method) avoid signature guesswork. Run AFTER the 1-case smoke (benchmarks/smoke.json) passes. Coverage is skipped by default (see .env TESTAGENT_MVN_EXTRA_ARGS -Djacoco.skip=true) so cases report coverage_unavailable; the focus is compile/exec/pass on real code.",
+  "cases": [
+    {
+      "name": "commons-cli Option",
+      "repo_url": "https://github.com/apache/commons-cli.git",
+      "target_class": "org.apache.commons.cli.Option"
+    },
+    {
+      "name": "commons-csv CSVRecord",
+      "repo_url": "https://github.com/apache/commons-csv.git",
+      "target_class": "org.apache.commons.csv.CSVRecord"
+    },
+    {
+      "name": "commons-text WordUtils",
+      "repo_url": "https://github.com/apache/commons-text.git",
+      "target_class": "org.apache.commons.text.WordUtils"
+    }
+  ]
+}

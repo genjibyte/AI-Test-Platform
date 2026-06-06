@@ -21,7 +21,7 @@ baseline coverage.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Sequence
 
 from app.context.context_collector import ContextError, build_snapshot
 from app.coverage.coverage_compare import compare
@@ -33,7 +33,8 @@ from app.generate.gen_executor import (
 )
 from app.generate.generation import dry_generate
 from app.generate.test_writer import TestWriteError, write_generated_test
-from app.llm.client import LLMClient, get_client
+from app.llm.client import LLMClient, LLMRequestError, get_client
+from app.llm.schema import LLMOutputError
 from app.models.job import Job, JobStatus
 from app.runtime.workspace import Workspace
 from app.storage.job_repo import JobRepo
@@ -67,6 +68,7 @@ def run_generation(
     target_class: str,
     target_method: Optional[str] = None,
     client: Optional[LLMClient] = None,
+    maven_extra_args: Optional[Sequence[str]] = None,
 ) -> Job:
     bundle = _empty_bundle()
 
@@ -110,7 +112,12 @@ def run_generation(
     # --- GENERATE (LLM -> artifact -> independent test file) --------------
     repo.update_status(job.id, JobStatus.GENERATE)
     job = repo.get(job.id)
-    result = dry_generate(snapshot, client or get_client())
+    try:
+        result = dry_generate(snapshot, client or get_client())
+    except LLMRequestError as exc:  # auth / quota / network / bad model name
+        return _gen_fail(repo, job, bundle, f"LLM request failed: {exc}")
+    except LLMOutputError as exc:   # model returned unparseable / off-schema JSON
+        return _gen_fail(repo, job, bundle, f"LLM output invalid: {exc}")
     bundle["result"] = result.model_dump()
     try:
         write = write_generated_test(repo_dir, result)
@@ -123,7 +130,9 @@ def run_generation(
     # --- GEN_EXECUTE (reuse Phase 1 runner) -------------------------------
     repo.update_status(job.id, JobStatus.GEN_EXECUTE)
     job = repo.get(job.id)
-    exec_result = execute_generated_test(repo_dir, workspace, fqcn_of(result))
+    exec_result = execute_generated_test(
+        repo_dir, workspace, fqcn_of(result), maven_extra_args=maven_extra_args
+    )
     bundle["execution"] = exec_result.model_dump()
     job.generation = bundle
     repo.save(job)

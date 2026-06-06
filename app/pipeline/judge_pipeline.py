@@ -13,6 +13,8 @@ No LLM, no generation, no fixer — Phase 1 is read-only judging.
 """
 from __future__ import annotations
 
+from typing import Optional, Sequence
+
 from app.build.maven_runner import BuildOutcome
 from app.coverage.jacoco_parser import parse_jacoco
 from app.coverage.jacoco_runner import run_mvn_test_with_coverage
@@ -31,7 +33,11 @@ def _fail(repo: JobRepo, job: Job, reason: str) -> Job:
     return job
 
 
-def run_pipeline(job: Job, repo: JobRepo) -> Job:
+def run_pipeline(
+    job: Job,
+    repo: JobRepo,
+    maven_extra_args: Optional[Sequence[str]] = None,
+) -> Job:
     workspace = Workspace(job.id)
 
     # --- IMPORT -----------------------------------------------------------
@@ -53,7 +59,9 @@ def run_pipeline(job: Job, repo: JobRepo) -> Job:
     if not project.is_maven:
         return _fail(repo, job, f"not a maven project: {project.reason}")
 
-    build_record, outcome = run_mvn_test_with_coverage(workspace.repo_dir, workspace)
+    build_record, outcome = run_mvn_test_with_coverage(
+        workspace.repo_dir, workspace, extra_args=maven_extra_args
+    )
     job = repo.get(job.id)
     job.build_outcome = outcome.value
     if build_record is not None:

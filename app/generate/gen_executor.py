@@ -17,7 +17,7 @@ from __future__ import annotations
 import enum
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 
 from pydantic import BaseModel
 
@@ -123,6 +123,7 @@ def execute_generated_test(
     repo_dir: Union[str, Path],
     workspace: Workspace,
     generated_class: str,
+    maven_extra_args: Optional[Sequence[str]] = None,
 ) -> GenExecResult:
     """Run the suite (incl. the generated test) and record the generated
     test's isolated outcome plus the after-coverage.
@@ -132,7 +133,9 @@ def execute_generated_test(
     """
     repo_dir = Path(repo_dir)
 
-    record, outcome = run_mvn_test_with_coverage(repo_dir, workspace)
+    record, outcome = run_mvn_test_with_coverage(
+        repo_dir, workspace, extra_args=maven_extra_args
+    )
     gen_outcome, counts = _classify(repo_dir, generated_class, outcome)
 
     suite_result = parse_surefire(repo_dir)

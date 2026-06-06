@@ -7,7 +7,7 @@ line* using a pinned plugin version. This produces both Surefire reports and
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union
 
 from app.build.maven_runner import (
     ENCODING_ARGS,
@@ -40,11 +40,12 @@ def run_mvn_test_with_coverage(
     workspace: Workspace,
     jacoco_version: str = DEFAULT_JACOCO_VERSION,
     timeout: int = DEFAULT_TEST_TIMEOUT,
+    extra_args: Optional[Sequence[str]] = None,
 ) -> Tuple[Optional[ExecRecord], BuildOutcome]:
     base = resolve_maven(repo_dir)
     if base is None:
         return None, BuildOutcome.NO_MAVEN
-    cmd = build_command(base, jacoco_version)
+    cmd = [*build_command(base, jacoco_version), *(extra_args or [])]
     log = workspace.log_file("mvn-test-jacoco.log")
     record = run_command(
         "mvn-test-jacoco", cmd, cwd=repo_dir, log_path=log, timeout=timeout

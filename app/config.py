@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     # Maven Wrapper exists and `mvn` is not on PATH. Set via TESTAGENT_MAVEN_CMD.
     maven_cmd: Optional[str] = None
 
+    # Phase 2.5 benchmark-only Maven args (space-separated). The benchmark runner
+    # passes these explicitly to its judge/generate calls; normal API, run_judge,
+    # and Phase 2 e2e paths do not read them. Used to skip policy/style/audit
+    # plugins for controlled real-repo compile/exec smoke runs.
+    mvn_extra_args: str = ""
+
     # LLM isolation layer (P2-T03). Defaults to the offline fake client; no real
     # model is contacted until contracts are confirmed and a provider is wired.
     llm_provider: str = "fake"            # TESTAGENT_LLM_PROVIDER

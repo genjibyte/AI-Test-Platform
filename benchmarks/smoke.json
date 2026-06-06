@@ -1,0 +1,10 @@
+{
+  "_comment": "Phase 2.5 DeepSeek SMOKE: ONE case. Run this first to verify the API key, model name, JSON schema, latency and cost before the full spec.example.json. commons-cli is already mirror-cached from the offline dry-run, so this is one real model call + one mvn run.",
+  "cases": [
+    {
+      "name": "smoke: commons-cli Option",
+      "repo_url": "https://github.com/apache/commons-cli.git",
+      "target_class": "org.apache.commons.cli.Option"
+    }
+  ]
+}
