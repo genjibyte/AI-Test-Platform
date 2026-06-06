@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     test_result_json  TEXT,
     coverage_json     TEXT,
     stages_json       TEXT,
+    target_json       TEXT,
+    generation_json   TEXT,
     created_at        TEXT NOT NULL,
     updated_at        TEXT NOT NULL
 );

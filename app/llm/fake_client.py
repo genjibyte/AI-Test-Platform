@@ -21,6 +21,9 @@ _FAKE_PAYLOAD = {
     "test_source": (
         "// FAKE CLIENT PLACEHOLDER — not a real generated test.\n"
         "// Used only to validate prompt/context/output contracts offline.\n"
+        "// Compiles & runs (so the offline pipeline reaches a PASS state) but\n"
+        "// asserts nothing and covers no target code.\n"
+        "import org.junit.jupiter.api.Test;\n\n"
         "class PlaceholderAiGeneratedTest {\n"
         "    @Test\n"
         "    void placeholder() {\n"

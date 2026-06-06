@@ -14,6 +14,20 @@ from app.config import get_settings
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
+# Columns added after the initial schema. CREATE TABLE IF NOT EXISTS will not
+# add them to a pre-existing table, so they are applied as idempotent ALTERs.
+_ADDED_COLUMNS: dict[str, str] = {
+    "target_json": "TEXT",
+    "generation_json": "TEXT",
+}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(jobs)")}
+    for name, decl in _ADDED_COLUMNS.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} {decl}")
+
 
 def get_connection(db_path: Optional[Union[str, Path]] = None) -> sqlite3.Connection:
     path = Path(db_path) if db_path else get_settings().db_path
@@ -29,6 +43,7 @@ def init_db(db_path: Optional[Union[str, Path]] = None) -> None:
     try:
         with conn:
             conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+            _migrate(conn)
     finally:
         conn.close()
 

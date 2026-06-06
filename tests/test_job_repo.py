@@ -65,3 +65,24 @@ def test_results_roundtrip(repo):
     loaded = repo.get(job.id)
     assert loaded.test_result["passed"] == 9
     assert loaded.coverage["line"] == 0.42
+
+
+def test_phase2_fields_roundtrip(repo):
+    # target + generation columns (P2-T10) persist through create/save/get.
+    job = Job(git_url="https://example.com/z.git")
+    repo.create(job)
+    job.target = {"target_class": "com.example.Calc", "method_exists": True}
+    job.generation = {"result": {"test_class_name": "CalcAiGeneratedTest"},
+                      "error": None}
+    repo.save(job)
+    loaded = repo.get(job.id)
+    assert loaded.target["target_class"] == "com.example.Calc"
+    assert loaded.generation["result"]["test_class_name"] == "CalcAiGeneratedTest"
+
+
+def test_phase2_fields_default_none(repo):
+    job = Job(git_url="https://example.com/z.git")
+    repo.create(job)
+    loaded = repo.get(job.id)
+    assert loaded.target is None
+    assert loaded.generation is None

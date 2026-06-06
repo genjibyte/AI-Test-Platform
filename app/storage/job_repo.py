@@ -17,6 +17,7 @@ from app.storage.db import get_connection
 _COLUMNS = (
     "id, git_url, branch, commit_sha, status, error, build_outcome, "
     "project_json, test_result_json, coverage_json, stages_json, "
+    "target_json, generation_json, "
     "created_at, updated_at"
 )
 
@@ -46,6 +47,8 @@ def _row_to_job(row: sqlite3.Row) -> Job:
         test_result=_loads(row["test_result_json"]),
         coverage=_loads(row["coverage_json"]),
         stages=_loads(row["stages_json"]) or [],
+        target=_loads(row["target_json"]),
+        generation=_loads(row["generation_json"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -60,7 +63,7 @@ class JobRepo:
         with self.conn:
             self.conn.execute(
                 f"INSERT INTO jobs ({_COLUMNS}) VALUES "
-                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     job.id,
                     job.git_url,
@@ -73,6 +76,8 @@ class JobRepo:
                     _dumps(job.test_result),
                     _dumps(job.coverage),
                     _dumps(job.stages),
+                    _dumps(job.target),
+                    _dumps(job.generation),
                     job.created_at,
                     job.updated_at,
                 ),
@@ -86,7 +91,8 @@ class JobRepo:
             self.conn.execute(
                 "UPDATE jobs SET git_url=?, branch=?, commit_sha=?, status=?, "
                 "error=?, build_outcome=?, project_json=?, test_result_json=?, "
-                "coverage_json=?, stages_json=?, updated_at=? WHERE id=?",
+                "coverage_json=?, stages_json=?, target_json=?, generation_json=?, "
+                "updated_at=? WHERE id=?",
                 (
                     job.git_url,
                     job.branch,
@@ -98,6 +104,8 @@ class JobRepo:
                     _dumps(job.test_result),
                     _dumps(job.coverage),
                     _dumps(job.stages),
+                    _dumps(job.target),
+                    _dumps(job.generation),
                     job.updated_at,
                     job.id,
                 ),
