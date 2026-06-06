@@ -38,23 +38,26 @@ class OpenAIClient(LLMClient):
         self.timeout = timeout
 
     def generate(self, prompt: str) -> LLMResponse:
-        resp = httpx.post(
-            f"{self.base_url}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": _SYSTEM},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0,
-                "response_format": {"type": "json_object"},
-            },
-            timeout=self.timeout,
-        )
+        try:
+            resp = httpx.post(
+                f"{self.base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": _SYSTEM},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0,
+                    "response_format": {"type": "json_object"},
+                },
+                timeout=self.timeout,
+            )
+        except httpx.HTTPError as exc:
+            raise LLMRequestError(f"OpenAI-compatible API request failed: {exc}") from exc
         if resp.status_code >= 400:
             try:
                 err = resp.json().get("error", {})

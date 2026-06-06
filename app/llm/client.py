@@ -51,7 +51,10 @@ def get_client(settings: Optional[Settings] = None) -> LLMClient:
             base_url = settings.llm_base_url
             model = settings.llm_model
         return OpenAIClient(
-            api_key=settings.llm_api_key, model=model, base_url=base_url
+            api_key=settings.llm_api_key,
+            model=model,
+            base_url=base_url,
+            timeout=settings.llm_timeout_seconds,
         )
     raise NotImplementedError(
         f"real LLM provider '{provider}' is not wired yet; use 'fake', 'openai', or 'deepseek'"

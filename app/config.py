@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     llm_model: Optional[str] = None       # TESTAGENT_LLM_MODEL
     llm_api_key: Optional[str] = None     # TESTAGENT_LLM_API_KEY (never logged/committed)
     llm_base_url: Optional[str] = None    # TESTAGENT_LLM_BASE_URL
+    llm_timeout_seconds: float = 60.0     # TESTAGENT_LLM_TIMEOUT_SECONDS
+
+    # Phase 3 opt-in compile-only repair. Default off so Phase 2/2.5 facts stay
+    # unchanged unless a benchmark explicitly enables the repair loop.
+    repair_compile_failures: bool = False  # TESTAGENT_REPAIR_COMPILE_FAILURES
+    repair_max_rounds: int = 1             # TESTAGENT_REPAIR_MAX_ROUNDS
 
     @property
     def db_path(self) -> Path:
