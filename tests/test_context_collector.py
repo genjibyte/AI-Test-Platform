@@ -4,8 +4,12 @@ from pathlib import Path
 import pytest
 
 from app.context.class_index import find_class_file, list_classes
-from app.context.context_collector import ContextError, build_snapshot
-from app.context.maven_deps import summarize_dependencies
+from app.context.context_collector import (
+    ContextError,
+    _neighbor_source_excerpt,
+    build_snapshot,
+)
+from app.context.maven_deps import summarize_build_constraints, summarize_dependencies
 from app.targeting.target_selector import resolve_target
 
 REPO = Path(__file__).resolve().parents[1] / "samples" / "calc"
@@ -41,6 +45,12 @@ def test_dependency_summary():
     assert ("org.junit.jupiter", "junit-jupiter", "test") in arts
 
 
+def test_build_constraints_summary():
+    constraints = summarize_build_constraints(REPO)
+    assert constraints.java_source == "1.8"
+    assert constraints.java_target == "1.8"
+
+
 def test_build_snapshot_bounded_content():
     snap = build_snapshot(REPO, "com.example.Calc", "max")
     assert snap.target_class == "com.example.Calc"
@@ -53,6 +63,28 @@ def test_build_snapshot_bounded_content():
     assert "max" in snap.neighbor_test.test_methods
     # maven deps summarized
     assert any(d.artifact_id == "junit-jupiter" for d in snap.maven_dependencies)
+    assert snap.build_constraints.java_source == "1.8"
+
+
+def test_neighbor_excerpt_skips_long_header_and_includes_test_body():
+    source = (
+        "/* " + ("license " * 180) + " */\n"
+        "package com.example;\n"
+        "import static org.junit.jupiter.api.Assertions.assertEquals;\n"
+        "import org.junit.jupiter.api.Test;\n"
+        "\n"
+        "class CalcTest {\n"
+        "  @Test\n"
+        "  void max() {\n"
+        "    assertEquals(2, new Calc().max(1, 2));\n"
+        "  }\n"
+        "}\n"
+    )
+    excerpt = _neighbor_source_excerpt(source, limit=300)
+    assert len(excerpt) <= 300
+    assert "import static org.junit.jupiter.api.Assertions.assertEquals;" in excerpt
+    assert "@Test" in excerpt
+    assert "assertEquals(2" in excerpt
 
 
 def test_build_snapshot_missing_class_fails():

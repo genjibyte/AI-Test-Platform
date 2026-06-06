@@ -27,7 +27,13 @@ class LLMOutputError(Exception):
 
 
 class LLMTestPayload(BaseModel):
-    """The model-controlled JSON contract. No extra keys are required."""
+    """The model-controlled JSON contract. No extra keys are required.
+
+    Prompt/Context v2 adds OPTIONAL grounding metadata (default-empty, so v1
+    payloads and the offline fake still validate). These make the model declare
+    what it grounded on and what it deliberately skipped — a cheap self-check
+    that reduces API/oracle hallucination, and a signal the human reviewer sees.
+    """
 
     model_config = {"extra": "ignore"}
 
@@ -36,6 +42,13 @@ class LLMTestPayload(BaseModel):
     scenarios: List[str] = Field(default_factory=list)
     mocks: List[str] = Field(default_factory=list)
     notes: Optional[str] = None
+
+    # v2 grounding metadata (optional)
+    used_apis: List[str] = Field(default_factory=list)            # APIs used, must be in context
+    behavior_sources: List[str] = Field(default_factory=list)     # evidence backing each oracle
+    omitted_uncertain_cases: List[str] = Field(default_factory=list)  # cases skipped, not guessed
+    dependency_assumptions: List[str] = Field(default_factory=list)   # assumed JUnit/Mockito facts
+    risk_flags: List[str] = Field(default_factory=list)           # self-declared risky choices
 
 
 class TestGenerationResult(BaseModel):
@@ -55,6 +68,13 @@ class TestGenerationResult(BaseModel):
     notes: Optional[str] = None
     model: Optional[str] = None
     trusted: bool = False  # generated tests are NEVER trusted (docs/07 P2)
+
+    # v2 grounding metadata (carried from the payload; optional)
+    used_apis: List[str] = Field(default_factory=list)
+    behavior_sources: List[str] = Field(default_factory=list)
+    omitted_uncertain_cases: List[str] = Field(default_factory=list)
+    dependency_assumptions: List[str] = Field(default_factory=list)
+    risk_flags: List[str] = Field(default_factory=list)
 
 
 def _extract_json(text: str) -> str:
@@ -102,4 +122,9 @@ def assemble_result(
         notes=payload.notes,
         model=model,
         trusted=False,
+        used_apis=payload.used_apis,
+        behavior_sources=payload.behavior_sources,
+        omitted_uncertain_cases=payload.omitted_uncertain_cases,
+        dependency_assumptions=payload.dependency_assumptions,
+        risk_flags=payload.risk_flags,
     )

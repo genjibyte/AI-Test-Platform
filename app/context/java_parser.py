@@ -219,6 +219,7 @@ def parse_java(source: str, file_path: Optional[str] = None) -> Optional[JavaCla
     fields: List[JavaField] = []
     constructors: List[JavaConstructor] = []
     methods: List[JavaMethod] = []
+    nested_classes: List[str] = []
 
     i = body_open + 1
     seg_start = i
@@ -232,10 +233,19 @@ def parse_java(source: str, file_path: Optional[str] = None) -> Optional[JavaCla
             continue
         if ch == "{":
             close = _match_brace(masked, i)
-            member = _classify_member(
-                masked[seg_start:i], source[seg_start:close + 1], class_name
-            )
-            _dispatch(member, fields, constructors, methods)
+            header = _strip_annotations(masked[seg_start:i])
+            nested = re.search(r"\b(?:class|interface|enum|record)\s+(\w+)", header)
+            # A nested TYPE header has a type keyword and no method parens before the
+            # brace; capturing its name (not misclassifying it as a field) lets the
+            # prompt require Owner.Nested qualification.
+            if nested and "(" not in header:
+                if nested.group(1) not in nested_classes:
+                    nested_classes.append(nested.group(1))
+            else:
+                member = _classify_member(
+                    masked[seg_start:i], source[seg_start:close + 1], class_name
+                )
+                _dispatch(member, fields, constructors, methods)
             i = close + 1
             seg_start = i
             continue
@@ -244,7 +254,7 @@ def parse_java(source: str, file_path: Optional[str] = None) -> Optional[JavaCla
     return JavaClassStructure(
         package=package, imports=imports, class_name=class_name, kind=kind,
         fields=fields, constructors=constructors, methods=methods,
-        file_path=file_path,
+        nested_classes=nested_classes, file_path=file_path,
     )
 
 

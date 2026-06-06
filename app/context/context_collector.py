@@ -11,13 +11,39 @@ from typing import Optional, Union
 
 from app.context.class_index import list_classes
 from app.context.java_parser import extract_test_methods, parse_java
-from app.context.maven_deps import summarize_dependencies
+from app.context.maven_deps import summarize_build_constraints, summarize_dependencies
 from app.models.context_snapshot import ContextSnapshot, NeighborTestSummary
 from app.targeting.target_selector import resolve_target
 
 
 class ContextError(Exception):
     """Raised when required context cannot be collected (explicit failure)."""
+
+
+def _neighbor_source_excerpt(source: str, limit: int = 1600) -> str:
+    """Return a bounded neighbor-test excerpt that includes real test behavior.
+
+    Apache-style test files often start with long license headers and import
+    lists; a naive ``source[:N]`` can miss every ``@Test`` method. Keep a compact
+    import/style prelude, then splice in the first actual test body area.
+    """
+    if len(source) <= limit:
+        return source
+
+    test_idx = source.find("@Test")
+    if test_idx == -1:
+        return source[:limit]
+
+    imports = [
+        line for line in source.splitlines()
+        if line.strip().startswith("import ")
+    ]
+    prelude = "\n".join(imports[:20]).strip()
+    if prelude:
+        prelude += "\n...\n"
+
+    remaining = max(0, limit - len(prelude))
+    return prelude + source[test_idx:test_idx + remaining]
 
 
 def _find_neighbor_test(
@@ -34,6 +60,9 @@ def _find_neighbor_test(
                 file_path=ref.file_path,
                 class_name=structure.class_name if structure else ref.simple_name,
                 test_methods=extract_test_methods(source),
+                # Bounded excerpt so the generator can mirror assertion/mock
+                # style (docs/07 §4.3) without dumping the file.
+                source_excerpt=_neighbor_source_excerpt(source),
             )
     return NeighborTestSummary(found=False)
 
@@ -61,6 +90,7 @@ def build_snapshot(
 
     neighbor = _find_neighbor_test(repo_dir, structure.package, structure.class_name)
     deps = summarize_dependencies(repo_dir)
+    constraints = summarize_build_constraints(repo_dir)
 
     return ContextSnapshot(
         target_class=target_class,
@@ -72,4 +102,5 @@ def build_snapshot(
         fields=structure.fields,
         neighbor_test=neighbor,
         maven_dependencies=deps,
+        build_constraints=constraints,
     )

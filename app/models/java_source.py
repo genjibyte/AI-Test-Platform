@@ -49,4 +49,5 @@ class JavaClassStructure(BaseModel):
     fields: List[JavaField] = Field(default_factory=list)
     constructors: List[JavaConstructor] = Field(default_factory=list)
     methods: List[JavaMethod] = Field(default_factory=list)  # public/protected only
+    nested_classes: List[str] = Field(default_factory=list)  # simple names of nested types
     file_path: Optional[str] = None  # relative to repo root

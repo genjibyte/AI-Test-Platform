@@ -57,9 +57,30 @@ def test_factory_openai_constructs_with_key_no_network():
     from app.llm.openai_client import OpenAIClient
 
     client = get_client(
-        Settings(llm_provider="openai", llm_api_key="sk-test", llm_model="gpt-4o-mini")
+        Settings(
+            llm_provider="openai",
+            llm_api_key="sk-test",
+            llm_model="gpt-4o-mini",
+            llm_timeout_seconds=123,
+        )
     )
     assert isinstance(client, OpenAIClient)  # construction makes no network call
+    assert client.timeout == 123
+
+
+def test_openai_generate_wraps_httpx_errors(monkeypatch):
+    import httpx
+
+    from app.llm.client import LLMRequestError
+    from app.llm.openai_client import OpenAIClient
+
+    def boom(*_args, **_kwargs):
+        raise httpx.ReadTimeout("slow model")
+
+    monkeypatch.setattr("app.llm.openai_client.httpx.post", boom)
+    client = OpenAIClient(api_key="sk-test", model="m", timeout=0.01)
+    with pytest.raises(LLMRequestError, match="slow model"):
+        client.generate("prompt")
 
 
 def test_parse_plain_and_fenced_json():
@@ -91,3 +112,21 @@ def test_assemble_result_deterministic_identity():
     assert result.file_name == "CalcAiGeneratedTest.java"
     assert result.trusted is False           # never trusted (docs/07 P2)
     assert result.model == "fake-1"
+
+
+def test_v2_metadata_is_optional_backward_compatible():
+    # A v1-style payload (no grounding metadata) still validates -> empty lists.
+    p = parse_payload('{"test_source": "class T {}"}')
+    assert p.used_apis == [] and p.risk_flags == [] and p.omitted_uncertain_cases == []
+
+
+def test_v2_metadata_flows_through_to_result():
+    payload = parse_payload(
+        '{"test_source": "class T {}", "used_apis": ["Calc.max"], '
+        '"risk_flags": ["mocked Converter"], "omitted_uncertain_cases": ["overflow"]}'
+    )
+    assert payload.used_apis == ["Calc.max"]
+    result = assemble_result(_ctx(), payload, model="m")
+    assert result.used_apis == ["Calc.max"]
+    assert result.risk_flags == ["mocked Converter"]
+    assert result.omitted_uncertain_cases == ["overflow"]

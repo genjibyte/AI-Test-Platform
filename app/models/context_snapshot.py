@@ -28,11 +28,18 @@ class DependencySummary(BaseModel):
     scope: Optional[str] = None
 
 
+class BuildConstraints(BaseModel):
+    java_source: Optional[str] = None
+    java_target: Optional[str] = None
+    java_release: Optional[str] = None
+
+
 class NeighborTestSummary(BaseModel):
     found: bool = False
     file_path: Optional[str] = None
     class_name: Optional[str] = None
     test_methods: List[str] = Field(default_factory=list)
+    source_excerpt: Optional[str] = None  # bounded snippet for style/mock imitation (v2)
 
 
 class ContextSnapshot(BaseModel):
@@ -47,3 +54,4 @@ class ContextSnapshot(BaseModel):
     fields: List[JavaField] = Field(default_factory=list)             # 5. fields
     neighbor_test: NeighborTestSummary = Field(default_factory=NeighborTestSummary)  # 6.
     maven_dependencies: List[DependencySummary] = Field(default_factory=list)        # 7.
+    build_constraints: BuildConstraints = Field(default_factory=BuildConstraints)    # 8.
