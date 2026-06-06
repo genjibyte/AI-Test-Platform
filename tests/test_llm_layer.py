@@ -34,8 +34,12 @@ def test_fake_client_offline_valid_payload():
     assert "org.junit.jupiter.api.Test" in payload.imports
 
 
-def test_factory_defaults_to_fake():
-    client = get_client(Settings())
+def test_factory_defaults_to_fake(monkeypatch):
+    monkeypatch.delenv("TESTAGENT_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("TESTAGENT_LLM_MODEL", raising=False)
+    monkeypatch.delenv("TESTAGENT_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("TESTAGENT_LLM_BASE_URL", raising=False)
+    client = get_client(Settings(_env_file=None))
     assert isinstance(client, FakeLLMClient)
 
 

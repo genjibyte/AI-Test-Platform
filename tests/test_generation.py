@@ -4,6 +4,7 @@ from pathlib import Path
 from app.context.context_collector import build_snapshot
 from app.generate.generation import dry_generate
 from app.generate.prompt_builder import build_prompt
+from app.llm.fake_client import FakeLLMClient
 
 REPO = Path(__file__).resolve().parents[1] / "samples" / "calc"
 
@@ -34,7 +35,7 @@ def test_prompt_does_not_dump_whole_repo():
 
 
 def test_dry_generate_offline_contract_loop():
-    result = dry_generate(_context())  # fake client by default
+    result = dry_generate(_context(), client=FakeLLMClient())
     assert result.target_class == "com.example.Calc"
     assert result.target_method == "max"
     assert result.file_name == "CalcAiGeneratedTest.java"
