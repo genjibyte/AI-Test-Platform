@@ -46,12 +46,14 @@ def render_markdown(report: BenchReport) -> str:
         f"quality_gate_pass_rate: {_pct(a.get('quality_gate_pass_rate'))}  "
         f"quality_gate_failures: {a.get('quality_gate_failures', 0)}  "
         "accept_rate: —",
+        f"- recommendation_distribution: {a.get('recommendation_distribution', {})}  "
+        "(advisory; conclusion stays NEED_HUMAN_REVIEW)",
         "",
         "## Per-case",
         "",
-        "| case | judged | compiled | passed | failure | repair | quality | coverage | "
-        "tgt_branch_Δ | improved | ms |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| case | judged | compiled | passed | failure | repair | quality | "
+        "recommendation | coverage | tgt_branch_Δ | improved | ms |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for c in report.cases:
         lines.append(
@@ -62,6 +64,7 @@ def render_markdown(report: BenchReport) -> str:
             f"{c.repair_rounds if c.repair_rounds is not None else '—'} | "
             f"{c.quality_gate_status or '—'}"
             f" ({c.quality_blockers}/{c.quality_warnings}) | "
+            f"{c.review_recommendation or '—'} | "
             f"{c.coverage_status} | "
             f"{_f(c.target_branch_delta)} | "
             f"{c.target_improved if c.target_improved is not None else '—'} | "

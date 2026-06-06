@@ -21,6 +21,7 @@ from __future__ import annotations
 from typing import Optional
 
 from app.quality.test_quality_gate import evaluate_test_quality
+from app.review.review_policy import build_review_summary, recommend
 
 CONCLUSION = "NEED_HUMAN_REVIEW"  # invariant for all of Phase 2
 
@@ -77,6 +78,20 @@ def assemble_generation_report(generation: dict) -> dict:
         grounding=grounding,
     )
 
+    # Phase 4 review policy (docs/22): advisory triage + reviewer summary.
+    # Never changes `conclusion` / `trusted` — the platform still never accepts.
+    quality_dict = quality.model_dump()
+    review_recommendation = recommend(
+        quality_status=quality.status,
+        gen_outcome=outcome,
+        production_code_touched=production_code_touched,
+    )
+    review_summary = build_review_summary(
+        generation=generation,
+        quality=quality_dict,
+        recommendation=review_recommendation,
+    )
+
     return {
         "target_class": target.get("target_class") or result.get("target_class"),
         "target_method": target.get("target_method") or result.get("target_method"),
@@ -111,7 +126,10 @@ def assemble_generation_report(generation: dict) -> dict:
         },
         # coverage delta (P2-T08)
         "coverage_delta": coverage,
-        "quality_gate": quality.model_dump(),
+        "quality_gate": quality_dict,
+        # Phase 4 (docs/22): advisory recommendation + reviewer summary.
+        "review_recommendation": review_recommendation,
+        "review_summary": review_summary,
         # patch preview: a NEW file, so the full content IS the diff
         "patch": {
             "file_path": write.get("file_path"),

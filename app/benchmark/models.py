@@ -99,6 +99,7 @@ class BenchCaseResult(BaseModel):
     quality_gate_status: Optional[str] = None
     quality_blockers: int = 0
     quality_warnings: int = 0
+    review_recommendation: Optional[str] = None  # Phase 4 advisory triage (docs/22)
     runtime_ms: int = 0
     error: Optional[str] = None
 
@@ -201,6 +202,14 @@ def aggregate(cases: List[BenchCaseResult]) -> dict:
         ),
         "quality_gate_reviews": sum(
             1 for c in quality_checked if c.quality_gate_status == "REVIEW"
+        ),
+        # Phase 4 advisory triage distribution over generation-attempted cases.
+        "recommendation_distribution": dict(
+            Counter(
+                c.review_recommendation
+                for c in attempted
+                if c.review_recommendation is not None
+            ).most_common()
         ),
         "accept_rate": None,
     }
