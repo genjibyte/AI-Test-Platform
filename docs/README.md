@@ -53,6 +53,7 @@
 - [29 Context V3.2 Hardening](/docs/60_context_v3/29_CONTEXT_V3_2_HARDENING.md)
 - [30 Context V3.2 4-Case Review](/docs/60_context_v3/30_CONTEXT_V3_2_4CASE_REVIEW.md)
 - [31 Context V3.2.1 BooleanUtils Review](/docs/60_context_v3/31_CONTEXT_V3_2_1_BOOLEANUTILS_REVIEW.md)
+- [35 Context V3.2.2 BooleanUtils Review](/docs/60_context_v3/35_CONTEXT_V3_2_2_BOOLEANUTILS_REVIEW.md)
 
 ## 70 Preflight
 
