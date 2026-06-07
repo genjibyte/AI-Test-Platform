@@ -176,6 +176,32 @@ def test_v3_2_field_initializers_and_constructor_body_grounding():
     assert "post-construction state" in p                  # header signals the purpose
 
 
+def test_v3_2_constructor_body_ignores_leading_javadoc_braces():
+    structure = JavaClassStructure(
+        package="org.apache.commons.cli", class_name="Option",
+        constructors=[
+            JavaConstructor(
+                modifiers=["public"], name="Option",
+                params=[JavaParam(type="String", name="opt")],
+                signature="public Option",
+                source=(
+                    "/** @throws IllegalArgumentException if {@code opt} is blank. */\n"
+                    "public Option(String opt) { // validate before assignment\n"
+                    " this.option = opt; }"
+                ),
+            ),
+        ],
+        methods=[],
+    )
+    p = build_user_prompt(_ctx(
+        class_structure=structure,
+        constructors=structure.constructors,
+    ))
+    assert "sets: this.option = opt;" in p
+    assert "{@code opt}" not in p
+    assert "validate before assignment" not in p
+
+
 def test_v3_2_overload_varargs_primitive_boxed_strengthened():
     # 10-case BooleanUtils: and/or/xor varargs + toBoolean(null) primitive/boxed ambiguity.
     sys = build_system_prompt(_ctx())

@@ -36,6 +36,8 @@ Per-method return-body grounding and an invalid-JSON retry remain deferred (v4).
 """
 from __future__ import annotations
 
+import re
+
 from app.models.context_snapshot import ContextSnapshot
 
 # --- SYSTEM block: role + hard rules (deterministic, context-independent) ----
@@ -135,24 +137,42 @@ def _fields_block(context: ContextSnapshot) -> str:
         if "=" in f.raw:
             init = f.raw.split("=", 1)[1].strip()
             if init:
-                head += " = " + (init[:80] + "…" if len(init) > 80 else init)
+                head += " = " + (init[:80] + "..." if len(init) > 80 else init)
         rows.append(head)
     return "\n".join(rows)
+
+
+def _strip_leading_comments(source: str) -> str:
+    """Remove Javadoc/block/line comments before a member declaration."""
+    prev = None
+    out = source
+    while prev != out:
+        prev = out
+        out = re.sub(r"^\s*/\*.*?\*/\s*", "", out, flags=re.DOTALL)
+        out = re.sub(r"^\s*//[^\n]*(?:\n|$)", "", out)
+    return out
+
+
+def _strip_inline_comments(source: str) -> str:
+    source = re.sub(r"/\*.*?\*/", " ", source, flags=re.DOTALL)
+    return re.sub(r"//[^\n]*(?:\n|$)", " ", source)
 
 
 def _ctor_body_excerpt(source: str, limit: int = 240) -> str:
     """v3.2: bounded, single-line constructor body. The field assignments inside
     are the post-construction state evidence (e.g. Option setting argCount)."""
+    source = _strip_leading_comments(source)
     open_idx = source.find("{")
     if open_idx == -1:
         return ""
     body = source[open_idx + 1:].rstrip()
     if body.endswith("}"):
         body = body[:-1]
+    body = _strip_inline_comments(body)
     body = " ".join(body.split())  # collapse to one line
     if not body:
         return ""
-    return body[:limit] + ("…" if len(body) > limit else "")
+    return body[:limit] + ("..." if len(body) > limit else "")
 
 
 def _ctors_block(context: ContextSnapshot) -> str:

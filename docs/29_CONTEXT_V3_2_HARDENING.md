@@ -32,6 +32,11 @@ v3.2 just renders it, bounded. Rules #2–#6 are additive SYSTEM_PROMPT text. No
 parser/model/runner change. Tests pin each to its bucket
 (`tests/test_prompt_builder.py::test_v3_2_*`).
 
+Post-audit note: constructor excerpts strip leading Javadoc/block/line comments
+before finding the constructor body. This prevents Javadoc braces such as
+`{@code opt}` from being mistaken for the body open brace, and keeps the bounded
+`sets:` excerpt focused on executable state assignments.
+
 > `@Nested` route choice: `docs/28` §6.6 offers prompt-forbid vs harness-aggregate.
 > v3.2 takes the **prompt-forbid** route because it is smaller (§7.2). The harness
 > route (aggregate `GeneratedTest$*` surefire reports) stays open if nested tests
