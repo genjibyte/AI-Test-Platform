@@ -10,7 +10,7 @@
 
 ## 0. 结论速览（TL;DR）
 
-1. **当前设计方向正确，继续，不重构。** “判卷优先 / 把 AI 输出当不可信代码 / 结构性确定性质量门 / 永不自动采纳 / 人是最终门”这套姿态，与 EvoSuite（自动 oracle 会固化 bug）、IntelliTest（人选哪些生成测试入 regression suite）、GitHub Copilot（“never trust… without review”）、Meta SapFix（修复经工程师审批才落地）的公开实践**一致**。见 §2 问题 4/5 与 §5。
+1. **当前设计方向正确，继续，不重构。** “判卷优先 / 把 AI 输出当不可信代码 / 结构性确定性质量门 / 永不自动采纳 / 人是最终门”这套姿态，与 EvoSuite（自动 oracle 仍需开发者检查）、IntelliTest（人选哪些生成测试入 regression suite）、GitHub Copilot（生成测试后仍需 review）、Meta SapFix（修复经工程师审批才落地）的公开实践**一致**。见 §2 问题 4/5 与 §5。
 2. **下一步最高性价比 = Context v3（方法契约接地）**，直接命中 `docs/21` 两个真实失败（猜错异常/内部 API），且纯增量、可离线验证。
 3. **benchmark 先固化再小扩**：`docs/23` 的 `manifest.v1`（10 case / 4 repo / SHA 固化）已是“小扩”落地；不必现在冲 20。
 4. **Phase 3 repair 做、但收窄**：仅 compile/API 机械错，永不碰 oracle，修复后仍 `NEED_HUMAN_REVIEW`；排在 Context v3 之后。

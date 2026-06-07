@@ -97,6 +97,7 @@ def test_bucket5_oracle_grounding_and_skip():
     assert "Derive every expected value from EVIDENCE" in sys
     assert "omitted_uncertain_cases" in sys
     assert "assertThrows" in sys
+    assert "body-contains-throw fact is only supporting evidence" in sys
     assert "tautological" in sys
 
 
@@ -106,7 +107,7 @@ def test_v3_method_contract_evidence_rendered():
     assert "builder(String opt) throws IllegalArgumentException" in p
     assert "@return a builder for the option" in p
     assert "@throws IllegalArgumentException if opt is blank" in p
-    assert "body throws: UnsupportedOperationException" in p
+    assert "body contains throw: UnsupportedOperationException" in p
 
 
 def test_api_grounding_only_context_apis():

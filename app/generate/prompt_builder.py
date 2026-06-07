@@ -50,9 +50,10 @@ SYSTEM_PROMPT = (
     "[Oracle grounding]\n"
     "- Derive every expected value from EVIDENCE (target source or neighbor "
     "test). If not derivable, SKIP into omitted_uncertain_cases; never guess.\n"
-    "- Exception oracles need method-contract evidence: throws, Javadoc "
-    "@throws, body throw, or neighbor test. Use assertThrows only then; "
-    "otherwise SKIP into omitted_uncertain_cases.\n"
+    "- Exception oracles need strong evidence: declared throws, Javadoc @throws, "
+    "or neighbor test. A body-contains-throw fact is only supporting evidence; "
+    "do NOT assertThrows from it alone. Otherwise SKIP into "
+    "omitted_uncertain_cases.\n"
     "- No tautological assertions such as assertEquals(x, callThatReturnsX()).\n"
     "- Assert observable behavior, not implementation details.\n"
     "[Test strategy]\n"
@@ -112,7 +113,7 @@ def _methods_block(context: ContextSnapshot) -> str:
         for jt in m.javadoc_throws:
             facts.append(f"@throws {jt}")
         if m.body_throws:
-            facts.append("body throws: " + ", ".join(m.body_throws))
+            facts.append("body contains throw: " + ", ".join(m.body_throws))
         if facts:
             sig += "\n  contract: " + " | ".join(facts)
         rows.append(sig)
