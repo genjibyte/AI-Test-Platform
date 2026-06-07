@@ -13,7 +13,13 @@ from app.models.context_snapshot import (
     ContextSnapshot,
     NeighborTestSummary,
 )
-from app.models.java_source import JavaClassStructure, JavaMethod, JavaParam
+from app.models.java_source import (
+    JavaClassStructure,
+    JavaConstructor,
+    JavaField,
+    JavaMethod,
+    JavaParam,
+)
 
 
 def _ctx(**over):
@@ -133,6 +139,75 @@ def test_v3_1_post_construction_state_and_doc_source_conflict():
     assert "post-construction field/state" in sys
     assert "Javadoc conflicts" in sys
     assert "do not assert the documented value" in sys
+
+
+def test_v3_2_field_initializers_and_constructor_body_grounding():
+    # 10-case Option: new Option("a", true, "desc").getArgs() is 1 (set by the
+    # constructor), not the field default UNINITIALIZED. v3.2 renders field
+    # initializers + the constructor body so that state is derivable, not guessed.
+    structure = JavaClassStructure(
+        package="org.apache.commons.cli", class_name="Option",
+        fields=[
+            JavaField(modifiers=["private", "static", "final"], type="int",
+                      name="UNINITIALIZED",
+                      raw="private static final int UNINITIALIZED = -1"),
+            JavaField(modifiers=["private"], type="int", name="argCount",
+                      raw="private int argCount = UNINITIALIZED"),
+        ],
+        constructors=[
+            JavaConstructor(modifiers=["public"], name="Option",
+                params=[JavaParam(type="String", name="opt"),
+                        JavaParam(type="boolean", name="hasArg")],
+                signature="public Option",
+                source="public Option(String opt, boolean hasArg) "
+                       "{ this.opt = opt; if (hasArg) this.argCount = 1; }"),
+        ],
+        methods=[],
+    )
+    # context_collector copies these to the snapshot top level; mirror that here.
+    p = build_user_prompt(_ctx(
+        class_structure=structure,
+        fields=structure.fields,
+        constructors=structure.constructors,
+    ))
+    assert "UNINITIALIZED = -1" in p                       # constant value surfaced
+    assert "argCount = UNINITIALIZED" in p                 # field default surfaced
+    assert "if (hasArg) this.argCount = 1" in p            # constructor sets the state
+    assert "post-construction state" in p                  # header signals the purpose
+
+
+def test_v3_2_overload_varargs_primitive_boxed_strengthened():
+    # 10-case BooleanUtils: and/or/xor varargs + toBoolean(null) primitive/boxed ambiguity.
+    sys = build_system_prompt(_ctx())
+    assert "primitive and boxed overloads" in sys
+    assert "new Boolean[]" in sys
+    assert "(Boolean) null" in sys
+
+
+def test_v3_2_method_must_be_in_rendered_list():
+    # 10-case CSVRecord: called putInMap(...) which is not on the class in this version.
+    sys = build_system_prompt(_ctx())
+    assert "confirm it appears in the rendered method list" in sys
+
+
+def test_v3_2_conditional_body_throw_not_oracle():
+    # 10-case Option.testCloneThrows: conditional/catch throw misused as a normal-path oracle.
+    sys = build_system_prompt(_ctx())
+    assert "may be conditional" in sys
+    assert "body-contains-throw fact is only supporting evidence" in sys  # v3.1 phrase kept
+
+
+def test_v3_2_no_exact_string_transformation_guess():
+    # 10-case StringEscapeUtils: guessed exact XML entity maps (&gt;).
+    sys = build_system_prompt(_ctx())
+    assert "string-transformation" in sys
+    assert "&gt;" in sys
+
+
+def test_v3_2_flat_tests_no_nested():
+    # 10-case Validate: @Nested tests ran but the top-level surefire report was empty.
+    sys = build_system_prompt(_ctx())
+    assert "do NOT use @Nested" in sys
 
 
 def test_api_grounding_only_context_apis():

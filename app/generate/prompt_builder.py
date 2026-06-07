@@ -23,7 +23,16 @@ v3.1 prompt hardening (docs/26 §6) adds rules for the 10-case failure buckets:
   7 overload/generic ambiguity (Options/NumberUtils/BooleanUtils) -> cast null, typed varargs, declared generics
   8 reflection/private-ctor misuse (WordUtils)            -> public observable APIs only
   9 post-construction state guess; doc!=source (Option.getValues) -> skip when state not shown / docs conflict
-Deeper constructor/state grounding and an invalid-JSON retry are deferred (v4).
+
+v3.2 prompt/context hardening (docs/29, driven by the v3.1 10-case review docs/28):
+- renders field initializers + bounded constructor bodies so post-construction
+  state (e.g. Option argCount) is derivable, not just skipped;
+- strengthens overloads for primitive/boxed varargs + null (BooleanUtils);
+- skips a method not in the rendered list (CSVRecord putInMap), exact
+  string-transformation/entity maps (StringEscapeUtils), and conditional/catch
+  body throws (Option clone);
+- forbids @Nested so the top-level surefire report is not empty (Validate).
+Per-method return-body grounding and an invalid-JSON retry remain deferred (v4).
 """
 from __future__ import annotations
 
@@ -44,6 +53,9 @@ SYSTEM_PROMPT = (
     "(setAccessible/getDeclared*) or call a private constructor, even if a "
     "neighbor test does, unless the target itself is that constructor's "
     "behavior.\n"
+    "- Before calling any method, confirm it appears in the rendered method list "
+    "in the context; if it is not listed, it does not exist in this version — "
+    "skip it.\n"
     "[Imports]\n"
     "- test_source must be ONE self-contained compilable file: a package "
     "declaration and EVERY import, including static import for each JUnit "
@@ -64,12 +76,18 @@ SYSTEM_PROMPT = (
     "overloads do not compile.\n"
     "- Respect declared generic types: assign a result to its declared type and "
     "do not assign a wildcard (List<?>) to a concrete generic (List<Option>).\n"
+    "- If a method has both primitive and boxed overloads (boolean... vs "
+    "Boolean..., or toBoolean(Boolean) vs toBoolean(String)), never call it with "
+    "individual values or a bare null: pass ONE explicitly typed array "
+    "(new boolean[]{...} or new Boolean[]{...}) and cast null to the exact type "
+    "((Boolean) null, (String) null, (Integer) null).\n"
     "[Oracle grounding]\n"
     "- Derive every expected value from EVIDENCE (target source or neighbor "
     "test). If not derivable, SKIP into omitted_uncertain_cases; never guess.\n"
     "- Exception oracles need strong evidence: declared throws, Javadoc @throws, "
-    "or neighbor test. A body-contains-throw fact is only supporting evidence; "
-    "do NOT assertThrows from it alone. Otherwise SKIP into "
+    "or neighbor test. A body-contains-throw fact is only supporting evidence and "
+    "may be conditional (inside a catch or an if), so it is NOT proof the normal "
+    "path throws; do NOT assertThrows from it alone. Otherwise SKIP into "
     "omitted_uncertain_cases.\n"
     "- Do not infer an object's post-construction field/state from constants or "
     "Javadoc alone; if state is not shown by the target source, a neighbor test, "
@@ -77,9 +95,14 @@ SYSTEM_PROMPT = (
     "return type or source (e.g. doc says empty array but source can return "
     "null), treat it as uncertain: SKIP and note it, do not assert the "
     "documented value.\n"
+    "- Do not assert exact string-transformation outputs (escaping, entity maps "
+    "like &gt;, encoding, formatting) unless the exact expected value is shown in "
+    "the target source or a neighbor test; otherwise SKIP.\n"
     "- No tautological assertions such as assertEquals(x, callThatReturnsX()).\n"
     "- Assert observable behavior, not implementation details.\n"
     "[Test strategy]\n"
+    "- Use flat @Test methods only; do NOT use @Nested (the build reads the "
+    "top-level test report).\n"
     "- Prefer a few high-confidence tests over a large exhaustive suite; one "
     "behavior per test; avoid large shared @BeforeEach; no assertNotNull-only "
     "smoke tests.\n"
@@ -104,17 +127,49 @@ OUTPUT_CONTRACT = (
 def _fields_block(context: ContextSnapshot) -> str:
     if not context.fields:
         return "(none)"
-    return "\n".join(
-        f"- {' '.join(f.modifiers)} {f.type} {f.name}".strip()
-        for f in context.fields
-    )
+    rows = []
+    for f in context.fields:
+        head = f"- {' '.join(f.modifiers)} {f.type} {f.name}".strip()
+        # v3.2: surface the initializer (constant value / field default) as
+        # post-construction state evidence, bounded.
+        if "=" in f.raw:
+            init = f.raw.split("=", 1)[1].strip()
+            if init:
+                head += " = " + (init[:80] + "…" if len(init) > 80 else init)
+        rows.append(head)
+    return "\n".join(rows)
+
+
+def _ctor_body_excerpt(source: str, limit: int = 240) -> str:
+    """v3.2: bounded, single-line constructor body. The field assignments inside
+    are the post-construction state evidence (e.g. Option setting argCount)."""
+    open_idx = source.find("{")
+    if open_idx == -1:
+        return ""
+    body = source[open_idx + 1:].rstrip()
+    if body.endswith("}"):
+        body = body[:-1]
+    body = " ".join(body.split())  # collapse to one line
+    if not body:
+        return ""
+    return body[:limit] + ("…" if len(body) > limit else "")
 
 
 def _ctors_block(context: ContextSnapshot) -> str:
     if not context.constructors:
         return "(default constructor only)"
-    return "\n".join(f"- {c.signature}(" + ", ".join(
-        f"{p.type} {p.name}" for p in c.params) + ")" for c in context.constructors)
+    rows = []
+    for c in context.constructors:
+        sig = (
+            f"- {c.signature}("
+            + ", ".join(f"{p.type} {p.name}" for p in c.params)
+            + ")"
+        )
+        body = _ctor_body_excerpt(c.source)
+        if body:
+            sig += "\n  sets: " + body
+        rows.append(sig)
+    return "\n".join(rows)
 
 
 def _methods_block(context: ContextSnapshot) -> str:
@@ -205,8 +260,10 @@ def build_user_prompt(context: ContextSnapshot) -> str:
         f"# Package\n{cs.package or '(default)'}",
         "# Imports available on the target class\n"
         + ("\n".join(context.imports) if context.imports else "(none)"),
-        "# Fields\n" + _fields_block(context),
-        "# Constructors\n" + _ctors_block(context),
+        "# Fields (with initializers — post-construction state evidence)\n"
+        + _fields_block(context),
+        "# Constructors (with body — derive post-construction state from these)\n"
+        + _ctors_block(context),
         "# Public/Protected methods and method-contract evidence (use ONLY these)\n"
         + _methods_block(context),
         "# Nested types (reference as Owner.Nested)\n" + _nested_block(context),
