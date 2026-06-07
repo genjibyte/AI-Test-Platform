@@ -189,6 +189,7 @@ def _completed_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
         quality_blockers=len(quality.get("blocking_issues") or []),
         quality_warnings=len(quality.get("warnings") or []),
         review_recommendation=rep.get("review_recommendation"),
+        review_summary=rep.get("review_summary"),
         runtime_ms=int((time.monotonic() - t0) * 1000),
         error=(job.generation or {}).get("error"),
     )

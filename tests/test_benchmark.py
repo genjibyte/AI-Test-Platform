@@ -5,6 +5,7 @@ markdown rendering. The real judge+generate run is exercised manually via
 scripts/run_benchmark.py against real repos.
 """
 import pytest
+import time
 
 from app.benchmark.models import (
     COVERAGE_AVAILABLE,
@@ -17,8 +18,9 @@ from app.benchmark.models import (
     load_spec,
 )
 from app.benchmark.report_md import render_markdown
-from app.benchmark.runner import run_benchmark
+from app.benchmark.runner import _completed_result, run_benchmark
 from app.llm.fake_client import FakeLLMClient
+from app.models.job import Job, JobStatus
 
 # JaCoCo double-agent crash signature (F2) and an Apache RAT failure (F1).
 _JACOCO_LOG = "Caused by: java.lang.LinkageError: ... java.lang.$JaCoCo ..."
@@ -136,6 +138,56 @@ def test_render_markdown_has_facts():
     assert "setup_failures" in md
     assert "deepseek" not in md.lower()  # no hardcoded model
     assert "| a |" in md
+
+
+def test_completed_result_carries_review_summary_failures():
+    fqcn = "com.example.CAiGeneratedTest"
+    job = Job(git_url="file:///repo", status=JobStatus.GEN_DONE,
+              build_outcome="SUCCESS")
+    job.test_result = {"has_reports": True, "failed": 0, "errors": 0}
+    job.coverage = {}
+    job.generation = {
+        "target": {"target_class": "com.example.C"},
+        "result": {
+            "test_class_name": "CAiGeneratedTest",
+            "test_source": (
+                "package com.example;\n"
+                "import org.junit.jupiter.api.Test;\n"
+                "import static org.junit.jupiter.api.Assertions.*;\n"
+                "class CAiGeneratedTest {\n"
+                "  @Test void fails() { assertEquals(true, false); }\n"
+                "}\n"
+            ),
+            "trusted": False,
+        },
+        "write": {"created": True, "content": "", "production_code_touched": False},
+        "execution": {
+            "gen_outcome": "TEST_FAILURE",
+            "build_outcome": "TEST_FAILURE",
+            "generated_class": fqcn,
+            "suite_result": {
+                "failed_cases": [
+                    {
+                        "classname": fqcn,
+                        "name": "fails",
+                        "type": "failure",
+                        "message": "expected: <true> but was: <false>",
+                    }
+                ]
+            },
+        },
+    }
+
+    result = _completed_result(
+        BenchCase(repo_url="file:///repo", target_class="com.example.C"),
+        job,
+        time.monotonic(),
+    )
+
+    failure = result.review_summary["failures"][0]
+    assert failure["test_name"] == "fails"
+    assert failure["expected"] == "true"
+    assert failure["actual"] == "false"
 
 
 def test_run_benchmark_reports_llm_config_failure(tmp_path, monkeypatch):

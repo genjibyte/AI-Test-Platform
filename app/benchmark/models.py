@@ -102,6 +102,7 @@ class BenchCaseResult(BaseModel):
     quality_blockers: int = 0
     quality_warnings: int = 0
     review_recommendation: Optional[str] = None  # Phase 4 advisory triage (docs/22)
+    review_summary: Optional[dict] = None         # actionable reviewer facts (docs/22)
     runtime_ms: int = 0
     error: Optional[str] = None
 
