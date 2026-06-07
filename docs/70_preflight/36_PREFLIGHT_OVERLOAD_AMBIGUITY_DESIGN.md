@@ -92,5 +92,33 @@ Worst case under conservatism: a real ambiguity isn't flagged → Maven catches 
 (safe direction). The reverse (flagging a compilable call, skipping Maven) is what
 the conservatism prevents.
 
-> Status: parked pending the v3.2.3 10-case result. No code until the data picks
-> BUILD vs SHELVE.
+---
+
+## 7. Implementation status (2026-06-07) — IMPLEMENTED + VALIDATED (minimal)
+
+Greenlit ("允许最小实现"). Built minimally and validated offline before trusting it.
+
+- **Code** (`app/quality/generated_test_preflight.py`): `_Call` now carries `args`;
+  added lexical `_classify_arg` (NULL / BOXED / PRIMITIVE / UNKNOWN), `_param_is_reference`,
+  and the two conservative detectors `_null_overload_ambiguous` (Shape A) +
+  `_boxed_primitive_mix_ambiguous` (Shape B), wired into
+  `evaluate_generated_test_preflight` with blocker codes
+  `ambiguous_null_overload_call` / `ambiguous_boxed_primitive_overload_call`.
+  No pipeline/report change beyond the existing `PREFLIGHT_REJECT` path;
+  conclusion stays `NEED_HUMAN_REVIEW`. UNKNOWN args → defer to Maven.
+- **Tests** (`tests/test_generated_test_preflight.py`, +5): both shapes flag;
+  single-reference-overload null, all-primitive, all-boxed, and UNKNOWN-arg calls
+  do **not** flag. Full suite **193 passed, 4 skipped**.
+- **Offline replay over `var/benchmark/v3_2_3-pro-10case` (zero model cost):**
+  caught the 2 overload-ambiguity compile failures — BooleanUtils `toBoolean(null)`
+  and NumberUtils `toDouble(null,…)`, both `ambiguous_null_overload_call`;
+  **over-rejection = NONE** (no compiled PASS/TEST_FAILURE flagged), and the 3
+  other-bucket compile failures (Option import, Options generics, CSVRecord
+  instance-arg) were correctly **not** claimed. Precision 100% on this run.
+
+**Boundary held:** deterministic, lexical-only (never type inference), conservative,
+no repair, no oracle rewrite, no coverage, no model run.
+
+**Still deferred:** a broad replay across *all* historical `bench.db` (would
+re-confirm 0 over-rejection on dozens more samples — a `scripts/` tool, not done
+here); generics-assignment and instance-receiver detection (out of scope by design).

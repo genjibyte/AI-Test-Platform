@@ -34,6 +34,7 @@ class _Call(BaseModel):
     method: str
     arity: int
     evidence: str
+    args: list[str] = Field(default_factory=list)
 
 
 def _strip_java_comments(source: str) -> str:
@@ -191,6 +192,7 @@ def _target_calls(source: str, context: ContextSnapshot) -> list[_Call]:
                 method=match.group("method"),
                 arity=len(args),
                 evidence=evidence[:240],
+                args=args,
             )
         )
     return calls
@@ -238,6 +240,91 @@ def _fixed_arity_match(call: _Call, overloads: list[JavaMethod]) -> bool:
     )
 
 
+# --- Overload-ambiguity detection (docs/36). Lexical only, never type inference;
+# any UNKNOWN argument makes the call defer to Maven (conservative, FP-averse). ---
+_PRIMITIVE_TYPES = {"boolean", "byte", "char", "short", "int", "long", "float", "double"}
+_PRIMITIVE_LIT_RE = re.compile(
+    r"^(?:true|false|'(?:\\.|[^'])+'"          # boolean / char literal
+    r"|[+-]?(?:0[xX][0-9a-fA-F_]+|\d[\d_]*)[lL]?"   # int / long / hex
+    r"|[+-]?(?:\d[\d_]*\.\d*|\.\d+|\d[\d_]*)(?:[eE][+-]?\d+)?[fFdD]?)$"  # float/double
+)
+_BOXED_LIT_RE = re.compile(
+    r"^(?:(?:Boolean|Integer|Long|Double|Float|Short|Byte|Character)\s*\.\s*"
+    r"(?:TRUE|FALSE|valueOf\s*\(.*\))"
+    r"|new\s+(?:Boolean|Integer|Long|Double|Float|Short|Byte|Character)\s*\(.*\))$"
+)
+
+
+def _classify_arg(arg: str) -> str:
+    a = arg.strip()
+    if a == "null":
+        return "NULL"
+    if _BOXED_LIT_RE.match(a):
+        return "BOXED"
+    if _PRIMITIVE_LIT_RE.match(a):
+        return "PRIMITIVE"
+    return "UNKNOWN"
+
+
+def _param_is_reference(jtype: str) -> bool:
+    return jtype.strip().rstrip(".") not in _PRIMITIVE_TYPES
+
+
+def _scalar_same_arity(call: _Call, overloads: list[JavaMethod]) -> list[JavaMethod]:
+    return [m for m in overloads if not _is_varargs(m) and len(m.params) == call.arity]
+
+
+def _loosely_applicable(call: _Call, ov: JavaMethod) -> bool:
+    """Cheap applicability filter: a null cannot bind to a primitive parameter.
+    Everything else is loosely accepted (boxing/unboxing) — we only use this to
+    drop overloads a null clearly cannot reach."""
+    for i, arg in enumerate(call.args):
+        if _classify_arg(arg) == "NULL" and not _param_is_reference(ov.params[i].type):
+            return False
+    return True
+
+
+def _null_overload_ambiguous(call: _Call, overloads: list[JavaMethod]) -> bool:
+    """Shape A: a bare null that >=2 same-arity overloads accept as DIFFERENT
+    reference types is ambiguous and will not compile (e.g. toBoolean(null) ->
+    toBoolean(Boolean) vs toBoolean(String))."""
+    same = _scalar_same_arity(call, overloads)
+    if len(same) < 2:
+        return False
+    applicable = [ov for ov in same if _loosely_applicable(call, ov)]
+    for i, arg in enumerate(call.args):
+        if _classify_arg(arg) != "NULL":
+            continue
+        ref_types = {
+            ov.params[i].type.strip()
+            for ov in applicable
+            if _param_is_reference(ov.params[i].type)
+        }
+        if len(ref_types) >= 2:
+            return True
+    return False
+
+
+def _boxed_primitive_mix_ambiguous(call: _Call, overloads: list[JavaMethod]) -> bool:
+    """Shape B: mixing a boxed arg and a primitive arg in a same-arity
+    primitive/boxed overload family is ambiguous via (un)boxing (e.g.
+    toBoolean(Integer.valueOf(3), 1, 2) -> toBoolean(int,int,int) vs
+    toBoolean(Integer,Integer,Integer))."""
+    kinds = [_classify_arg(a) for a in call.args]
+    if "BOXED" not in kinds or "PRIMITIVE" not in kinds:
+        return False
+    same = _scalar_same_arity(call, overloads)
+    all_primitive = any(
+        ov.params and all(not _param_is_reference(p.type) for p in ov.params)
+        for ov in same
+    )
+    all_reference = any(
+        ov.params and all(_param_is_reference(p.type) for p in ov.params)
+        for ov in same
+    )
+    return all_primitive and all_reference
+
+
 def evaluate_generated_test_preflight(
     source: str,
     context: ContextSnapshot,
@@ -283,6 +370,27 @@ def evaluate_generated_test_preflight(
                     evidence=call.evidence,
                 )
             )
+            continue
+        if _null_overload_ambiguous(call, overloads):
+            blocking.append(
+                PreflightIssue(
+                    code="ambiguous_null_overload_call",
+                    severity="blocker",
+                    message="bare null is ambiguous between same-arity reference-type overloads",
+                    evidence=call.evidence,
+                )
+            )
+            continue
+        if _boxed_primitive_mix_ambiguous(call, overloads):
+            blocking.append(
+                PreflightIssue(
+                    code="ambiguous_boxed_primitive_overload_call",
+                    severity="blocker",
+                    message="mixed boxed/primitive args are ambiguous in a primitive/boxed overload family",
+                    evidence=call.evidence,
+                )
+            )
+            continue
 
     return GeneratedTestPreflightResult(
         checked=True,

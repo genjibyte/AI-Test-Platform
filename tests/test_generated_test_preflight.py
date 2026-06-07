@@ -113,3 +113,61 @@ def test_preflight_checks_fqcn_qualified_calls():
         "class T { void t() { org.apache.commons.lang3.BooleanUtils.missing(1); } }"
     )
     assert "unlisted_target_method" in codes
+
+
+# --- docs/36: overload-ambiguity detection (Shape A bare-null, Shape B mix) ----
+
+def _run(source: str, methods: list[JavaMethod]):
+    ctx = ContextSnapshot(
+        target_class="org.apache.commons.lang3.BooleanUtils",
+        class_structure=JavaClassStructure(
+            package="org.apache.commons.lang3", class_name="BooleanUtils",
+            methods=methods,
+        ),
+    )
+    res = evaluate_generated_test_preflight(source, ctx)
+    return {i.code for i in res.blocking_issues}, res.status
+
+
+def test_preflight_flags_bare_null_reference_overload_ambiguity():
+    # toBoolean(null): Boolean vs String both accept null -> ambiguous (Shape A).
+    methods = [_method("toBoolean", ["boolean"]), _method("toBoolean", ["Boolean"]),
+               _method("toBoolean", ["String"])]
+    codes, _ = _run("class T { void t() { BooleanUtils.toBoolean(null); } }", methods)
+    assert "ambiguous_null_overload_call" in codes
+
+
+def test_preflight_allows_bare_null_single_reference_overload():
+    # Only String accepts null (boolean cannot) -> unambiguous, must not flag.
+    methods = [_method("toBoolean", ["boolean"]), _method("toBoolean", ["String"])]
+    _, status = _run("class T { void t() { BooleanUtils.toBoolean(null); } }", methods)
+    assert status == "PASS"
+
+
+def test_preflight_flags_mixed_boxed_primitive_overload():
+    # toBoolean(Integer.valueOf(3), 1, 2): boxed + primitive in an int/Integer family.
+    methods = [_method("toBoolean", ["int", "int", "int"]),
+               _method("toBoolean", ["Integer", "Integer", "Integer"])]
+    codes, _ = _run(
+        "class T { void t() { BooleanUtils.toBoolean(Integer.valueOf(3), 1, 2); } }",
+        methods,
+    )
+    assert "ambiguous_boxed_primitive_overload_call" in codes
+
+
+def test_preflight_allows_all_primitive_or_all_boxed_call():
+    methods = [_method("toBoolean", ["int", "int", "int"]),
+               _method("toBoolean", ["Integer", "Integer", "Integer"])]
+    prim, _ = _run("class T { void t() { BooleanUtils.toBoolean(1, 2, 3); } }", methods)
+    boxed, _ = _run(
+        "class T { void t() { BooleanUtils.toBoolean(Integer.valueOf(1), "
+        "Integer.valueOf(2), Integer.valueOf(3)); } }", methods)
+    assert prim == set() and boxed == set()
+
+
+def test_preflight_overload_ambiguity_unknown_args_defer_to_maven():
+    # Variables are UNKNOWN -> never spuriously flagged (conservative, FP-averse).
+    methods = [_method("toBoolean", ["int", "int", "int"]),
+               _method("toBoolean", ["Integer", "Integer", "Integer"])]
+    _, status = _run("class T { void t() { BooleanUtils.toBoolean(a, b, c); } }", methods)
+    assert status == "PASS"
