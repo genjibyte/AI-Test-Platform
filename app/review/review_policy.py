@@ -93,6 +93,7 @@ def build_review_summary(
     result = generation.get("result") or {}
     write = generation.get("write") or {}
     target = generation.get("target") or {}
+    preflight = generation.get("preflight") or {}
     return {
         "recommendation": recommendation,
         "conclusion": CONCLUSION,
@@ -113,6 +114,16 @@ def build_review_summary(
             "omitted_uncertain_cases": result.get("omitted_uncertain_cases", []),
             "risk_flags": result.get("risk_flags", []),
             "dependency_assumptions": result.get("dependency_assumptions", []),
+        },
+        "preflight": {
+            "status": preflight.get("status"),
+            "blockers": [
+                {
+                    "code": i.get("code"),
+                    "evidence": i.get("evidence"),
+                }
+                for i in preflight.get("blocking_issues") or []
+            ],
         },
         "patch_preview": {
             "file_path": write.get("file_path"),

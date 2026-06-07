@@ -53,6 +53,7 @@ def assemble_generation_report(generation: dict) -> dict:
     write = generation.get("write") or {}
     execution = generation.get("execution") or {}
     repair = generation.get("repair") or {}
+    preflight = generation.get("preflight") or {}
     delta = generation.get("coverage_delta")
 
     outcome = execution.get("gen_outcome")
@@ -127,6 +128,7 @@ def assemble_generation_report(generation: dict) -> dict:
         # coverage delta (P2-T08)
         "coverage_delta": coverage,
         "quality_gate": quality_dict,
+        "preflight": preflight,
         # Phase 4 (docs/22): advisory recommendation + reviewer summary.
         "review_recommendation": review_recommendation,
         "review_summary": review_summary,

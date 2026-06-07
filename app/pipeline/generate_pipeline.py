@@ -28,6 +28,7 @@ from app.context.context_collector import ContextError, build_snapshot
 from app.coverage.coverage_compare import compare
 from app.coverage.jacoco_parser import parse_jacoco, parse_jacoco_class
 from app.generate.gen_executor import (
+    GenExecResult,
     GenTestOutcome,
     execute_generated_test,
     fqcn_of,
@@ -37,6 +38,7 @@ from app.generate.test_writer import TestWriteError, write_generated_test
 from app.llm.client import LLMClient, LLMRequestError, get_client
 from app.llm.schema import LLMOutputError
 from app.models.job import Job, JobStatus
+from app.quality.generated_test_preflight import evaluate_generated_test_preflight
 from app.repair.compile_repair import repair_compile_failure
 from app.runtime.workspace import Workspace
 from app.storage.job_repo import JobRepo
@@ -62,6 +64,28 @@ def _gen_fail(repo: JobRepo, job: Job, bundle: dict, reason: str) -> Job:
     job.error = reason
     repo.save(job)
     return repo.get(job.id)
+
+
+def _preflight_reject_result(generated_class: str) -> GenExecResult:
+    """Synthetic execution fact for a deterministic pre-Maven rejection."""
+    return GenExecResult(
+        generated_class=generated_class,
+        gen_outcome=GenTestOutcome.COMPILE_FAILURE,
+        build_outcome="PREFLIGHT_REJECT",
+        gen_report_found=False,
+        gen_total=0,
+        gen_passed=0,
+        gen_failed=0,
+        gen_errors=0,
+        gen_skipped=0,
+        suite_result={},
+        after_coverage={"has_report": False},
+        log_path=None,
+        exec_record={
+            "tool": "generated_test_preflight",
+            "outcome": "PREFLIGHT_REJECT",
+        },
+    )
 
 
 def run_generation(
@@ -123,6 +147,26 @@ def run_generation(
     except LLMOutputError as exc:   # model returned unparseable / off-schema JSON
         return _gen_fail(repo, job, bundle, f"LLM output invalid: {exc}")
     bundle["result"] = result.model_dump()
+
+    preflight = evaluate_generated_test_preflight(result.test_source, snapshot)
+    bundle["preflight"] = preflight.model_dump()
+    job.generation = bundle
+    repo.save(job)
+    if preflight.status == "FAIL":
+        repo.update_status(job.id, JobStatus.GEN_EXECUTE)
+        job = repo.get(job.id)
+        bundle["execution"] = _preflight_reject_result(
+            fqcn_of(result)
+        ).model_dump()
+        job.generation = bundle
+        repo.save(job)
+        repo.update_status(job.id, JobStatus.COMPARE)
+        job = repo.get(job.id)
+        job.generation = bundle
+        repo.save(job)
+        repo.update_status(job.id, JobStatus.GEN_DONE)
+        return repo.get(job.id)
+
     try:
         write = write_generated_test(repo_dir, result)
     except TestWriteError as exc:

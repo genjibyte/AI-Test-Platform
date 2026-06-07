@@ -127,6 +127,33 @@ def test_quality_gate_can_pass_a_grounded_meaningful_test():
     assert r["quality_gate"]["metrics"]["assertions"] == 1
 
 
+def test_preflight_findings_surface_in_report_and_review_summary():
+    bundle = _bundle()
+    bundle["preflight"] = {
+        "checked": True,
+        "status": "FAIL",
+        "blocking_issues": [{
+            "code": "unlisted_target_overload_arity",
+            "severity": "blocker",
+            "message": "target-class call arity is not in the rendered method list",
+            "evidence": "Calc.missing(1, 2)",
+        }],
+        "metrics": {"target_class_calls": 1},
+    }
+    bundle["execution"] = {
+        "gen_outcome": "COMPILE_FAILURE",
+        "build_outcome": "PREFLIGHT_REJECT",
+    }
+    r = assemble_generation_report(bundle)
+    assert r["preflight"]["status"] == "FAIL"
+    assert r["preflight"]["blocking_issues"][0]["code"] == (
+        "unlisted_target_overload_arity"
+    )
+    assert r["review_summary"]["preflight"]["blockers"][0]["evidence"] == (
+        "Calc.missing(1, 2)"
+    )
+
+
 def test_compile_failure_not_compiled_not_executed():
     r = assemble_generation_report(
         _bundle(execution={"gen_outcome": "COMPILE_FAILURE",
