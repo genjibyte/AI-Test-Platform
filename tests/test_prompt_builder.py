@@ -210,6 +210,19 @@ def test_v3_2_overload_varargs_primitive_boxed_strengthened():
     assert "(Boolean) null" in sys
 
 
+def test_v3_2_1_varargs_positive_paths_use_named_typed_arrays():
+    # v3.2 4-case BooleanUtils still emitted BooleanUtils.and(true, true), which
+    # is ambiguous between boolean... and Boolean... overloads. v3.2.1 makes the
+    # positive-path form explicit instead of relying on a loose typed-array hint.
+    sys = build_system_prompt(_ctx())
+    assert "named typed array variable" in sys
+    assert "BooleanUtils.and(values)" in sys
+    assert "BooleanUtils.and(boxedValues)" in sys
+    assert "Never write BooleanUtils.and(true, true)" in sys
+    assert "BooleanUtils.and(Boolean.TRUE, Boolean.TRUE)" in sys
+    assert "SKIP it into omitted_uncertain_cases" in sys
+
+
 def test_v3_2_method_must_be_in_rendered_list():
     # 10-case CSVRecord: called putInMap(...) which is not on the class in this version.
     sys = build_system_prompt(_ctx())
