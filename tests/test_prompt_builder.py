@@ -249,6 +249,15 @@ def test_v3_2_flat_tests_no_nested():
     assert "do NOT use @Nested" in sys
 
 
+def test_v3_2_2_bare_null_overload_guardrail():
+    # Recurring bucket: NumberUtils.toDouble(null, ...) and BooleanUtils.toBoolean(null)
+    # are ambiguous between same-arity reference-type overloads -> compile failure.
+    sys = build_system_prompt(_ctx())
+    assert "bare null is AMBIGUOUS and will not compile" in sys
+    assert "multiple same-arity overloads differing only by a reference-type parameter" in sys
+    assert "toDouble(BigDecimal, double) vs toDouble(String, double)" in sys
+
+
 def test_api_grounding_only_context_apis():
     sys = build_system_prompt(_ctx())
     assert "Use ONLY types" in sys

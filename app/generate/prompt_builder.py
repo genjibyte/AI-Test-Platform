@@ -36,6 +36,11 @@ v3.2 prompt/context hardening (docs/29, driven by the v3.1 10-case review docs/2
 v3.2.1 prompt-only guardrail (docs/30): primitive/boxed varargs overload pairs
 must use named typed array variables for positive-path calls; if the model
 cannot do that, it must skip the method instead of emitting ambiguous Java.
+v3.2.2 prompt-only guardrail: a bare null to a method with multiple same-arity
+reference-type overloads (toBoolean(Boolean|String);
+toDouble(BigDecimal|String, double)) is ambiguous and will not compile — cast to
+the evidenced type or skip. Prompt/test only; no pipeline/repair/preflight change.
+(Surfaced by the live BooleanUtils validation; its review doc follows the next live run.)
 Per-method return-body grounding and an invalid-JSON retry remain deferred (v4).
 """
 from __future__ import annotations
@@ -87,6 +92,11 @@ SYSTEM_PROMPT = (
     "BooleanUtils.and(boxedValues). Never write BooleanUtils.and(true, true), "
     "BooleanUtils.and(Boolean.TRUE, Boolean.TRUE), or mixed individual varargs; "
     "if unsure, SKIP it into omitted_uncertain_cases.\n"
+    "- A bare null is AMBIGUOUS and will not compile when the target has multiple "
+    "same-arity overloads differing only by a reference-type parameter "
+    "(toBoolean(Boolean) vs toBoolean(String); toDouble(BigDecimal, double) vs "
+    "toDouble(String, double)): cast null to the evidenced type ((Boolean) null, "
+    "(String) null) or SKIP into omitted_uncertain_cases.\n"
     "[Oracle grounding]\n"
     "- Derive every expected value from EVIDENCE (target source or neighbor "
     "test). If not derivable, SKIP into omitted_uncertain_cases; never guess.\n"
