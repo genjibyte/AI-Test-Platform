@@ -54,7 +54,7 @@ SYSTEM_PROMPT = (
     "neighbor test does, unless the target itself is that constructor's "
     "behavior.\n"
     "- Before calling any method, confirm it appears in the rendered method list "
-    "in the context; if it is not listed, it does not exist in this version — "
+    "in the context; if it is not listed, it does not exist in this version, so "
     "skip it.\n"
     "[Imports]\n"
     "- test_source must be ONE self-contained compilable file: a package "
