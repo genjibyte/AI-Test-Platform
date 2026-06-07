@@ -1,6 +1,6 @@
 # Phase 2 中期验收、审计与后续规划
 
-> 上级文档：`docs/00_PROJECT_CHARTER.md`、`docs/07_SOURCE_NOTES.md`、`docs/09_PHASE2_BACKLOG.md`。
+> 上级文档：`/docs/00_foundation/00_PROJECT_CHARTER.md`、`/docs/00_foundation/07_SOURCE_NOTES.md`、`/docs/20_phase2/09_PHASE2_BACKLOG.md`。
 > 报告日期：2026-06-06（换机后在新机器上重建环境并复核）。
 > 性质：**中期审计 + 规划，不是 Phase 2 终验**。Phase 2 终验报告待 T11 完成后另出（`docs/1X_PHASE2_ACCEPTANCE_REPORT.md`）。
 > 本文不实现新功能，只记录"已设计/已实现的事实"、"红线合规结论"、"差距"与"后续计划"。
@@ -124,7 +124,7 @@
 - **T08**：`CoverageDelta` 模型记录 `line/branch` 的 before/after/delta、`coverage_not_dropped: bool`、目标类聚合增量。需让 `jacoco_parser` 能按类聚合（当前 `parse_jacoco` 多为汇总，需补"按 `com.example.Calc` 提取 counter"）。判据来自 `docs/00` 北极星：覆盖率不下降 + 目标提升可量化；**不把"覆盖率提升"等同"有效"**。
 - **T09**：报告新增"生成段"——是否生成/编译/执行、覆盖率 delta、新增测试 diff（patch 预览）、是否改生产代码（应为否）、结论恒为 `NEED_HUMAN_REVIEW`；新增 `GET /jobs/{id}/generation`。**不输出 accept/reject**。
 - **T10**：`Job` 增 Phase 2 状态（`TARGET_SELECT/CONTEXT/GENERATE/GEN_EXECUTE/COMPARE/GEN_DONE/GEN_FAILED`）与字段（`target`、`generation`、`coverage_delta`），同步 `schema.sql`/`job_repo`；`generate_pipeline.py` 串起 T01–T09，任一步失败短路 `GEN_FAILED` 并留日志；与 Phase 1 判卷解耦但复用其 baseline。顺手补齐 §4.1。
-- **T11**：`tests/e2e/test_phase2_e2e.py`（门控 `TESTAGENT_E2E`，用假客户端产出固定测试，或真实模型可选）；跑通 `Calc.max` 全链路；产出 `docs/11_PHASE2_ACCEPTANCE_REPORT.md`（含成功**与**失败用例，禁止只演示成功）。
+- **T11**：`tests/e2e/test_phase2_e2e.py`（门控 `TESTAGENT_E2E`，用假客户端产出固定测试，或真实模型可选）；跑通 `Calc.max` 全链路；产出 `/docs/20_phase2/11_PHASE2_ACCEPTANCE_REPORT.md`（含成功**与**失败用例，禁止只演示成功）。
 
 **Phase 2 完成定义（DoD，复述自 `docs/09` §3）**：T01–T11 全过；对一个目标类/方法能"有界上下文→LLM 生成→写独立测试→真实执行→覆盖率对比→出报告"；生成测试可编译可执行、目标覆盖率较 baseline 可量化变化；全程零生产码改动、零既有测试改动、零自动入仓、零 Fixer、零门禁；不确定默认 `NEED_HUMAN_REVIEW`。
 

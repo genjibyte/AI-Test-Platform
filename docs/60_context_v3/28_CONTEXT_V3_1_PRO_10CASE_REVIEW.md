@@ -15,7 +15,7 @@ Observed change scope:
 - `app/generate/prompt_builder.py`: additive `SYSTEM_PROMPT` rules only.
 - `tests/test_prompt_builder.py`: tests pin overload/generic, public API, and doc/source-conflict rules.
 - `tests/test_generation.py`: bounded-context prompt-length heuristic raised from 4000 to 6000.
-- `docs/27_CONTEXT_V3_1_PROMPT_HARDENING.md`: design note.
+- `/docs/60_context_v3/27_CONTEXT_V3_1_PROMPT_HARDENING.md`: design note.
 
 No parser, repair, coverage, benchmark runner, or production pipeline code changed in this commit.
 

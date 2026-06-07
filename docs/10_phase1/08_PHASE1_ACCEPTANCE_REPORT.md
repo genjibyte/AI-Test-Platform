@@ -1,6 +1,6 @@
 # Phase 1 验收报告（判卷场）
 
-> 上级文档：`docs/00_PROJECT_CHARTER.md`、`docs/05_PHASE1_BACKLOG.md`、`docs/07_SOURCE_NOTES.md`。
+> 上级文档：`/docs/00_foundation/00_PROJECT_CHARTER.md`、`/docs/10_phase1/05_PHASE1_BACKLOG.md`、`/docs/00_foundation/07_SOURCE_NOTES.md`。
 > 验收日期：2026-06-05。
 > 结论：**Phase 1 通过。判卷场闭环成立，且真实 Maven 判卷核心已用真实工程验证。**
 > 本报告不实现任何新功能，仅记录验收证据。
@@ -211,7 +211,7 @@ No matches found
 2. 执行只读：`mvn test` 在隔离工作区内运行；JaCoCo 经**命令行 plugin 目标注入**（`org.jacoco:...:prepare-agent/report`），**从不修改 pom 或源码**。
 3. 平台只向 `workspace/<job>/logs/` 写日志，从不向被测仓库 `src/` 写入。
 
-事实证据：本次真实 e2e 后，`samples/calc` 的源码与 pom **无改动**（`git status` 仅显示 `docs/07_SOURCE_NOTES.md` 未跟踪；`samples/calc` 下仅新增 `target/`，且 `target/` 已被 gitignore，非源码）。
+事实证据：本次真实 e2e 后，`samples/calc` 的源码与 pom **无改动**（`git status` 仅显示 `/docs/00_foundation/07_SOURCE_NOTES.md` 未跟踪；`samples/calc` 下仅新增 `target/`，且 `target/` 已被 gitignore，非源码）。
 
 ---
 
@@ -299,12 +299,12 @@ Your branch is up to date with 'origin/main'.
 
 Untracked files:
   (use "git add <file>..." to include in what will be committed)
-	docs/07_SOURCE_NOTES.md
+	/docs/00_foundation/07_SOURCE_NOTES.md
 
 nothing added to commit but untracked files present
 ```
 
-> 仅 `docs/07_SOURCE_NOTES.md` 未跟踪（工程知识文件，本次新增）。
+> 仅 `/docs/00_foundation/07_SOURCE_NOTES.md` 未跟踪（工程知识文件，本次新增）。
 > 无任何 `app/` 或 `samples/` 源码改动 → 印证第 10 节。
 
 ## 附录 C：git log --format=fuller -1

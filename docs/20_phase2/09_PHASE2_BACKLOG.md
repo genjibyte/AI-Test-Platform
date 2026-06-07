@@ -1,6 +1,6 @@
 # Phase 2 Backlog —— 最小生成器（Minimal Generator）
 
-> 上级文档：`docs/00_PROJECT_CHARTER.md`、`docs/05_PHASE1_BACKLOG.md`、`docs/07_SOURCE_NOTES.md`。
+> 上级文档：`/docs/00_foundation/00_PROJECT_CHARTER.md`、`/docs/10_phase1/05_PHASE1_BACKLOG.md`、`/docs/00_foundation/07_SOURCE_NOTES.md`。
 > 冲突时以 Charter 为准；范围以 `docs/07` 第 5 节 Phase 2 定义为准。
 > 本文档只规划 **Phase 2**，**不写代码**，**不启动实现**。
 

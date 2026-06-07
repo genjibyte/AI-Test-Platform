@@ -6,7 +6,7 @@
 
 ## 1. Purpose
 
-`docs/32_GENERATED_TEST_PREFLIGHT_GATE.md` introduced a deterministic
+`/docs/70_preflight/32_GENERATED_TEST_PREFLIGHT_GATE.md` introduced a deterministic
 generated-test preflight gate. Because a preflight `FAIL` skips Maven in the
 current pipeline, the gate needs an explicit evidence check before the next paid
 benchmark.

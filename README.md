@@ -5,19 +5,20 @@
 > **当前阶段：Phase 2 已验收 — 最小生成器。** 在 Phase 1 判卷场之上，新增"目标选择 → 有界上下文 →
 > LLM 生成 → 写独立测试 → 真实执行 → 覆盖率对比 → 报告"，结论恒为 `NEED_HUMAN_REVIEW`。
 > **仍不做 Fixer（Phase 3）、不做质量门禁（Phase 4）、不自动入仓、不改生产代码。**
-> Phase 1 见 [`docs/05`](docs/05_PHASE1_BACKLOG.md)，Phase 2 见 [`docs/09`](docs/09_PHASE2_BACKLOG.md) 与验收 [`docs/11`](docs/11_PHASE2_ACCEPTANCE_REPORT.md)。
+> Phase 1 见 [`docs/05`](/docs/10_phase1/05_PHASE1_BACKLOG.md)，Phase 2 见 [`docs/09`](/docs/20_phase2/09_PHASE2_BACKLOG.md) 与验收 [`docs/11`](/docs/20_phase2/11_PHASE2_ACCEPTANCE_REPORT.md)。
 
 ## 文档
 
 | 文档 | 作用 |
 |---|---|
-| [`docs/00_PROJECT_CHARTER.md`](docs/00_PROJECT_CHARTER.md) | 最高约束文件 |
-| [`docs/01_PROJECT_PLAN.md`](docs/01_PROJECT_PLAN.md) | 里程碑规划 |
-| [`docs/04_ENV_AND_STACK_DECISION.md`](docs/04_ENV_AND_STACK_DECISION.md) | 技术栈决策 + 环境前置 |
-| [`docs/05_PHASE1_BACKLOG.md`](docs/05_PHASE1_BACKLOG.md) | Phase 1 任务拆解 |
-| [`docs/09_PHASE2_BACKLOG.md`](docs/09_PHASE2_BACKLOG.md) | Phase 2 任务拆解 |
-| [`docs/10_PHASE2_MIDPHASE_AUDIT.md`](docs/10_PHASE2_MIDPHASE_AUDIT.md) | Phase 2 中期审计 + 后续规划 |
-| [`docs/11_PHASE2_ACCEPTANCE_REPORT.md`](docs/11_PHASE2_ACCEPTANCE_REPORT.md) | Phase 2 验收报告 |
+| [`/docs/README.md`](/docs/README.md) | 分层文档总索引 |
+| [`/docs/00_foundation/00_PROJECT_CHARTER.md`](/docs/00_foundation/00_PROJECT_CHARTER.md) | 最高约束文件 |
+| [`/docs/00_foundation/01_PROJECT_PLAN.md`](/docs/00_foundation/01_PROJECT_PLAN.md) | 里程碑规划 |
+| [`/docs/00_foundation/04_ENV_AND_STACK_DECISION.md`](/docs/00_foundation/04_ENV_AND_STACK_DECISION.md) | 技术栈决策 + 环境前置 |
+| [`/docs/10_phase1/05_PHASE1_BACKLOG.md`](/docs/10_phase1/05_PHASE1_BACKLOG.md) | Phase 1 任务拆解 |
+| [`/docs/20_phase2/09_PHASE2_BACKLOG.md`](/docs/20_phase2/09_PHASE2_BACKLOG.md) | Phase 2 任务拆解 |
+| [`/docs/20_phase2/10_PHASE2_MIDPHASE_AUDIT.md`](/docs/20_phase2/10_PHASE2_MIDPHASE_AUDIT.md) | Phase 2 中期审计 + 后续规划 |
+| [`/docs/20_phase2/11_PHASE2_ACCEPTANCE_REPORT.md`](/docs/20_phase2/11_PHASE2_ACCEPTANCE_REPORT.md) | Phase 2 验收报告 |
 
 ## 技术栈
 
@@ -35,7 +36,7 @@ $env:TESTAGENT_MAVEN_CMD = "C:\path\to\apache-maven\bin\mvn.cmd"
 
 > 仅运行下方骨架（health 接口）不需要 Maven/JDK。
 > 注意：若宿主机有会加密落盘文件的 DLP/安全代理，git 克隆出的源码可能被篡改，
-> 导致远程仓库无法构建。详见 `docs/06_PHASE1_GOLDEN_SAMPLE.md`。
+> 导致远程仓库无法构建。详见 `/docs/10_phase1/06_PHASE1_GOLDEN_SAMPLE.md`。
 
 ## 快速开始
 

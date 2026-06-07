@@ -12,7 +12,7 @@ test pass, but the remaining blocker is oracle/test quality. A generated test ca
 compile and pass while still being weak, tautological, unstable, or unrelated to
 the target behavior.
 
-This is the exact Phase 4 direction described in `docs/07_SOURCE_NOTES.md`:
+This is the exact Phase 4 direction described in `/docs/00_foundation/07_SOURCE_NOTES.md`:
 assertion quality checks, production-code boundary checks, coverage comparison,
 and weak assertion detection.
 

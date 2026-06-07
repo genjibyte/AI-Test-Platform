@@ -1,6 +1,6 @@
 # Phase 1 端到端验证与选样记录（P1-T11）
 
-> 上级文档：`docs/00_PROJECT_CHARTER.md`、`docs/05_PHASE1_BACKLOG.md`。
+> 上级文档：`/docs/00_foundation/00_PROJECT_CHARTER.md`、`/docs/10_phase1/05_PHASE1_BACKLOG.md`。
 > 记录日期：2026-06-05。
 
 ---

@@ -28,8 +28,8 @@ The Phase 2.5 real-repo benchmark showed that the platform's useful pain is not 
 
 Evidence:
 
-- `docs/15_PHASE2_5_RESULT_REVIEW.md` records the first 3-case run: 0/3 generated tests passed, with 2 compile failures and 1 oracle/test failure.
-- `docs/16_MODEL_COMPARISON_REVIEW.md` records model comparison: stronger model helps but does not remove failures.
+- `/docs/30_phase2_5_quality/15_PHASE2_5_RESULT_REVIEW.md` records the first 3-case run: 0/3 generated tests passed, with 2 compile failures and 1 oracle/test failure.
+- `/docs/30_phase2_5_quality/16_MODEL_COMPARISON_REVIEW.md` records model comparison: stronger model helps but does not remove failures.
 - `var/benchmark/v2-flash/report.md` and `var/benchmark/v2-pro/report.md` show v2 prompt/context still had 67% compile pass and 33% generated-test pass in both model tiers.
 
 This round therefore focuses on two concrete enterprise-like constraints:
@@ -90,7 +90,7 @@ Evidence:
 - The remaining failing case is `commons-cli Option`.
 - The failure is behavioral/oracle-related, not harness setup, clone, or repo build: setup/clone/repo build failures are all 0 in the benchmark reports.
 
-Do not solve this by automatically changing expected values to match runtime output. That would create weak or tautological tests, which conflicts with the direction in `docs/07_SOURCE_NOTES.md` and `docs/15_PHASE2_5_RESULT_REVIEW.md`.
+Do not solve this by automatically changing expected values to match runtime output. That would create weak or tautological tests, which conflicts with the direction in `/docs/00_foundation/07_SOURCE_NOTES.md` and `/docs/30_phase2_5_quality/15_PHASE2_5_RESULT_REVIEW.md`.
 
 Also not solved:
 

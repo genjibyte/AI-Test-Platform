@@ -2,7 +2,7 @@
 
 > 日期：2026-06-06  
 > 性质：方向审计 + 下一步设计，不包含 Phase 3 实现。  
-> 上级文档：`docs/00_PROJECT_CHARTER.md`、`docs/07_SOURCE_NOTES.md`、`docs/13_PROJECT_DIRECTION_REVIEW.md`、`docs/14_PHASE2_5_BENCHMARK.md`、`docs/15_PHASE2_5_RESULT_REVIEW.md`。  
+> 上级文档：`/docs/00_foundation/00_PROJECT_CHARTER.md`、`/docs/00_foundation/07_SOURCE_NOTES.md`、`/docs/00_foundation/13_PROJECT_DIRECTION_REVIEW.md`、`/docs/30_phase2_5_quality/14_PHASE2_5_BENCHMARK.md`、`/docs/30_phase2_5_quality/15_PHASE2_5_RESULT_REVIEW.md`。  
 > 证据目录：`var/benchmark/deepseek/`（`deepseek-v4-flash`）与 `var/benchmark/deepseek-pro-final/`（`deepseek-v4-pro`）。
 
 ---
@@ -32,7 +32,7 @@
 
 - `var/benchmark/deepseek/report.md`：`provider=openai`、`model=deepseek-v4-flash`、`setup_failures=0`、`clone_failures=0`、`repo_build_failures=0`。
 - `var/benchmark/deepseek-pro-final/report.md`：`provider=openai`、`model=deepseek-v4-pro`、`setup_failures=0`、`clone_failures=0`、`repo_build_failures=0`。
-- 两次运行均为真实 Maven 判卷，覆盖率轴本轮按 `docs/14_PHASE2_5_BENCHMARK.md` 策略关闭，因此 `coverage_measured=0/3`。
+- 两次运行均为真实 Maven 判卷，覆盖率轴本轮按 `/docs/30_phase2_5_quality/14_PHASE2_5_BENCHMARK.md` 策略关闭，因此 `coverage_measured=0/3`。
 
 ### 1.2 Per-case 对照
 
@@ -128,7 +128,7 @@ pro：
 
 - pro 的 WordUtils 失败数从 `16/34` 降到 `11/55`，但仍未通过。
 - 这说明更强模型能改善一部分行为理解，但不能替代确定性判卷和质量门禁。
-- 这类问题不能用自动修复器直接“把 expected 改成 actual”。那会违反 `docs/07_SOURCE_NOTES.md` 中“不让 LLM 当验证者”和“避免弱断言/同义反复测试”的设计原则。
+- 这类问题不能用自动修复器直接“把 expected 改成 actual”。那会违反 `/docs/00_foundation/07_SOURCE_NOTES.md` 中“不让 LLM 当验证者”和“避免弱断言/同义反复测试”的设计原则。
 
 ---
 
@@ -203,7 +203,7 @@ Phase 3 最小目标应该是：
 | missing import / static import | `assertNotSame` 未导入、`Stream` 未导入 | flash Option、pro CSVRecord | 应引入 |
 | nested class qualification | `Builder` 应为 `Option.Builder` | flash Option | 应引入 |
 | source-level syntax | 方法内 local enum | flash CSVRecord | 应引入，但只做简单迁移/重生，不做复杂 AST 重构 |
-| nonexistent method / API hallucination | smoke 中 `setObjectType`、`setType(Object)` 这类方法幻觉 | `docs/14_PHASE2_5_BENCHMARK.md` smoke 记录 | 可分类，谨慎修复 |
+| nonexistent method / API hallucination | smoke 中 `setObjectType`、`setType(Object)` 这类方法幻觉 | `/docs/30_phase2_5_quality/14_PHASE2_5_BENCHMARK.md` smoke 记录 | 可分类，谨慎修复 |
 | test dependency misuse | Mockito mock final class | pro Option | 先分类，不作为第一版主修复目标 |
 | oracle mismatch | WordUtils expected 错 | flash/pro WordUtils | 不引入自动修复 |
 
@@ -280,7 +280,7 @@ Phase 3 不做：
 
 价值：
 
-- 接近 `docs/00_PROJECT_CHARTER.md` 中的完整 MVP：生成、判卷、修复、拒收、审计报告。
+- 接近 `/docs/00_foundation/00_PROJECT_CHARTER.md` 中的完整 MVP：生成、判卷、修复、拒收、审计报告。
 
 ### C. 激进路线：企业 PoC
 

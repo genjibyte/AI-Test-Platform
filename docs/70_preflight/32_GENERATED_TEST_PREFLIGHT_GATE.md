@@ -5,7 +5,7 @@
 
 ## 1. Why This Exists
 
-`docs/31_CONTEXT_V3_2_1_BOOLEANUTILS_REVIEW.md` showed a useful failure
+`/docs/60_context_v3/31_CONTEXT_V3_2_1_BOOLEANUTILS_REVIEW.md` showed a useful failure
 migration:
 
 - v3.2.1 fixed the original primitive/boxed varargs ambiguity in

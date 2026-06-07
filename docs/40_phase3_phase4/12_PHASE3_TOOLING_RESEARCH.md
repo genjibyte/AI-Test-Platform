@@ -1,6 +1,6 @@
 # Phase 3 修复闭环 —— 开源工具 / Skill / 知识库选型调研
 
-> 上级文档：`docs/00_PROJECT_CHARTER.md`、`docs/07_SOURCE_NOTES.md`、`docs/09_PHASE2_BACKLOG.md`、`docs/11_PHASE2_ACCEPTANCE_REPORT.md`。
+> 上级文档：`/docs/00_foundation/00_PROJECT_CHARTER.md`、`/docs/00_foundation/07_SOURCE_NOTES.md`、`/docs/20_phase2/09_PHASE2_BACKLOG.md`、`/docs/20_phase2/11_PHASE2_ACCEPTANCE_REPORT.md`。
 > 日期：2026-06-06。
 > 性质：**纯调研文档**。不安装任何依赖、不改任何代码、不写实现。仅给出"引入/不引入"建议。
 > 范围：Phase 3 = 失败分类 + 有限 Fixer（**≤3 轮**）+ patch 历史 + badcase 落库（`docs/07` §5 Phase 3）。

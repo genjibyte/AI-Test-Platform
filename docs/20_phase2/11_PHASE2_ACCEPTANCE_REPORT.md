@@ -1,6 +1,6 @@
 # Phase 2 验收报告（最小生成器）
 
-> 上级文档：`docs/00_PROJECT_CHARTER.md`、`docs/07_SOURCE_NOTES.md`、`docs/09_PHASE2_BACKLOG.md`。
+> 上级文档：`/docs/00_foundation/00_PROJECT_CHARTER.md`、`/docs/00_foundation/07_SOURCE_NOTES.md`、`/docs/20_phase2/09_PHASE2_BACKLOG.md`。
 > 验收日期：2026-06-06。
 > 结论：**Phase 2 通过。最小生成器闭环成立——目标→有界上下文→LLM 生成→写独立测试→真实执行→覆盖率对比→报告，全部用真实 Maven 验证，且成功与失败两类结果均被如实记录。**
 > 本报告不实现新功能，仅记录验收证据。

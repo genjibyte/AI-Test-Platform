@@ -306,7 +306,7 @@ Required:
 
 Coding Agents must follow these rules:
 
-1. Read `docs/00_PROJECT_CHARTER.md` before every major task.
+1. Read `/docs/00_foundation/00_PROJECT_CHARTER.md` before every major task.
 2. Read this file before making scope decisions.
 3. Do not start a later phase before the current phase is accepted.
 4. Do not introduce LLM calls before Phase 2.

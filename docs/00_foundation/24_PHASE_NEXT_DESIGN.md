@@ -1,9 +1,9 @@
 # Phase Next — 方向审计与下一阶段设计（技术负责人视角）
 
 > 日期：2026-06-07。性质：**方向审计 + 设计**，不写代码、不跑模型、不安装工具、不重构、不新增大功能。
-> 上级约束：`docs/00_PROJECT_CHARTER.md`、`docs/07_SOURCE_NOTES.md`。
+> 上级约束：`/docs/00_foundation/00_PROJECT_CHARTER.md`、`/docs/00_foundation/07_SOURCE_NOTES.md`。
 > 关联：`docs/20`、`docs/21`、`docs/22`、`docs/23`（本会话新建的 frozen benchmark manifest）。
-> **编号说明**：用户要求文件名为 `docs/23_PHASE_NEXT_DESIGN.md`，但本会话已先建 `docs/23_BENCHMARK_MANIFEST.md`（Step 2 工件，已被代码/JSON 引用）。为遵守“不覆盖已有文档”且不在本轮改代码，本文落到 `docs/24`。若需互换编号，请告知。
+> **编号说明**：用户要求文件名为 `docs/23_PHASE_NEXT_DESIGN.md`，但本会话已先建 `/docs/50_benchmark/23_BENCHMARK_MANIFEST.md`（Step 2 工件，已被代码/JSON 引用）。为遵守“不覆盖已有文档”且不在本轮改代码，本文落到 `docs/24`。若需互换编号，请告知。
 > **方法纪律**：每个判断给出（本项目事实证据 ‖ 外部高可信来源链接）。外部来源限学术论文、官方文档、厂商工程博客；不引用营销软文。来源汇总见 §5。
 
 ---

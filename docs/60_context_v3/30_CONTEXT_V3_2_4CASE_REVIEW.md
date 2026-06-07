@@ -16,7 +16,7 @@ Model:
 - provider: `openai`
 - model: `deepseek-v4-pro`
 
-Cases selected from the v3.2 acceptance risks in `docs/29_CONTEXT_V3_2_HARDENING.md`:
+Cases selected from the v3.2 acceptance risks in `/docs/60_context_v3/29_CONTEXT_V3_2_HARDENING.md`:
 
 | Case | Why selected |
 |---|---|
@@ -58,7 +58,7 @@ Per case:
 
 ## 3. Acceptance Check Against docs/29
 
-`docs/29_CONTEXT_V3_2_HARDENING.md` defines the targeted validation acceptance:
+`/docs/60_context_v3/29_CONTEXT_V3_2_HARDENING.md` defines the targeted validation acceptance:
 
 - `BooleanUtils` compiles with typed varargs / cast null.
 - `Validate` reports real test counts and avoids `@Nested`.

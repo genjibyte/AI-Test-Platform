@@ -1,6 +1,6 @@
 # 环境与技术栈决策记录（Phase 1）
 
-> 上级文档：`docs/00_PROJECT_CHARTER.md`、`docs/05_PHASE1_BACKLOG.md`。
+> 上级文档：`/docs/00_foundation/00_PROJECT_CHARTER.md`、`/docs/10_phase1/05_PHASE1_BACKLOG.md`。
 > 本文档补齐 backlog 0.3 节遗留的「技术栈仅为假设、无正式记录」空白，并登记开发环境审计结论。
 > 记录日期：2026-06-05。
 

@@ -5,7 +5,7 @@
 > 阅读范围：`docs/00`、`docs/07`、`docs/11`、`docs/12`、`app/`、`tests/`、`samples/`、`git log`。
 > 证据规则：每个判断标注代码文件 / 测试 / 文档 / commit；不确定处写明"不确定"与验证方法；不写营销话术。
 
-> **文档勘误（先记）**：审计任务清单第 4 项指向 `docs/12_PHASE3_TOOL_SKILL_KB_AUDIT.md`，仓库中**不存在**该文件；实际文件为 `docs/12_PHASE3_TOOLING_RESEARCH.md`（本次已阅）。
+> **文档勘误（先记）**：审计任务清单第 4 项指向 `docs/12_PHASE3_TOOL_SKILL_KB_AUDIT.md`，仓库中**不存在**该文件；实际文件为 `/docs/40_phase3_phase4/12_PHASE3_TOOLING_RESEARCH.md`（本次已阅）。
 
 ---
 

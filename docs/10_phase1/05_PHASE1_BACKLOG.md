@@ -1,6 +1,6 @@
 # Phase 1 Backlog —— 判卷场（The Judging Arena）
 
-> 上级文档：`docs/00_PROJECT_CHARTER.md`、`docs/01_PROJECT_PLAN.md`。
+> 上级文档：`/docs/00_foundation/00_PROJECT_CHARTER.md`、`/docs/00_foundation/01_PROJECT_PLAN.md`。
 > 冲突时以 Charter 为准。
 > 本文档只规划 **Phase 1**，**不写代码**。
 
@@ -484,7 +484,7 @@ P1-T01 后端骨架与运行约定
    - 全链路（pipeline + 所有上游任务）。
 
 5. **需要新增或修改的文件**
-   - 新增 `docs/06_PHASE1_GOLDEN_SAMPLE.md`（选样记录与验证结论）
+   - 新增 `/docs/10_phase1/06_PHASE1_GOLDEN_SAMPLE.md`（选样记录与验证结论）
    - 新增 `tests/e2e/test_phase1_e2e.py`（端到端冒烟用例，可选）
    - 修改 `README.md`（补充端到端复现步骤）
 

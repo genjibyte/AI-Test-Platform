@@ -8,7 +8,7 @@ Two gated (``TESTAGENT_E2E=1``) tests:
 
 2. ``test_full_pipeline_git`` — the complete pipeline including git import. It
    self-skips if the host's security agent tampers cloned files (see
-   docs/06_PHASE1_GOLDEN_SAMPLE.md), since that corrupts the cloned source.
+   docs/10_phase1/06_PHASE1_GOLDEN_SAMPLE.md), since that corrupts the cloned source.
 
 Run::
 
