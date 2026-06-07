@@ -119,6 +119,33 @@ Greenlit ("允许最小实现"). Built minimally and validated offline before tr
 **Boundary held:** deterministic, lexical-only (never type inference), conservative,
 no repair, no oracle rewrite, no coverage, no model run.
 
-**Still deferred:** a broad replay across *all* historical `bench.db` (would
-re-confirm 0 over-rejection on dozens more samples — a `scripts/` tool, not done
-here); generics-assignment and instance-receiver detection (out of scope by design).
+### 7.1 Correction (2026-06-07) — false-positive fix + broad replay
+
+A manual review found the first cut **over-rejected two *compilable* calls** (it
+would have skipped Maven on valid code):
+- Shape B flagged `T.f(Integer.valueOf(1), 2)` with `f(int,int)` / `f(String,String)`
+  — Java binds `f(int,int)`; `String` is not the wrapper of `int`.
+- Shape A flagged `T.f(null, 1)` with `f(String,int)` / `f(Integer,String)` — the
+  `1` excludes `f(Integer,String)`, so Java binds `f(String,int)`.
+
+Root cause: the applicability filter only excluded null→primitive and treated all
+other args as possibly-applicable — inconsistent with "only when certain / UNKNOWN
+defers to Maven". Tightened:
+- **Shape A** now flags only when ≥2 overloads are identical at every *other*
+  position and differ solely by the reference type at the null position, AND each
+  other position is a primitive the call's arg confirmedly fits; otherwise defer.
+- **Shape B** now requires the reference overload to be the *exact wrapper family*
+  of an all-primitive overload (`f(int,int)` ↔ `f(Integer,Integer)`); a non-wrapper
+  reference overload, or any UNKNOWN/NULL arg, defers.
+
+Both counterexamples are pinned as regression tests.
+
+**Broad historical replay (28 runs, 80 generated tests, zero model cost):**
+**over-rejection = 0** — no compiled test flagged anywhere — while the detector
+still caught **7** real overload-ambiguity compile failures across 5 runs
+(BooleanUtils + NumberUtils; both Shape A null and Shape B boxed/primitive). Full
+suite **195 passed**.
+
+**Still deferred:** generics-assignment and instance-receiver detection (out of
+scope by design); a durable `scripts/` replay tool (the broad replay above was a
+one-off temp script).

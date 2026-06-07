@@ -117,12 +117,13 @@ def test_preflight_checks_fqcn_qualified_calls():
 
 # --- docs/36: overload-ambiguity detection (Shape A bare-null, Shape B mix) ----
 
-def _run(source: str, methods: list[JavaMethod]):
+def _run(source: str, methods: list[JavaMethod],
+         target: str = "org.apache.commons.lang3.BooleanUtils"):
     ctx = ContextSnapshot(
-        target_class="org.apache.commons.lang3.BooleanUtils",
+        target_class=target,
         class_structure=JavaClassStructure(
-            package="org.apache.commons.lang3", class_name="BooleanUtils",
-            methods=methods,
+            package=target.rsplit(".", 1)[0] if "." in target else "",
+            class_name=target.rsplit(".", 1)[-1], methods=methods,
         ),
     )
     res = evaluate_generated_test_preflight(source, ctx)
@@ -170,4 +171,26 @@ def test_preflight_overload_ambiguity_unknown_args_defer_to_maven():
     methods = [_method("toBoolean", ["int", "int", "int"]),
                _method("toBoolean", ["Integer", "Integer", "Integer"])]
     _, status = _run("class T { void t() { BooleanUtils.toBoolean(a, b, c); } }", methods)
+    assert status == "PASS"
+
+
+def test_preflight_shape_b_no_flag_when_reference_overload_is_not_wrapper_family():
+    # f(int,int) / f(String,String); f(Integer.valueOf(1), 2) binds f(int,int) and
+    # compiles. String is not the wrapper of int, so this must NOT be flagged.
+    _, status = _run(
+        "class X { void t() { T.f(Integer.valueOf(1), 2); } }",
+        [_method("f", ["int", "int"]), _method("f", ["String", "String"])],
+        target="pkg.T",
+    )
+    assert status == "PASS"
+
+
+def test_preflight_shape_a_defers_when_another_arg_disambiguates():
+    # f(String,int) / f(Integer,String); f(null, 1) -> the int `1` excludes
+    # f(Integer,String), so Java binds f(String,int). Must NOT be flagged.
+    _, status = _run(
+        "class X { void t() { T.f(null, 1); } }",
+        [_method("f", ["String", "int"]), _method("f", ["Integer", "String"])],
+        target="pkg.T",
+    )
     assert status == "PASS"

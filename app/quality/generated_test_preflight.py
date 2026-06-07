@@ -274,55 +274,76 @@ def _scalar_same_arity(call: _Call, overloads: list[JavaMethod]) -> list[JavaMet
     return [m for m in overloads if not _is_varargs(m) and len(m.params) == call.arity]
 
 
-def _loosely_applicable(call: _Call, ov: JavaMethod) -> bool:
-    """Cheap applicability filter: a null cannot bind to a primitive parameter.
-    Everything else is loosely accepted (boxing/unboxing) — we only use this to
-    drop overloads a null clearly cannot reach."""
-    for i, arg in enumerate(call.args):
-        if _classify_arg(arg) == "NULL" and not _param_is_reference(ov.params[i].type):
-            return False
-    return True
+_WRAPPER = {
+    "int": "Integer", "boolean": "Boolean", "long": "Long", "double": "Double",
+    "float": "Float", "short": "Short", "byte": "Byte", "char": "Character",
+}
 
 
 def _null_overload_ambiguous(call: _Call, overloads: list[JavaMethod]) -> bool:
-    """Shape A: a bare null that >=2 same-arity overloads accept as DIFFERENT
-    reference types is ambiguous and will not compile (e.g. toBoolean(null) ->
-    toBoolean(Boolean) vs toBoolean(String))."""
+    """Shape A: a bare null is ambiguous ONLY when >=2 same-arity overloads are
+    identical at every other position and differ only by the reference type at
+    the null position, AND the call's other args confirmedly match those shared
+    *primitive* positions (so nothing else disambiguates). Anything less certain
+    -- a reference other-position, or an UNKNOWN/non-primitive other arg -- means
+    another arg may pick the overload, so we DEFER to Maven (never over-reject).
+
+    e.g. FLAG  toBoolean(null)            : toBoolean(Boolean) vs toBoolean(String)
+         FLAG  toDouble(null, 0.0)        : toDouble(String,double) vs toDouble(BigDecimal,double)
+         DEFER f(null, 1)                 : f(String,int) vs f(Integer,String) -- the `1` picks f(String,int)
+    """
     same = _scalar_same_arity(call, overloads)
     if len(same) < 2:
         return False
-    applicable = [ov for ov in same if _loosely_applicable(call, ov)]
-    for i, arg in enumerate(call.args):
+    for p, arg in enumerate(call.args):
         if _classify_arg(arg) != "NULL":
             continue
-        ref_types = {
-            ov.params[i].type.strip()
-            for ov in applicable
-            if _param_is_reference(ov.params[i].type)
-        }
-        if len(ref_types) >= 2:
-            return True
+        others_idx = [j for j in range(call.arity) if j != p]
+        # group reference-at-p overloads by their identical signature elsewhere
+        groups: dict[tuple, set] = {}
+        for ov in same:
+            if not _param_is_reference(ov.params[p].type):
+                continue  # this overload can't take null at p
+            sig = tuple(ov.params[j].type.strip() for j in others_idx)
+            groups.setdefault(sig, set()).add(ov.params[p].type.strip())
+        for sig, ref_types in groups.items():
+            if len(ref_types) < 2:
+                continue
+            # every other position must be a primitive the call's arg confirmedly
+            # fits; else another arg could disambiguate -> defer.
+            if all(
+                t.rstrip(".") in _PRIMITIVE_TYPES
+                and _classify_arg(call.args[j]) in ("PRIMITIVE", "BOXED")
+                for t, j in zip(sig, others_idx)
+            ):
+                return True
     return False
 
 
 def _boxed_primitive_mix_ambiguous(call: _Call, overloads: list[JavaMethod]) -> bool:
-    """Shape B: mixing a boxed arg and a primitive arg in a same-arity
-    primitive/boxed overload family is ambiguous via (un)boxing (e.g.
-    toBoolean(Integer.valueOf(3), 1, 2) -> toBoolean(int,int,int) vs
-    toBoolean(Integer,Integer,Integer))."""
+    """Shape B: mixing a boxed and a primitive arg is ambiguous ONLY when the
+    same-arity family contains an all-primitive overload AND its EXACT wrapper
+    counterpart (e.g. f(int,int) and f(Integer,Integer)). A reference overload
+    that is not the wrapper family (e.g. f(String,String)) does not make the call
+    ambiguous, so it must not be flagged. Any UNKNOWN/NULL arg defers to Maven.
+
+    e.g. FLAG  toBoolean(Integer.valueOf(3), 1, 2) with int.. / Integer.. family
+         DEFER f(Integer.valueOf(1), 2)  with f(int,int) / f(String,String) -- binds f(int,int)
+    """
     kinds = [_classify_arg(a) for a in call.args]
     if "BOXED" not in kinds or "PRIMITIVE" not in kinds:
         return False
+    if any(k in ("UNKNOWN", "NULL") for k in kinds):
+        return False
     same = _scalar_same_arity(call, overloads)
-    all_primitive = any(
-        ov.params and all(not _param_is_reference(p.type) for p in ov.params)
-        for ov in same
-    )
-    all_reference = any(
-        ov.params and all(_param_is_reference(p.type) for p in ov.params)
-        for ov in same
-    )
-    return all_primitive and all_reference
+    sigs = {tuple(p.type.strip() for p in ov.params) for ov in same}
+    for ov in same:
+        if not ov.params or not all(not _param_is_reference(p.type) for p in ov.params):
+            continue  # not an all-primitive overload
+        wrapper_sig = tuple(_WRAPPER.get(p.type.strip()) for p in ov.params)
+        if None not in wrapper_sig and wrapper_sig in sigs:
+            return True  # found f(int..) and its exact f(Integer..) counterpart
+    return False
 
 
 def evaluate_generated_test_preflight(
