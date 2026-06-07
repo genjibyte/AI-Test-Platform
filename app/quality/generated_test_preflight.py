@@ -229,6 +229,15 @@ def _has_ambiguous_varargs_pair(overloads: list[JavaMethod]) -> bool:
     )
 
 
+def _fixed_arity_match(call: _Call, overloads: list[JavaMethod]) -> bool:
+    """A non-varargs overload exactly matches the call arity. Java binds a
+    fixed-arity overload before a varargs one (JLS 15.12.2), so a primitive/boxed
+    varargs pair is NOT ambiguous for a call that a fixed overload accepts."""
+    return any(
+        not _is_varargs(m) and len(m.params) == call.arity for m in overloads
+    )
+
+
 def evaluate_generated_test_preflight(
     source: str,
     context: ContextSnapshot,
@@ -261,7 +270,11 @@ def evaluate_generated_test_preflight(
                 )
             )
             continue
-        if _has_ambiguous_varargs_pair(overloads) and call.arity > 1:
+        if (
+            _has_ambiguous_varargs_pair(overloads)
+            and call.arity > 1
+            and not _fixed_arity_match(call, overloads)
+        ):
             blocking.append(
                 PreflightIssue(
                     code="ambiguous_varargs_overload_call",

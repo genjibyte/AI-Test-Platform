@@ -71,6 +71,19 @@ If preflight fails:
 - review recommendation stays advisory and conclusion remains
   `NEED_HUMAN_REVIEW`.
 
+### 3.1 Post-audit fix (2026-06-07)
+
+The ambiguous primitive/boxed varargs blocker now fires only when **no
+fixed-arity overload matches the call arity**. Java binds a fixed-arity overload
+before a varargs one (JLS 15.12.2), so a call that a fixed overload accepts is
+not ambiguous; biasing toward "defer to Maven" prevents the gate from skipping a
+compilable test. Pinned by
+`tests/test_generated_test_preflight.py::test_preflight_allows_fixed_arity_overload_alongside_varargs_pair`.
+Live preflight↔javac agreement is deferred to the next benchmark audit doc (an
+offline replay of the gate over the generated tests already stored in
+`var/benchmark/*/bench.db`, compared against their real Maven outcomes — zero
+model cost).
+
 ## 4. Boundary
 
 This is not Phase 3 repair.

@@ -83,3 +83,33 @@ def test_preflight_ignores_comments_strings_and_instance_calls():
     )
     assert result.status == "PASS"
     assert result.metrics["target_class_calls"] == 0
+
+
+def test_preflight_allows_fixed_arity_overload_alongside_varargs_pair():
+    # If a fixed-arity overload matches the call arity, Java binds to it before a
+    # varargs overload (JLS 15.12.2), so the boolean.../Boolean... pair is NOT
+    # ambiguous for this call and the gate must not skip a compilable test.
+    ctx = ContextSnapshot(
+        target_class="org.apache.commons.lang3.BooleanUtils",
+        class_structure=JavaClassStructure(
+            package="org.apache.commons.lang3",
+            class_name="BooleanUtils",
+            methods=[
+                _method("and", ["boolean", "boolean"]),  # fixed 2-arg overload
+                _method("and", ["boolean..."]),
+                _method("and", ["Boolean..."]),
+            ],
+        ),
+    )
+    result = evaluate_generated_test_preflight(
+        "class T { void t() { BooleanUtils.and(true, true); } }", ctx,
+    )
+    assert result.status == "PASS"
+
+
+def test_preflight_checks_fqcn_qualified_calls():
+    # Fully-qualified target calls are validated the same as simple-name calls.
+    codes = _codes(
+        "class T { void t() { org.apache.commons.lang3.BooleanUtils.missing(1); } }"
+    )
+    assert "unlisted_target_method" in codes
