@@ -258,6 +258,14 @@ def test_v3_2_2_bare_null_overload_guardrail():
     assert "toDouble(BigDecimal, double) vs toDouble(String, double)" in sys
 
 
+def test_v3_2_3_no_mixed_boxed_primitive_args():
+    # Live v3.2.2 BooleanUtils (docs/35): toBoolean(Integer.valueOf(3), 1, 2) is
+    # ambiguous between toBoolean(int,int,int) and toBoolean(Integer,Integer,Integer).
+    sys = build_system_prompt(_ctx())
+    assert "do NOT mix boxed and primitive arguments" in sys
+    assert "toBoolean(Integer.valueOf(3), 1, 2) is ambiguous" in sys
+
+
 def test_api_grounding_only_context_apis():
     sys = build_system_prompt(_ctx())
     assert "Use ONLY types" in sys

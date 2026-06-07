@@ -41,6 +41,10 @@ reference-type overloads (toBoolean(Boolean|String);
 toDouble(BigDecimal|String, double)) is ambiguous and will not compile — cast to
 the evidenced type or skip. Prompt/test only; no pipeline/repair/preflight change.
 (Surfaced by the live BooleanUtils validation; its review doc follows the next live run.)
+v3.2.3 prompt-only guardrail (docs/35): for same-name same-arity primitive/boxed
+overload families, never mix boxed and primitive args in one call
+(toBoolean(Integer.valueOf(3), 1, 2) is ambiguous) — use all-primitive or
+all-boxed, else skip. Prompt/test only.
 Per-method return-body grounding and an invalid-JSON retry remain deferred (v4).
 """
 from __future__ import annotations
@@ -97,6 +101,11 @@ SYSTEM_PROMPT = (
     "(toBoolean(Boolean) vs toBoolean(String); toDouble(BigDecimal, double) vs "
     "toDouble(String, double)): cast null to the evidenced type ((Boolean) null, "
     "(String) null) or SKIP into omitted_uncertain_cases.\n"
+    "- For same-name same-arity primitive/boxed overload families, do NOT mix "
+    "boxed and primitive arguments in one call (e.g. "
+    "toBoolean(Integer.valueOf(3), 1, 2) is ambiguous): pass ALL primitive "
+    "literals or ALL boxed values; if the intended overload is not evidenced, "
+    "SKIP into omitted_uncertain_cases.\n"
     "[Oracle grounding]\n"
     "- Derive every expected value from EVIDENCE (target source or neighbor "
     "test). If not derivable, SKIP into omitted_uncertain_cases; never guess.\n"
