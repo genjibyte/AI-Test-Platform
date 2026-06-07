@@ -110,6 +110,31 @@ def test_v3_method_contract_evidence_rendered():
     assert "body contains throw: UnsupportedOperationException" in p
 
 
+def test_v3_1_overload_and_generics_disambiguation():
+    # 10-case compile fails: Options wildcard, NumberUtils null overload, BooleanUtils varargs.
+    sys = build_system_prompt(_ctx())
+    assert "Overloads and generics" in sys
+    assert "(String) null" in sys                       # cast null to the intended overload
+    assert "new boolean[]{true}" in sys                 # explicitly typed varargs array
+    assert "List<?>" in sys and "List<Option>" in sys   # no wildcard -> concrete generic
+
+
+def test_v3_1_public_apis_no_reflection_or_private_ctor():
+    # 10-case WordUtils FAIL: reflection / private-constructor test is not useful.
+    sys = build_system_prompt(_ctx())
+    assert "public, observable APIs" in sys
+    assert "reflection" in sys
+    assert "private constructor" in sys
+
+
+def test_v3_1_post_construction_state_and_doc_source_conflict():
+    # 10-case Option.getValues(): Javadoc says empty array but impl returns null.
+    sys = build_system_prompt(_ctx())
+    assert "post-construction field/state" in sys
+    assert "Javadoc conflicts" in sys
+    assert "do not assert the documented value" in sys
+
+
 def test_api_grounding_only_context_apis():
     sys = build_system_prompt(_ctx())
     assert "Use ONLY types" in sys

@@ -30,8 +30,10 @@ def test_prompt_contains_bounded_context_and_contract():
 
 
 def test_prompt_does_not_dump_whole_repo():
-    # bounded context: prompt should be small, not the entire repository
-    assert len(build_prompt(_context())) < 4000
+    # Bounded context: the prompt is fixed rules + a small target context, never
+    # the whole repo. The bound has headroom for the deterministic v3/v3.1 rule
+    # text; a real repository dump would be an order of magnitude larger.
+    assert len(build_prompt(_context())) < 6000
 
 
 def test_dry_generate_offline_contract_loop():

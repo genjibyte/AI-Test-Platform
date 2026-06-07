@@ -18,6 +18,12 @@ Each rule maps to an observed failure bucket:
   4 mock final class (DeprecatedAttributes)               -> conditional mock rule
   5 oracle/expected wrong (WordUtils)                      -> derive-then-assert / skip
   6 exception/API contract wrong (CSVRecord/Option)       -> contract evidence
+
+v3.1 prompt hardening (docs/26 §6) adds rules for the 10-case failure buckets:
+  7 overload/generic ambiguity (Options/NumberUtils/BooleanUtils) -> cast null, typed varargs, declared generics
+  8 reflection/private-ctor misuse (WordUtils)            -> public observable APIs only
+  9 post-construction state guess; doc!=source (Option.getValues) -> skip when state not shown / docs conflict
+Deeper constructor/state grounding and an invalid-JSON retry are deferred (v4).
 """
 from __future__ import annotations
 
@@ -34,6 +40,10 @@ SYSTEM_PROMPT = (
     "methods, overloads, parameters or fields; SKIP unknown APIs into "
     "omitted_uncertain_cases.\n"
     "- Reference nested types as Owner.Nested (e.g. Option.Builder), never bare.\n"
+    "- Test only public, observable APIs. Never use reflection "
+    "(setAccessible/getDeclared*) or call a private constructor, even if a "
+    "neighbor test does, unless the target itself is that constructor's "
+    "behavior.\n"
     "[Imports]\n"
     "- test_source must be ONE self-contained compilable file: a package "
     "declaration and EVERY import, including static import for each JUnit "
@@ -47,6 +57,13 @@ SYSTEM_PROMPT = (
     "unless a neighbor test mocks it. Do not assume Mockito inline mock-maker; "
     "prefer real instances.\n"
     "- No network, no absolute file paths, no sleeping/time/randomness.\n"
+    "[Overloads and generics]\n"
+    "- For overloaded methods, never pass a bare null or an untyped array: cast "
+    "each null to the intended parameter type (e.g. (String) null) and build "
+    "varargs as an explicitly typed array (e.g. new boolean[]{true}). Ambiguous "
+    "overloads do not compile.\n"
+    "- Respect declared generic types: assign a result to its declared type and "
+    "do not assign a wildcard (List<?>) to a concrete generic (List<Option>).\n"
     "[Oracle grounding]\n"
     "- Derive every expected value from EVIDENCE (target source or neighbor "
     "test). If not derivable, SKIP into omitted_uncertain_cases; never guess.\n"
@@ -54,6 +71,12 @@ SYSTEM_PROMPT = (
     "or neighbor test. A body-contains-throw fact is only supporting evidence; "
     "do NOT assertThrows from it alone. Otherwise SKIP into "
     "omitted_uncertain_cases.\n"
+    "- Do not infer an object's post-construction field/state from constants or "
+    "Javadoc alone; if state is not shown by the target source, a neighbor test, "
+    "or a constructor body, SKIP it. If Javadoc conflicts with the method's "
+    "return type or source (e.g. doc says empty array but source can return "
+    "null), treat it as uncertain: SKIP and note it, do not assert the "
+    "documented value.\n"
     "- No tautological assertions such as assertEquals(x, callThatReturnsX()).\n"
     "- Assert observable behavior, not implementation details.\n"
     "[Test strategy]\n"
