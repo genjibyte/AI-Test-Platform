@@ -7,7 +7,10 @@ failure, and only for low-risk buckets observed in Phase 2.5:
 - Java 8-incompatible ``List.of`` calls;
 - method-local enum declarations.
 
-No oracle/test-failure repair happens here.
+Hardened after the docs/38 audit: static-import repair is **compile-log triggered**
+(only adds an import javac actually flagged missing), and the ``List.of`` ->
+``Arrays.asList`` rewrite **skips ``List.of`` inside an assertion's arguments**, so
+it never edits oracle/expected-value text. No oracle/test-failure repair happens here.
 """
 from __future__ import annotations
 
@@ -75,11 +78,30 @@ def _insert_import(source: str, import_line: str) -> str:
     return "\n".join(lines) + ("\n" if source.endswith("\n") else "")
 
 
-def _repair_junit_static_imports(source: str) -> tuple[str, list[RepairPatch]]:
+_MISSING_SYMBOL_RE = re.compile(
+    r"(?:符号|symbol)\s*[:：]\s*(?:方法|method|变量|variable|类|class)?\s*([A-Za-z_]\w*)"
+)
+
+
+def _missing_symbols_from_log(compile_log: str) -> set[str]:
+    """Symbol names javac reported as not found ('找不到符号' / 'cannot find
+    symbol', both locales)."""
+    return {m.group(1) for m in _MISSING_SYMBOL_RE.finditer(compile_log or "")}
+
+
+def _repair_junit_static_imports(
+    source: str, compile_log: str = ""
+) -> tuple[str, list[RepairPatch]]:
     patches: list[RepairPatch] = []
+    flagged = _missing_symbols_from_log(compile_log)
     used = sorted(set(re.findall(r"\b(assert\w+|fail)\s*\(", source)))
     for name in used:
         if name not in _JUNIT_ASSERTIONS:
+            continue
+        # Log-triggered: when a compile log is available, only add the import the
+        # compiler actually flagged missing (avoids spurious imports). With no log,
+        # fall back to the source scan so non-pipeline callers keep working.
+        if compile_log and name not in flagged:
             continue
         import_line = f"import static org.junit.jupiter.api.Assertions.{name};"
         if import_line not in source:
@@ -93,17 +115,77 @@ def _repair_junit_static_imports(source: str) -> tuple[str, list[RepairPatch]]:
     return source, patches
 
 
+def _matching_paren(source: str, open_idx: int) -> Optional[int]:
+    """Index of the ')' that closes the '(' at open_idx, skipping string/char
+    literals. Returns None if unbalanced."""
+    depth = 0
+    quote: Optional[str] = None
+    escape = False
+    for k in range(open_idx, len(source)):
+        c = source[k]
+        if quote:
+            if escape:
+                escape = False
+            elif c == "\\":
+                escape = True
+            elif c == quote:
+                quote = None
+            continue
+        if c in "'\"":
+            quote = c
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return k
+    return None
+
+
+def _assertion_arg_spans(source: str) -> list[tuple[int, int]]:
+    """Char ranges covered by assert.../fail(...) calls, so a List.of inside an
+    assertion's arguments (an oracle/expected-value expression) is never rewritten."""
+    spans: list[tuple[int, int]] = []
+    for m in re.finditer(r"\b(?:assert\w+|fail)\s*\(", source):
+        close = _matching_paren(source, m.end() - 1)
+        if close is not None:
+            spans.append((m.start(), close))
+    return spans
+
+
 def _repair_java8_list_of(
     source: str, java_source_level: Optional[str]
 ) -> tuple[str, list[RepairPatch]]:
     if not _java8_or_older(java_source_level) or "List.of(" not in source:
         return source, []
-    fixed = source.replace("List.of(", "Arrays.asList(")
-    fixed = _insert_import(fixed, "import java.util.Arrays;")
+    spans = _assertion_arg_spans(source)
+
+    def _in_assertion(pos: int) -> bool:
+        return any(s <= pos <= e for s, e in spans)
+
+    out: list[str] = []
+    i = 0
+    changed = False
+    needle = "List.of("
+    while True:
+        j = source.find(needle, i)
+        if j == -1:
+            out.append(source[i:])
+            break
+        out.append(source[i:j])
+        if _in_assertion(j):
+            out.append(needle)  # oracle text: leave it (and the compile error) for review
+        else:
+            out.append("Arrays.asList(")
+            changed = True
+        i = j + len(needle)
+    if not changed:
+        return source, []
+    fixed = _insert_import("".join(out), "import java.util.Arrays;")
     return fixed, [
         RepairPatch(
             bucket="java_source_level",
-            description="replace Java 9 List.of with Java 8 Arrays.asList",
+            description="replace Java 9 List.of with Java 8 Arrays.asList (outside assertions)",
         )
     ]
 
@@ -149,7 +231,7 @@ def repair_compile_failure(
     patches: list[RepairPatch] = []
     repaired = source
 
-    repaired, ps = _repair_junit_static_imports(repaired)
+    repaired, ps = _repair_junit_static_imports(repaired, compile_log)
     patches.extend(ps)
     repaired, ps = _repair_java8_list_of(repaired, java_source_level)
     patches.extend(ps)

@@ -17,10 +17,43 @@ class TAiGeneratedTest {
     assert any(p.bucket == "missing_static_import" for p in out.patches)
 
 
-def test_rewrites_list_of_for_java8():
+def test_static_import_added_only_when_compile_log_flags_it():
+    src = """package x;
+
+class TAiGeneratedTest {
+    @org.junit.jupiter.api.Test
+    void t() { assertSame("a", "a"); }
+}
+"""
+    log = "X.java:[5,9] 找不到符号\n  符号:   方法 assertSame(java.lang.String,java.lang.String)\n"
+    out = repair_compile_failure(src, compile_log=log)
+    assert out.changed
+    assert "import static org.junit.jupiter.api.Assertions.assertSame;" in out.source
+
+
+def test_static_import_not_added_when_log_flags_other_symbol():
+    # The compile log names a different missing symbol -> the assertSame import,
+    # which the compiler did not flag, must NOT be added (log-triggered precision).
+    src = """package x;
+
+class TAiGeneratedTest {
+    @org.junit.jupiter.api.Test
+    void t() { assertSame("a", "a"); }
+}
+"""
+    log = "X.java:[5,9] cannot find symbol\n  symbol:   method putInMap(java.util.Map)\n"
+    out = repair_compile_failure(src, compile_log=log)
+    assert not out.changed
+    assert "Assertions.assertSame" not in out.source
+
+
+def test_keeps_list_of_inside_assertion_oracle():
+    # docs/38: List.of inside an assertion is an expected-value (oracle) expression;
+    # it must NOT be rewritten, even on Java 8 -- leave the compile error for review.
     src = """package x;
 
 import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class TAiGeneratedTest {
     @org.junit.jupiter.api.Test
@@ -28,10 +61,33 @@ class TAiGeneratedTest {
 }
 """
     out = repair_compile_failure(src, java_source_level="1.8")
+    assert not out.changed
+    assert out.source == src
+    assert "List.of(" in out.source
+    assert "Arrays.asList(" not in out.source
+
+
+def test_rewrites_list_of_outside_assertion_for_java8():
+    # List.of outside an assertion is plain code -> still rewritten on Java 8.
+    src = """package x;
+
+import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+class TAiGeneratedTest {
+    @org.junit.jupiter.api.Test
+    void t() {
+        List<String> expected = List.of("1", "2");
+        assertEquals(expected, values());
+    }
+}
+"""
+    out = repair_compile_failure(src, java_source_level="1.8")
     assert out.changed
     assert "import java.util.Arrays;" in out.source
     assert "Arrays.asList(\"1\", \"2\")" in out.source
     assert "List.of(" not in out.source
+    assert any(p.bucket == "java_source_level" for p in out.patches)
 
 
 def test_moves_method_local_enum_to_test_class_scope():

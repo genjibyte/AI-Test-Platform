@@ -104,5 +104,25 @@ If/when compile-only repair is enabled:
   `assert…(`/`fail(` call), keeping repair strictly oracle-free;
 - keep Maven as the verifier; never trust a repaired test without re-compilation.
 
-> Boundary: audit only. No code changed, no model run, no benchmark, no bucket
-> expansion. Findings are for a later decision.
+## 7. Fix applied (2026-06-07, follow-up)
+
+The audit (§0–§6) changed nothing. As a follow-up, §6 was implemented as a minimal
+hardening of `app/repair/compile_repair.py` (repair stays gated off in benchmark
+runs; this makes it oracle-safe for future enablement):
+
+- **`List.of` guard** — `List.of(`→`Arrays.asList(` now skips any `List.of` inside
+  an `assert…(`/`fail(` call (oracle text). A `List.of` inside an assertion on
+  Java 8 is left as-is → it stays a compile failure for human review rather than an
+  oracle rewrite. `List.of` outside assertions is still rewritten.
+- **`missing_static_import` is now compile-log triggered** — a JUnit static import
+  is added only for an assertion the compiler actually flagged missing (`找不到符号`
+  / `cannot find symbol`, both locales); no log → source-scan fallback. Kills
+  spurious imports (e.g. the `deepseek-pro-rerun Option` no-suitable-method case).
+- Not added: generics / receiver-type / overload-cast repair (out of scope).
+
+Re-validation (offline, all `bench.db`, zero model cost): **oracle-touch = 0** across
+all 23 `COMPILE_FAILURE` samples (was 2); repair-changed dropped 9→5; the
+missing-import bucket still fixes the real `assertNotEquals`-not-imported case. Full
+suite **199 passed**.
+
+> Boundaries held throughout: no model run, no new benchmark, no bucket expansion.
