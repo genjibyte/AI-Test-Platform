@@ -1,7 +1,16 @@
-"""Precipitation-layer (ledger) tests (docs/41 P1). Offline: no model, no pipeline."""
+"""Precipitation-layer (ledger) tests (docs/41 P1+P2). Offline: no model, no pipeline."""
+import uuid
+
 from app.benchmark.models import BenchCaseResult, BenchReport
+from app.ledger.analytics import (
+    aggregate_badcases,
+    author_profile,
+    badcase_signature,
+    compare_authors_on_target,
+    ledger_summary,
+)
 from app.ledger.ingest import record_from_bench_case, record_report
-from app.ledger.models import Provenance, fingerprint_source
+from app.ledger.models import JudgedRecord, Provenance, fingerprint_source
 from app.ledger.store import LedgerStore
 
 
@@ -88,3 +97,92 @@ def test_record_report_ingests_all_cases_with_provenance(tmp_path):
     assert all(r.provenance.run_id == "run-7" for r in recs)
     assert {r.passed for r in recs} == {True, False}
     assert {r.failure_type for r in recs} == {None, "TEST_FAILURE"}
+
+
+# --- P2 analytics (docs/41 section 5) --------------------------------------------
+
+def _rec(failure_type=None, author="gen", target_class="com.x.C", target_method="m",
+         passed=None, compiled=None, recommendation=None, created_at=None):
+    return JudgedRecord(
+        record_id=str(uuid.uuid4()),
+        created_at=created_at or "2026-01-01T00:00:00+00:00",
+        repo_url="https://x/r.git",
+        target_class=target_class,
+        target_method=target_method,
+        provenance=Provenance(author_type="platform_generator", author_id=author),
+        failure_type=failure_type,
+        passed=passed,
+        compiled=compiled,
+        review_recommendation=recommendation,
+    )
+
+
+def test_badcase_signature_form_and_none_for_pass():
+    assert badcase_signature(_rec(failure_type=None)) is None
+    assert badcase_signature(_rec(failure_type="TEST_FAILURE")) == "TEST_FAILURE@com.x.C#m"
+    assert badcase_signature(
+        _rec(failure_type="COMPILE_FAILURE", target_method=None)
+    ) == "COMPILE_FAILURE@com.x.C#*"
+
+
+def test_aggregate_badcases_groups_counts_and_sorts():
+    records = [
+        _rec(failure_type="TEST_FAILURE", author="genA", created_at="2026-01-01T00:00:00+00:00"),
+        _rec(failure_type="TEST_FAILURE", author="genB", created_at="2026-01-03T00:00:00+00:00"),
+        _rec(failure_type="COMPILE_FAILURE", author="genA", created_at="2026-01-02T00:00:00+00:00"),
+        _rec(failure_type=None, author="genA"),  # clean PASS -> not a badcase
+    ]
+    stats = aggregate_badcases(records)
+    assert len(stats) == 2                               # PASS ignored
+    top = stats[0]
+    assert top.signature == "TEST_FAILURE@com.x.C#m"     # count 2 sorts first
+    assert top.count == 2
+    assert top.authors == ["genA", "genB"]
+    assert top.first_seen == "2026-01-01T00:00:00+00:00"
+    assert top.last_seen == "2026-01-03T00:00:00+00:00"
+    assert len(top.examples) == 2
+    assert any(s.failure_type == "COMPILE_FAILURE" and s.count == 1 for s in stats)
+
+
+def test_author_profile_rates_and_failure_types():
+    records = [
+        _rec(author="genA", compiled=True, passed=True, recommendation="STRONG_REVIEW_CANDIDATE"),
+        _rec(author="genA", compiled=True, passed=False, failure_type="TEST_FAILURE",
+             recommendation="NEEDS_REVISION"),
+        _rec(author="genB", compiled=False, passed=False, failure_type="COMPILE_FAILURE"),
+    ]
+    prof = author_profile(records, "genA")
+    assert prof["records"] == 2
+    assert prof["compile_rate"] == 1.0
+    assert prof["pass_rate"] == 0.5
+    assert prof["recommendation_distribution"] == {
+        "STRONG_REVIEW_CANDIDATE": 1, "NEEDS_REVISION": 1}
+    assert prof["top_failure_types"] == {"TEST_FAILURE": 1}
+
+
+def test_compare_authors_on_target_splits_by_author():
+    records = [
+        _rec(author="human-alice", target_method="m", compiled=True, passed=True),
+        _rec(author="gen-v3", target_method="m", compiled=True, passed=False,
+             failure_type="TEST_FAILURE"),
+        _rec(author="gen-v3", target_method="other", compiled=True, passed=True),  # diff method
+    ]
+    cmp = compare_authors_on_target(records, "com.x.C", "m")
+    assert cmp["records"] == 2                            # the 'other' method excluded
+    assert cmp["authors"] == ["gen-v3", "human-alice"]
+    assert cmp["per_author"]["human-alice"]["pass_rate"] == 1.0
+    assert cmp["per_author"]["gen-v3"]["pass_rate"] == 0.0
+    assert cmp["per_author"]["gen-v3"]["failure_types"] == {"TEST_FAILURE": 1}
+
+
+def test_ledger_summary_digest():
+    records = [
+        _rec(author="genA", passed=True),
+        _rec(author="genB", failure_type="TEST_FAILURE", passed=False),
+    ]
+    summ = ledger_summary(records)
+    assert summ["records"] == 2
+    assert summ["authors"] == ["genA", "genB"]
+    assert summ["targets"] == 1
+    assert summ["top_badcases"][0]["failure_type"] == "TEST_FAILURE"
+    assert len(summ["author_profiles"]) == 2

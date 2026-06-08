@@ -13,6 +13,14 @@ are designed in docs/41 but NOT built here.
 from app.ledger.models import AUTHOR_TYPES, JudgedRecord, Provenance, fingerprint_source
 from app.ledger.store import LedgerStore
 from app.ledger.ingest import record_from_bench_case, record_report
+from app.ledger.analytics import (
+    BadcaseStat,
+    aggregate_badcases,
+    author_profile,
+    badcase_signature,
+    compare_authors_on_target,
+    ledger_summary,
+)
 
 __all__ = [
     "AUTHOR_TYPES",
@@ -22,4 +30,11 @@ __all__ = [
     "LedgerStore",
     "record_from_bench_case",
     "record_report",
+    # analytics (P2)
+    "BadcaseStat",
+    "badcase_signature",
+    "aggregate_badcases",
+    "author_profile",
+    "compare_authors_on_target",
+    "ledger_summary",
 ]
