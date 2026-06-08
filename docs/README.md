@@ -11,6 +11,7 @@
 - [07 Source Notes](/docs/00_foundation/07_SOURCE_NOTES.md)
 - [13 Project Direction Review](/docs/00_foundation/13_PROJECT_DIRECTION_REVIEW.md)
 - [24 Phase Next Design](/docs/00_foundation/24_PHASE_NEXT_DESIGN.md)
+- [40 Core Thesis Repositioning](/docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md)
 
 ## 10 Phase 1
 
