@@ -39,6 +39,8 @@
 
 - [12 Phase 3 Tooling Research](/docs/40_phase3_phase4/12_PHASE3_TOOLING_RESEARCH.md)
 - [22 Phase 4 Review Policy Design](/docs/40_phase3_phase4/22_PHASE4_REVIEW_POLICY_DESIGN.md)
+- [38 Compile Repair Replay Audit](/docs/40_phase3_phase4/38_COMPILE_REPAIR_REPLAY_AUDIT.md)
+- [39 Compile Repair Enablement Plan](/docs/40_phase3_phase4/39_COMPILE_REPAIR_ENABLEMENT_PLAN.md)
 
 ## 50 Benchmark
 

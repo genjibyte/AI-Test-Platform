@@ -67,8 +67,9 @@ class TAiGeneratedTest {
     assert "Arrays.asList(" not in out.source
 
 
-def test_rewrites_list_of_outside_assertion_for_java8():
-    # List.of outside an assertion is plain code -> still rewritten on Java 8.
+def test_rewrites_list_of_in_initializer_for_java8():
+    # docs/38: a plain `... = List.of(...)` local initializer is non-oracle code ->
+    # still rewritten on Java 8.
     src = """package x;
 
 import java.util.List;
@@ -88,6 +89,42 @@ class TAiGeneratedTest {
     assert "Arrays.asList(\"1\", \"2\")" in out.source
     assert "List.of(" not in out.source
     assert any(p.bucket == "java_source_level" for p in out.patches)
+
+
+def test_keeps_list_of_in_fluent_assertion_chain():
+    # docs/38 hardening: a chained/fluent oracle puts the expected value OUTSIDE the
+    # first assert(...) paren span -- it is not a `= List.of` initializer, so it must
+    # NOT be rewritten (the span-only guard would have missed this and edited oracle text).
+    src = """package x;
+
+import java.util.List;
+
+class TAiGeneratedTest {
+    @org.junit.jupiter.api.Test
+    void t() { assertThat(values()).isEqualTo(List.of("1", "2")); }
+}
+"""
+    out = repair_compile_failure(src, java_source_level="1.8")
+    assert not out.changed
+    assert out.source == src
+    assert "Arrays.asList(" not in out.source
+
+
+def test_keeps_list_of_in_non_assert_matcher():
+    # The initializer-only rule is assertion-name independent: a non-`assert*` DSL
+    # (here `then(...)`) holding an expected List.of is still left untouched.
+    src = """package x;
+
+import java.util.List;
+
+class TAiGeneratedTest {
+    @org.junit.jupiter.api.Test
+    void t() { then(values()).isEqualTo(List.of("1", "2")); }
+}
+"""
+    out = repair_compile_failure(src, java_source_level="1.8")
+    assert not out.changed
+    assert "Arrays.asList(" not in out.source
 
 
 def test_moves_method_local_enum_to_test_class_scope():

@@ -9,8 +9,13 @@ failure, and only for low-risk buckets observed in Phase 2.5:
 
 Hardened after the docs/38 audit: static-import repair is **compile-log triggered**
 (only adds an import javac actually flagged missing), and the ``List.of`` ->
-``Arrays.asList`` rewrite **skips ``List.of`` inside an assertion's arguments**, so
-it never edits oracle/expected-value text. No oracle/test-failure repair happens here.
+``Arrays.asList`` rewrite is **confined to local-variable initializer position**
+(``... = List.of(...)``) and additionally skips anything inside an assertion's
+argument span. Oracle expected values are arguments *inside* a matcher call
+(``assertEquals(List.of(...), x)``, ``assertThat(x).isEqualTo(List.of(...))``, or a
+non-``assert*`` DSL), never a ``= List.of`` initializer, so the rewrite cannot reach
+oracle text by construction -- independent of the assertion's name. No
+oracle/test-failure repair happens here.
 """
 from __future__ import annotations
 
@@ -153,6 +158,22 @@ def _assertion_arg_spans(source: str) -> list[tuple[int, int]]:
     return spans
 
 
+def _is_initializer_position(source: str, idx: int) -> bool:
+    """True when the token at ``idx`` is the right-hand side of an assignment /
+    initializer -- the nearest preceding non-space char is a bare ``=`` (not ``==``,
+    ``!=``, ``<=``, ``>=``, ``+=`` ...). This confines the List.of rewrite to
+    ``... = List.of(...)`` local initializers. Oracle expected values appear as
+    *arguments inside* a matcher call, never as a ``= List.of`` initializer, so
+    restricting to this position keeps the rewrite off oracle text regardless of the
+    assertion's name (assertEquals, assertThat-chains, or non-assert* DSLs)."""
+    k = idx - 1
+    while k >= 0 and source[k] in " \t\r\n":
+        k -= 1
+    if k < 0 or source[k] != "=":
+        return False
+    return k == 0 or source[k - 1] not in "=!<>+-*/%&|^~"
+
+
 def _repair_java8_list_of(
     source: str, java_source_level: Optional[str]
 ) -> tuple[str, list[RepairPatch]]:
@@ -173,11 +194,15 @@ def _repair_java8_list_of(
             out.append(source[i:])
             break
         out.append(source[i:j])
-        if _in_assertion(j):
-            out.append(needle)  # oracle text: leave it (and the compile error) for review
-        else:
+        # Rewrite only a plain ``= List.of(...)`` local initializer that is not
+        # inside an assertion span; anything else (matcher arguments, returns, call
+        # arguments) is left as-is -> stays a compile error for human review rather
+        # than risk editing oracle text.
+        if _is_initializer_position(source, j) and not _in_assertion(j):
             out.append("Arrays.asList(")
             changed = True
+        else:
+            out.append(needle)
         i = j + len(needle)
     if not changed:
         return source, []
@@ -185,7 +210,7 @@ def _repair_java8_list_of(
     return fixed, [
         RepairPatch(
             bucket="java_source_level",
-            description="replace Java 9 List.of with Java 8 Arrays.asList (outside assertions)",
+            description="replace Java 9 List.of with Java 8 Arrays.asList (initializer position only)",
         )
     ]
 

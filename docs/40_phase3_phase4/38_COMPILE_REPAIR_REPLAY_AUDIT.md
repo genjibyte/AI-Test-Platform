@@ -110,19 +110,61 @@ The audit (§0–§6) changed nothing. As a follow-up, §6 was implemented as a 
 hardening of `app/repair/compile_repair.py` (repair stays gated off in benchmark
 runs; this makes it oracle-safe for future enablement):
 
-- **`List.of` guard** — `List.of(`→`Arrays.asList(` now skips any `List.of` inside
-  an `assert…(`/`fail(` call (oracle text). A `List.of` inside an assertion on
-  Java 8 is left as-is → it stays a compile failure for human review rather than an
-  oracle rewrite. `List.of` outside assertions is still rewritten.
 - **`missing_static_import` is now compile-log triggered** — a JUnit static import
   is added only for an assertion the compiler actually flagged missing (`找不到符号`
   / `cannot find symbol`, both locales); no log → source-scan fallback. Kills
   spurious imports (e.g. the `deepseek-pro-rerun Option` no-suitable-method case).
+- **`List.of` span guard (first pass)** — `List.of(`→`Arrays.asList(` skipped any
+  `List.of` inside an `assert…(`/`fail(` paren span.
 - Not added: generics / receiver-type / overload-cast repair (out of scope).
 
-Re-validation (offline, all `bench.db`, zero model cost): **oracle-touch = 0** across
-all 23 `COMPILE_FAILURE` samples (was 2); repair-changed dropped 9→5; the
-missing-import bucket still fixes the real `assertNotEquals`-not-imported case. Full
-suite **199 passed**.
+### 7.1 Correction — the first pass over-claimed (2026-06-08)
+
+The §7 first-pass conclusion ("oracle-touch = 0 … strictly oracle-free") was
+**overstated**: the span guard only protects `List.of` inside the *first* paren of an
+`assert…(` call. It does **not** cover an oracle whose expected value sits *outside*
+that span — e.g. a fluent chain `assertThat(x).isEqualTo(List.of(…))`, or a
+non-`assert*` matcher DSL `then(x).isEqualTo(List.of(…))`. Those would still be
+rewritten. "0" was true *on this corpus*, not true *by construction*.
+
+**Hardening (stable-point fix).** The `List.of` rewrite is now **confined to
+local-variable initializer position** (`… = List.of(…)`), in addition to the span
+guard. Oracle expected values are arguments *inside* a matcher call, never a
+`= List.of` initializer — so the rewrite cannot reach oracle text **by construction,
+independent of the assertion's name** (`_is_initializer_position` in
+`app/repair/compile_repair.py`). Everything else (matcher args, `return List.of`,
+call args) is left as a compile error for human review.
+
+**Re-validation (offline replay, all `bench.db`, Java 8 forced = worst case for
+`List.of` rewriting, zero model cost):**
+
+| metric | value |
+|---|---:|
+| `COMPILE_FAILURE` samples | 23 |
+| samples with any `List.of(` | 2 |
+| samples with `List.of` **inside an assertion** (oracle-risk population) | 2 |
+| in-assertion `List.of` **rewritten** (oracle-touch) | **0** |
+| `java_source_level` (List.of) patches fired | **0** |
+| initializer-position `List.of` in corpus | 0 |
+
+So the `List.of` bucket is **dormant across the whole historical corpus** — both
+`List.of` instances are oracle arguments (now structurally skipped) and there are
+zero `= List.of` initializers to rewrite. It currently fixes *nothing* in practice;
+it exists only as forward-looking, oracle-safe-by-construction handling. The
+`missing_static_import` bucket still fixes the real `assertNotEquals`-not-imported
+case. Full suite **201 passed, 4 skipped** (+2 regression tests: fluent chain,
+non-`assert*` DSL).
+
+**Honest residual (not eliminated).** `List.of` vs `Arrays.asList` differ in
+mutability and null-handling. A `= List.of` *initializer* whose value is later
+asserted for *value equality* is verdict-preserving (`AbstractList.equals` is
+element-wise). The one case that can still change meaning: a test asserting the
+*immutability/null-rejection of the list object itself* (testing JDK `List.of`, not
+the SUT) — rare, and mitigated by the standing controls: Maven re-verifies every
+repaired test and the conclusion stays `NEED_HUMAN_REVIEW` (`trusted=False`), so a
+human sees it. The bucket is deliberately conservative (over-skips rather than risk
+oracle text). This is the **pre-enablement stable point**; repair remains gated off
+(`repair_compile_failures=False`). Enablement itself is designed separately in
+**docs/39**.
 
 > Boundaries held throughout: no model run, no new benchmark, no bucket expansion.
