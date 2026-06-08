@@ -46,6 +46,7 @@
 ## 50 Benchmark
 
 - [23 Benchmark Manifest](/docs/50_benchmark/23_BENCHMARK_MANIFEST.md)
+- [41 Precipitation Layer Design](/docs/50_benchmark/41_PRECIPITATION_LAYER_DESIGN.md)
 
 ## 60 Context V3
 
