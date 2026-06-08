@@ -209,9 +209,15 @@ def test_run_benchmark_reports_llm_config_failure(tmp_path, monkeypatch):
 
 
 def test_run_benchmark_reports_clone_failure(tmp_path, monkeypatch):
+    from app.ledger.store import LedgerStore
+
     monkeypatch.setattr(
         "app.benchmark.runner.get_client", lambda _settings: FakeLLMClient()
     )
+    # Contain the best-effort precipitation (docs/41) inside the test sandbox, and
+    # assert the run's case was appended to the ledger.
+    ledger_db = tmp_path / "ledger.db"
+    monkeypatch.setenv("TESTAGENT_LEDGER_DB", str(ledger_db))
 
     def boom(_repo_url, _branch, _cache_dir, commit=None):
         raise TimeoutError("clone timed out")
@@ -226,3 +232,5 @@ def test_run_benchmark_reports_clone_failure(tmp_path, monkeypatch):
     assert "clone timed out" in report.cases[0].error
     assert report.aggregate["setup_failures"] == 0
     assert report.aggregate["clone_failures"] == 1
+    # the benchmark precipitated its judged case into the durable ledger
+    assert LedgerStore(ledger_db).count() == 1

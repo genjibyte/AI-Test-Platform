@@ -224,6 +224,22 @@ def run_case(
     return _completed_result(case, job, t0)
 
 
+def _precipitate(report: BenchReport, workdir: Path) -> None:
+    """Best-effort: append the run's judged cases to the durable cross-run ledger
+    (docs/41 P1). Writes to ``$TESTAGENT_LEDGER_DB`` or ``<workdir>/../ledger.db`` (a
+    stable sibling of all run dirs). A ledger failure must NEVER fail a benchmark."""
+    try:
+        from app.ledger.ingest import record_report
+        from app.ledger.store import LedgerStore
+
+        ledger_path = os.environ.get("TESTAGENT_LEDGER_DB") or (
+            workdir.parent / "ledger.db"
+        )
+        record_report(LedgerStore(ledger_path), report, run_id=workdir.name)
+    except Exception:  # noqa: BLE001 - precipitation is best-effort, never fatal
+        pass
+
+
 def run_benchmark(
     cases: List[BenchCase],
     workdir: Path,
@@ -277,7 +293,7 @@ def run_benchmark(
         )
 
     model = next((r.model for r in results if r.model), settings.llm_model)
-    return BenchReport(
+    report = BenchReport(
         provider=settings.llm_provider,
         model=model,
         generated_at=now_iso(),
@@ -285,3 +301,5 @@ def run_benchmark(
         cases=results,
         aggregate=aggregate(results),
     )
+    _precipitate(report, workdir)  # best-effort; ledger is never on the critical path
+    return report

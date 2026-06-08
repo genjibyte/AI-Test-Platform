@@ -116,7 +116,25 @@ JudgedRecord = {
 ## 9. 待你拍板
 
 1. 账本用**独立 durable 库**（`var/ledger.db`）还是扩展 `bench.db`？（建议**独立库**，跨 run 更清晰。）
-2. 是否按 §7 的 **P1** 先落"一张表 + append 适配器"（最小、可停、零判卷改动）？
+2. ~~是否按 §7 的 **P1** 先落"一张表 + append 适配器"？~~ **已落地**（见 §10）。是否进 **P2**（badcase 聚合 + 查询）？
 3. badcase 签名粒度：**先粗**（`failure_type` + 目标）还是直接细（含 expected/actual 类名）？（建议**先粗**，避免过拟合，复发数据足够后再细化。）
+
+---
+
+## 10. 实现状态（P1 已落地，2026-06-08）
+
+按 §7 **P1** 实现，**零判卷逻辑改动、离线、复用 SQLite + pydantic**：
+
+- 新增 `app/ledger/`：
+  - `models.py`：`Provenance` / `JudgedRecord` / `fingerprint_source`（sha256 of 归一化 source）。
+  - `store.py`：`LedgerStore`（`append` + `by_target` / `by_author` / `by_fingerprint` / `count` / `all`；整条记录存 `record_json` + 索引列；`INSERT OR IGNORE` 幂等）。
+  - `ingest.py`：`record_from_bench_case(result, provenance, test_source?)` 适配器 + `record_report(store, report, ...)`。
+- `app/benchmark/runner.py`：跑完后 `_precipitate(report, workdir)` **best-effort** append（`$TESTAGENT_LEDGER_DB` 或 `<workdir>/../ledger.db`，即 `var/benchmark/ledger.db`，跨 run 共享）；**ledger 失败绝不影响 benchmark**。
+- 测试：新增 `tests/test_ledger.py`（5：指纹归一化、适配器投影、append/查询/roundtrip、`record_id` 幂等、report 全量 ingest）；`tests/test_benchmark.py` 增 ledger 接线断言（clone-failure 跑完账本 +1）。全量 **220 passed, 4 skipped**。
+- **未做（设计在案）**：badcase 签名聚合（P2）；author-agnostic `submit_candidate`（P3）；真实 `test_source` 指纹接线（runner P1 暂传 `None`，适配器已支持并测试，待 P3 的提交入口接通）。
+
+> 红线保持：判卷内核未改、账本独立库、不判卷 / 不采纳 / 不改 oracle / 不引新存储技术。
+
+---
 
 > 一句话：沉淀层不是新系统，而是**把已经在 `BenchCaseResult`/`bench.db` 里的判卷事实，升格为跨运行、跨作者、可查询、能识别复发失败的账本**——核心是判卷的"记忆"与"比较"，仍然 design-first、复用优先、不堆功能。
