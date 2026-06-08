@@ -6,6 +6,7 @@ from app.review.review_policy import (
     STRONG_REVIEW_CANDIDATE,
     build_review_summary,
     recommend,
+    recommend_with_reasons,
 )
 
 
@@ -105,7 +106,65 @@ def test_summary_carries_quality_grounding_and_invariants():
         recommendation=NEEDS_REVISION,
     )
     assert s["recommendation"] == NEEDS_REVISION
+    assert s["recommendation_reasons"] == []          # default when none passed
     assert s["quality"]["warnings"] == ["test_failure"]
     assert s["quality"]["advisories"] == ["model_declared_risk"]
     assert s["grounding"]["risk_flags"] == ["assumed exception type"]
-    assert s["invariants"] == {"trusted": False, "production_code_touched": False}
+    assert s["invariants"] == {
+        "trusted": False,
+        "production_code_touched": False,
+        "auto_accept_blocked": True,            # explicit never-auto-accept fact
+    }
+
+
+# --- risk-aware, explainable recommendation (docs/22) ----------------------------
+
+def test_recommend_with_reasons_clean_pass_is_strong():
+    rec, reasons = recommend_with_reasons(
+        quality_status="PASS", gen_outcome="PASS", production_code_touched=False)
+    assert rec == STRONG_REVIEW_CANDIDATE
+    assert reasons == ["clean_pass"]
+
+
+def test_downgrade_strong_when_machine_repaired():
+    rec, reasons = recommend_with_reasons(
+        quality_status="PASS", gen_outcome="PASS", production_code_touched=False,
+        repair_applied=True)
+    assert rec == REVIEW_CANDIDATE
+    assert "machine_repaired" in reasons and "downgraded_from_strong" in reasons
+
+
+def test_downgrade_strong_when_model_declared_risk():
+    rec, reasons = recommend_with_reasons(
+        quality_status="PASS", gen_outcome="PASS", production_code_touched=False,
+        model_risk=True)
+    assert rec == REVIEW_CANDIDATE
+    assert "model_declared_risk" in reasons and "downgraded_from_strong" in reasons
+
+
+def test_risk_signal_annotates_non_strong_without_downgrade_marker():
+    # quality REVIEW is already below STRONG: signal is recorded, no downgrade marker.
+    rec, reasons = recommend_with_reasons(
+        quality_status="REVIEW", gen_outcome="PASS", production_code_touched=False,
+        repair_applied=True)
+    assert rec == REVIEW_CANDIDATE
+    assert "machine_repaired" in reasons
+    assert "downgraded_from_strong" not in reasons
+
+
+def test_recommend_string_wrapper_is_backcompat():
+    assert recommend(quality_status="PASS", gen_outcome="PASS",
+                     production_code_touched=False) == STRONG_REVIEW_CANDIDATE
+
+
+def test_summary_carries_recommendation_reasons():
+    s = build_review_summary(
+        generation=_generation([]),
+        quality={"status": "PASS"},
+        recommendation=REVIEW_CANDIDATE,
+        recommendation_reasons=["clean_pass", "machine_repaired",
+                                "downgraded_from_strong"],
+    )
+    assert s["recommendation_reasons"] == [
+        "clean_pass", "machine_repaired", "downgraded_from_strong"]
+    assert s["invariants"]["auto_accept_blocked"] is True

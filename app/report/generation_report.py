@@ -21,13 +21,26 @@ from __future__ import annotations
 from typing import Optional
 
 from app.quality.test_quality_gate import evaluate_test_quality
-from app.review.review_policy import build_review_summary, recommend
+from app.review.review_policy import build_review_summary, recommend_with_reasons
 
 CONCLUSION = "NEED_HUMAN_REVIEW"  # invariant for all of Phase 2
 
 # GenTestOutcome values that imply the generated test compiled / executed.
 _COMPILED = {"PASS", "TEST_FAILURE", "NO_TESTS"}
 _EXECUTED = {"PASS", "TEST_FAILURE"}
+
+# Sentinels the model uses to say "no risk / nothing omitted" — these must NOT count
+# as a declared risk (otherwise every clean pass would downgrade off STRONG).
+_NO_RISK_SENTINELS = {"", "none", "none.", "n/a", "na", "no risk", "no risks"}
+
+
+def _has_meaningful_risk(items) -> bool:
+    """True if the model declared a real risk/omission (ignoring 'none'-style
+    sentinels). Drives the conservative STRONG -> REVIEW downgrade (docs/22)."""
+    return any(
+        str(x).strip().lower().rstrip(".") not in _NO_RISK_SENTINELS
+        for x in (items or [])
+    )
 
 
 def _coverage_view(delta: Optional[dict]) -> Optional[dict]:
@@ -82,15 +95,25 @@ def assemble_generation_report(generation: dict) -> dict:
     # Phase 4 review policy (docs/22): advisory triage + reviewer summary.
     # Never changes `conclusion` / `trusted` — the platform still never accepts.
     quality_dict = quality.model_dump()
-    review_recommendation = recommend(
+    # Risk signals already present in the bundle drive a conservative downgrade and
+    # explainable reasons: a machine-repaired test, or one the model flagged as
+    # risky, is never the top STRONG candidate (docs/22).
+    repair_applied = bool(repair.get("repair_rounds", 0))
+    model_risk = _has_meaningful_risk(grounding.get("risk_flags")) or (
+        _has_meaningful_risk(grounding.get("omitted_uncertain_cases"))
+    )
+    review_recommendation, review_reasons = recommend_with_reasons(
         quality_status=quality.status,
         gen_outcome=outcome,
         production_code_touched=production_code_touched,
+        repair_applied=repair_applied,
+        model_risk=model_risk,
     )
     review_summary = build_review_summary(
         generation=generation,
         quality=quality_dict,
         recommendation=review_recommendation,
+        recommendation_reasons=review_reasons,
     )
 
     return {

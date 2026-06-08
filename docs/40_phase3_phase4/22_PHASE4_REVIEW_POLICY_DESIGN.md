@@ -154,3 +154,22 @@ review_summary = {
 `recommendation_distribution = {NEEDS_REVISION: 2, STRONG_REVIEW_CANDIDATE: 1}`；三例 `conclusion` 均 `NEED_HUMAN_REVIEW`、`trusted=False`（不变量保持）。
 
 > 落地效果（对齐大厂痛点）：reviewer 现在每个生成测试都能直接看到**为什么失败**（异常类型猜错 / 内部 API 误用）与**建议处置**，而平台**不自动采纳、不自动改 oracle**——判卷优先、人是最终门。
+
+---
+
+## 10. 风险感知 + 可验证更新（2026-06-08，按用户明确决定"更安全、更可验证 / downgrade on both"）
+
+让"人审推荐"**更安全（保守降级）**且**更可验证（带理由 + 显式不变量）**。纯增量、零模型、零生产判决改动；`conclusion`/`trusted` 不变。
+
+**改动：**
+- 新增 `recommend_with_reasons(..., repair_applied=False, model_risk=False) -> (label, reasons[])`：同 §2 阶梯，但产出**确定性理由码**列表。`recommend(...)` 保留为返回字符串的**向后兼容封装**。
+- **降级规则**：当基础档为 `STRONG_REVIEW_CANDIDATE` 且（`repair_applied` 或 `model_risk`）时，降级为 `REVIEW_CANDIDATE`，理由附 `downgraded_from_strong` + 触发项。
+  - `repair_applied` = 该测试被**机器修复**过（`repair_rounds > 0`；被 safety-stop 回滚的不计）。
+  - `model_risk` = 模型声明了**实质** `risk_flags`/`omitted_uncertain_cases`（经 `_has_meaningful_risk` 过滤掉 `none`/`n/a` 等哨兵）。
+- `build_review_summary(...)` 增 `recommendation_reasons`，并在 `invariants` 增显式 `auto_accept_blocked: True`（永不自动采纳的可测断言）。
+
+**理由码（稳定字符串，供人核对推荐 vs 事实）：** `production_code_touched`、`quality_status=FAIL`、`gen_outcome=TEST_FAILURE`、`quality_status=REVIEW`、`clean_pass`、`conservative_fallback`、`machine_repaired`、`model_declared_risk`、`downgraded_from_strong`。
+
+**与早期文本的关系（显式取代）：** 本节就**推荐标签**取代 §1.6 末句 / §2 注 / §8.2-(2)（原："risk_flags 不降级 recommendation"）。**质量门 status 不变**：`risk_flags` 在质量门仍是 advisory，绝不改 `FAIL/REVIEW/PASS`（§1.6 在门层面仍成立）。这里降级的是**面向 reviewer 的排序标签**，目的是"这条更要仔细读"，并非质量惩罚；两种情况 `conclusion` 都恒为 `NEED_HUMAN_REVIEW`、`trusted=False`。诚实披露的测试与沉默的测试在**采纳上**完全一致（都需人审），只是在**阅读优先级**上更保守。
+
+**测试 / 验证（离线）：** `tests/test_review_policy.py` 增降级/理由/向后兼容用例；`tests/test_generation_report.py` 断言装配出的 `review_summary` 带 `recommendation_reasons` + `auto_accept_blocked`，且机器修复 / 实质 risk 会从 STRONG 降级、`none` 哨兵不降级。全量 `215 passed, 4 skipped`。

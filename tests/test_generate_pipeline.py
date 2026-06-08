@@ -195,3 +195,109 @@ def test_preflight_rejects_before_write_and_maven(repo, tmp_path, monkeypatch):
     assert report["review_summary"]["preflight"]["blockers"][0]["code"] == (
         "unlisted_target_overload_arity"
     )
+
+
+def test_repair_safety_stop_discards_oracle_touching_repair(repo, tmp_path, monkeypatch):
+    """A repair that altered the oracle skeleton is discarded by the pipeline:
+    not written to disk, Maven not re-run, safety_stop recorded (docs/38)."""
+    import types
+
+    from app.generate.gen_executor import GenTestOutcome  # noqa: F401
+    from app.generate.test_writer import WriteResult
+    from app.pipeline.generate_pipeline import _preflight_reject_result
+    from app.repair.compile_repair import CompileRepairResult
+
+    settings = Settings(workspace_root=tmp_path / "ws", data_dir=tmp_path / "data")
+    monkeypatch.setattr("app.runtime.workspace.get_settings", lambda: settings)
+
+    job = Job(git_url="https://example.com/x.git", status=JobStatus.DONE)
+    repo.create(job)
+    ws = Workspace(job.id).create()
+    ws.repo_dir.mkdir(parents=True, exist_ok=True)
+
+    structure = JavaClassStructure(package="com.example", class_name="Calc", methods=[])
+    snapshot = ContextSnapshot(
+        target_class="com.example.Calc", class_structure=structure
+    )
+    target = Target(
+        target_class="com.example.Calc",
+        file_path="src/main/java/com/example/Calc.java",
+        exists=True,
+    )
+    result = TestGenerationResult(
+        target_class="com.example.Calc",
+        package="com.example",
+        test_class_name="CalcAiGeneratedTest",
+        file_name="CalcAiGeneratedTest.java",
+        test_source="package com.example;\nclass CalcAiGeneratedTest { }\n",
+        model="fixture",
+    )
+
+    rel = "src/test/java/com/example/CalcAiGeneratedTest.java"
+    original = (
+        "package com.example;\n"
+        "class CalcAiGeneratedTest {\n"
+        "  void t() { assertEquals(2, Calc.add(1, 1)); }\n"
+        "}\n"
+    )
+    abs_path = ws.repo_dir / rel
+    # malicious "repair": rewrites the expected value -> oracle NOT preserved.
+    malicious = original.replace("assertEquals(2,", "assertEquals(999,")
+
+    def _fake_write(repo_dir, res, *a, **k):
+        p = repo_dir / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(original, encoding="utf-8")
+        return WriteResult(file_path=rel, test_class_name=res.test_class_name,
+                           created=True, content=original)
+
+    exec_calls = {"n": 0}
+
+    def _fake_exec(*a, **k):
+        exec_calls["n"] += 1
+        return _preflight_reject_result("com.example.CalcAiGeneratedTest")  # COMPILE_FAILURE
+
+    def _fake_repair(source, log_text="", java_source_level=None):
+        return CompileRepairResult(
+            changed=True, source=malicious, patches=[], oracle_preserved=False
+        )
+
+    monkeypatch.setattr("app.pipeline.generate_pipeline.resolve_target",
+                        lambda *a, **k: (target, structure))
+    monkeypatch.setattr("app.pipeline.generate_pipeline.build_snapshot",
+                        lambda *a, **k: snapshot)
+    monkeypatch.setattr("app.pipeline.generate_pipeline.parse_jacoco",
+                        lambda *a, **k: Coverage())
+    monkeypatch.setattr("app.pipeline.generate_pipeline.parse_jacoco_class",
+                        lambda *a, **k: Coverage())
+    monkeypatch.setattr("app.pipeline.generate_pipeline.dry_generate",
+                        lambda *a, **k: result)
+    monkeypatch.setattr(
+        "app.pipeline.generate_pipeline.evaluate_generated_test_preflight",
+        lambda *a, **k: types.SimpleNamespace(
+            status="PASS", model_dump=lambda: {"status": "PASS"}),
+    )
+    monkeypatch.setattr("app.pipeline.generate_pipeline.write_generated_test",
+                        _fake_write)
+    monkeypatch.setattr("app.pipeline.generate_pipeline.execute_generated_test",
+                        _fake_exec)
+    monkeypatch.setattr("app.pipeline.generate_pipeline.repair_compile_failure",
+                        _fake_repair)
+
+    out = run_generation(
+        job, repo, "com.example.Calc", client=object(),
+        repair_compile_failures=True, max_repair_rounds=1,
+    )
+
+    assert out.status == JobStatus.GEN_DONE
+    # the oracle-touching repair was discarded: on-disk file keeps the original oracle.
+    assert abs_path.read_text(encoding="utf-8") == original
+    assert "assertEquals(999" not in abs_path.read_text(encoding="utf-8")
+    rep = out.generation["repair"]
+    assert rep["safety_stopped"] is True
+    assert rep["repair_rounds"] == 0                 # reverted round does not count
+    last = rep["rounds"][-1]
+    assert last["safety_stop"] == "oracle_signature_changed"
+    assert last["oracle_preserved"] is False
+    # Maven ran once (initial); the post-repair re-run was skipped by the safety stop.
+    assert exec_calls["n"] == 1

@@ -167,4 +167,24 @@ oracle text). This is the **pre-enablement stable point**; repair remains gated 
 (`repair_compile_failures=False`). Enablement itself is designed separately in
 **docs/39**.
 
+### 7.2 Enforced + surfaced oracle-preservation postcondition (2026-06-08)
+
+The by-construction guard (§7.1) is now also an **enforced, verifiable runtime
+postcondition** — defense-in-depth for future repair enablement (docs/39):
+
+- `CompileRepairResult.oracle_preserved` — every repair carries it: the oracle
+  skeleton (the ordered, whitespace-normalized text of all `assert…(…)`/`fail(…)`
+  calls) is unchanged before vs after. `repair_is_safe(result)` exposes it
+  (`app/repair/compile_repair.py`).
+- The generate pipeline **reverts** any changed-but-not-preserved repair: the source
+  is **not written**, Maven is **not re-run**, and the round records
+  `safety_stop="oracle_signature_changed"` with `repair.safety_stopped=True`
+  (`app/pipeline/generate_pipeline.py`). The compile failure is left for human review
+  rather than persisting an oracle-touching edit.
+- Re-validation (offline, all `bench.db`, Java 8 forced): **23/23** `COMPILE_FAILURE`
+  repairs have `oracle_preserved=True`; `repair_is_safe=False` count = **0** — the
+  safety net never trips on real data (pure defense-in-depth, no behavior change on
+  the corpus). New tests: unit (`oracle_preserved`/`repair_is_safe`/signature) +
+  end-to-end pipeline revert. Full suite **215 passed, 4 skipped**.
+
 > Boundaries held throughout: no model run, no new benchmark, no bucket expansion.

@@ -1,4 +1,9 @@
-from app.repair.compile_repair import repair_compile_failure
+from app.repair.compile_repair import (
+    CompileRepairResult,
+    _oracle_signature,
+    repair_compile_failure,
+    repair_is_safe,
+)
 
 
 def test_adds_missing_junit_static_import():
@@ -150,3 +155,55 @@ def test_no_change_for_unknown_compile_failure():
     out = repair_compile_failure(src, compile_log="cannot find symbol Foo")
     assert not out.changed
     assert out.source == src
+
+
+# --- docs/38 verifiable oracle-preservation invariant -----------------------------
+
+def test_oracle_preserved_true_for_safe_repairs():
+    # missing static import (insert-only) preserves the oracle skeleton.
+    imp = """package x;
+
+class TAiGeneratedTest {
+    @org.junit.jupiter.api.Test
+    void t() { assertSame("a", "a"); }
+}
+"""
+    out = repair_compile_failure(imp)
+    assert out.changed and out.oracle_preserved is True
+
+    # initializer List.of rewrite (outside any assertion) preserves the oracle too.
+    lst = """package x;
+
+import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+class TAiGeneratedTest {
+    @org.junit.jupiter.api.Test
+    void t() {
+        List<String> expected = List.of("1", "2");
+        assertEquals(expected, values());
+    }
+}
+"""
+    out = repair_compile_failure(lst, java_source_level="1.8")
+    assert out.changed and out.oracle_preserved is True
+
+
+def test_oracle_signature_detects_assertion_argument_change():
+    a = 'class T { void t(){ assertEquals(2, f()); } }'
+    b = 'class T { void t(){ assertEquals(999, f()); } }'
+    assert _oracle_signature(a) != _oracle_signature(b)
+    # an inserted import / whitespace reflow does NOT change the signature
+    c = 'import z;\nclass T { void t(){ assertEquals(2,   f()); } }'
+    assert _oracle_signature(a) == _oracle_signature(c)
+
+
+def test_repair_is_safe_reflects_oracle_preservation():
+    assert repair_is_safe(CompileRepairResult(changed=False, source="x")) is True
+    assert repair_is_safe(
+        CompileRepairResult(changed=True, source="x", oracle_preserved=True)
+    ) is True
+    # a changed repair that did not preserve the oracle is NOT safe to persist.
+    assert repair_is_safe(
+        CompileRepairResult(changed=True, source="x", oracle_preserved=False)
+    ) is False

@@ -39,7 +39,7 @@ from app.llm.client import LLMClient, LLMRequestError, get_client
 from app.llm.schema import LLMOutputError
 from app.models.job import Job, JobStatus
 from app.quality.generated_test_preflight import evaluate_generated_test_preflight
-from app.repair.compile_repair import repair_compile_failure
+from app.repair.compile_repair import repair_compile_failure, repair_is_safe
 from app.runtime.workspace import Workspace
 from app.storage.job_repo import JobRepo
 from app.targeting.target_selector import resolve_target
@@ -216,11 +216,30 @@ def run_generation(
             attempt = {
                 "round": round_no,
                 "changed": repair.changed,
+                "oracle_preserved": repair.oracle_preserved,
                 "patches": [p.model_dump() for p in repair.patches],
                 "before_outcome": exec_result.gen_outcome.value,
             }
             attempts.append(attempt)
             if not repair.changed:
+                break
+            if not repair_is_safe(repair):
+                # Defense-in-depth (docs/38): a repair that altered the oracle
+                # skeleton is discarded -- not written, not re-run. The compile
+                # failure is left for human review rather than persisting an
+                # oracle-touching edit. Should never fire given the by-construction
+                # guards; this is the enforced postcondition.
+                attempt["changed"] = False
+                attempt["safety_stop"] = "oracle_signature_changed"
+                bundle["repair"] = {
+                    "enabled": True,
+                    "rounds": attempts,
+                    "repair_rounds": len([a for a in attempts if a.get("changed")]),
+                    "final_outcome": exec_result.gen_outcome.value,
+                    "safety_stopped": True,
+                }
+                job.generation = bundle
+                repo.save(job)
                 break
 
             test_path.write_text(repair.source, encoding="utf-8")

@@ -16,6 +16,11 @@ argument span. Oracle expected values are arguments *inside* a matcher call
 non-``assert*`` DSL), never a ``= List.of`` initializer, so the rewrite cannot reach
 oracle text by construction -- independent of the assertion's name. No
 oracle/test-failure repair happens here.
+
+Beyond the by-construction guards, every result carries a verifiable
+``oracle_preserved`` postcondition (the oracle skeleton -- assert.../fail(...) calls
+-- is unchanged); ``repair_is_safe`` exposes it and the pipeline reverts any repair
+that fails it.
 """
 from __future__ import annotations
 
@@ -34,6 +39,11 @@ class CompileRepairResult(BaseModel):
     changed: bool
     source: str
     patches: List[RepairPatch] = Field(default_factory=list)
+    # Verifiable postcondition: the oracle skeleton (assert.../fail(...) calls) is
+    # byte-identical (modulo whitespace) before and after repair. The pipeline
+    # reverts a repair where this is False (defense-in-depth over the by-construction
+    # guards). True when nothing changed.
+    oracle_preserved: bool = True
 
 
 _JUNIT_ASSERTIONS = {
@@ -158,6 +168,22 @@ def _assertion_arg_spans(source: str) -> list[tuple[int, int]]:
     return spans
 
 
+def _oracle_signature(source: str) -> tuple[str, ...]:
+    """Ordered, whitespace-normalized text of every assert.../fail(...) call -- the
+    test's oracle skeleton (which assertions exist + their expected-value arguments).
+    A repair that leaves this tuple unchanged provably did not edit oracle text.
+    Whitespace is normalized so a pure line-ending/import reflow is not flagged, while
+    any change to an assertion's arguments is."""
+    sig: list[str] = []
+    for m in re.finditer(r"\b(?:assert\w+|fail)\s*\(", source):
+        close = _matching_paren(source, m.end() - 1)
+        if close is None:
+            continue
+        call = source[m.start() : close + 1]
+        sig.append(re.sub(r"\s+", " ", call).strip())
+    return tuple(sig)
+
+
 def _is_initializer_position(source: str, idx: int) -> bool:
     """True when the token at ``idx`` is the right-hand side of an assignment /
     initializer -- the nearest preceding non-space char is a bare ``=`` (not ``==``,
@@ -267,4 +293,12 @@ def repair_compile_failure(
         changed=repaired != source,
         source=repaired,
         patches=patches,
+        oracle_preserved=_oracle_signature(source) == _oracle_signature(repaired),
     )
+
+
+def repair_is_safe(result: CompileRepairResult) -> bool:
+    """A repair is safe to persist iff it changed nothing or preserved the oracle
+    skeleton. The generate pipeline reverts (does not write / re-run Maven for) a
+    repair that fails this check."""
+    return (not result.changed) or result.oracle_preserved

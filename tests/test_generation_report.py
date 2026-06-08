@@ -193,3 +193,59 @@ def test_empty_bundle_degrades_gracefully():
     assert r["generated"] is False
     assert r["conclusion"] == CONCLUSION
     assert r["compiled"] is False
+
+
+# --- risk-aware, explainable review recommendation (docs/22) ---------------------
+
+def _grounded_pass_bundle(**over):
+    """A quality-PASS + gen-PASS bundle whose base recommendation is STRONG."""
+    source = (
+        "package com.example;\n"
+        "import org.junit.jupiter.api.Test;\n"
+        "import static org.junit.jupiter.api.Assertions.assertEquals;\n\n"
+        "class CalcAiGeneratedTest {\n"
+        "  @Test void maxReturnsLargerInput() {\n"
+        "    assertEquals(9, new Calc().max(2, 9));\n"
+        "  }\n"
+        "}\n"
+    )
+    b = _bundle()
+    b["result"]["test_source"] = source
+    b["result"]["behavior_sources"] = ["Calc.max returns the larger input"]
+    b["write"]["content"] = source
+    b.update(over)
+    return b
+
+
+def test_clean_pass_is_strong_with_reasons_and_invariant():
+    r = assemble_generation_report(_grounded_pass_bundle())
+    assert r["review_recommendation"] == "STRONG_REVIEW_CANDIDATE"
+    rs = r["review_summary"]
+    assert rs["recommendation_reasons"] == ["clean_pass"]
+    assert rs["invariants"]["auto_accept_blocked"] is True
+
+
+def test_machine_repaired_pass_downgrades_from_strong():
+    bundle = _grounded_pass_bundle()
+    bundle["repair"] = {"enabled": True, "repair_rounds": 1,
+                        "final_outcome": "PASS", "rounds": []}
+    r = assemble_generation_report(bundle)
+    assert r["review_recommendation"] == "REVIEW_CANDIDATE"
+    reasons = r["review_summary"]["recommendation_reasons"]
+    assert "machine_repaired" in reasons and "downgraded_from_strong" in reasons
+
+
+def test_model_declared_risk_downgrades_from_strong():
+    bundle = _grounded_pass_bundle()
+    bundle["result"]["risk_flags"] = ["assumed exception type"]
+    r = assemble_generation_report(bundle)
+    assert r["review_recommendation"] == "REVIEW_CANDIDATE"
+    assert "model_declared_risk" in r["review_summary"]["recommendation_reasons"]
+
+
+def test_no_risk_sentinel_stays_strong():
+    # the benign "none" sentinel must NOT downgrade a clean pass.
+    bundle = _grounded_pass_bundle()
+    bundle["result"]["risk_flags"] = ["none"]
+    r = assemble_generation_report(bundle)
+    assert r["review_recommendation"] == "STRONG_REVIEW_CANDIDATE"
