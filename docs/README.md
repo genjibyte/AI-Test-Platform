@@ -12,6 +12,7 @@
 - [13 Project Direction Review](/docs/00_foundation/13_PROJECT_DIRECTION_REVIEW.md)
 - [24 Phase Next Design](/docs/00_foundation/24_PHASE_NEXT_DESIGN.md)
 - [40 Core Thesis Repositioning](/docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md)
+- [42 AI Test Failure Empirical Audit](/docs/00_foundation/42_AI_TEST_FAILURE_EMPIRICAL_AUDIT.md)
 
 ## 10 Phase 1
 
