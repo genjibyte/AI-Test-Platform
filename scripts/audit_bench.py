@@ -1,15 +1,17 @@
-"""Read-only benchmark audit (P1-T4, foundation hardening).
+"""Read-only benchmark audit (P1-T4 + P1-T3 run_kind, foundation hardening).
 
 Recomputes the headline benchmark numbers from local ``var/benchmark/*/bench.db``
 artifacts using the pure ``assemble_generation_report`` -- NO model/API calls, NO
-``.env`` reading, NO mutation of any data. It separates fake/dry-run placeholder rows
-from real-model rows so headline metrics are not silently contaminated (the docs/42
-incident, n=80 raw -> n=67 real).
+``.env`` reading, NO mutation of any data.
 
-LIMITATION: the benchmark schema has no explicit ``run_kind`` field, so the fake/real
-split here is HEURISTIC (the ``FAKE CLIENT PLACEHOLDER`` marker in ``test_source`` or
-``model == "fake-1"``), not authoritative. P1-T3 should add a real ``run_kind``. This
-script must not pretend the heuristic is complete.
+run_kind (docs/43): this script **prefers the authoritative ``run_kind`` field** when a
+row carries it, and falls back to a clearly-labeled HEURISTIC for historical rows that
+have no field. Headline model-quality metrics use ``run_kind == "real"`` only;
+``fake``/``dryrun``/``smoke`` and unknown rows are raw/audit counts.
+
+LIMITATION: until benchmarks are re-run so every row carries ``run_kind``, the fake/real
+split for historical rows is heuristic and incomplete. This script never mutates
+historical ``bench.db`` (owner decision: historical data stays read-only).
 
 Usage (venv python, from repo root):
     & "E:\\AI-Test-Platform\\.venv\\Scripts\\python.exe" scripts/audit_bench.py
@@ -29,22 +31,21 @@ from pathlib import Path
 # root. assemble_generation_report is pure shaping; it never instantiates Settings and
 # therefore never reads ``.env``.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from app.llm.run_kind import RUN_KINDS  # noqa: E402
 from app.report.generation_report import assemble_generation_report  # noqa: E402
 
 _FAKE_MARKER = "FAKE CLIENT PLACEHOLDER"
 _COMPILED = {"PASS", "TEST_FAILURE", "NO_TESTS"}  # platform `compiled` definition
 
 
-def _is_fake(gen: dict, rep: dict) -> bool:
-    """Heuristic only -- see module LIMITATION. Not a substitute for a run_kind field."""
+def _heuristic_fake(gen: dict, rep: dict) -> bool:
+    """Historical-only fallback. NOT authoritative -- see module LIMITATION."""
     src = (
         (gen.get("write") or {}).get("content")
         or (gen.get("result") or {}).get("test_source")
         or ""
     )
-    if _FAKE_MARKER in src:
-        return True
-    return (rep.get("model") or "") == "fake-1"
+    return (_FAKE_MARKER in src) or ((rep.get("model") or "") == "fake-1")
 
 
 def _load(bench_dir: Path):
@@ -55,21 +56,23 @@ def _load(bench_dir: Path):
         conn = sqlite3.connect(db)
         conn.row_factory = sqlite3.Row
         try:
-            cur = conn.execute("SELECT generation_json FROM jobs")
-            for r in cur:
+            for r in conn.execute("SELECT generation_json FROM jobs"):
                 if not r["generation_json"]:
                     continue
                 gen = json.loads(r["generation_json"])
                 rep = assemble_generation_report(gen)
                 if rep.get("gen_outcome") is None:
                     continue
+                rk = gen.get("run_kind")
+                rk = rk if rk in RUN_KINDS else None  # authoritative field, if valid
                 rows.append(
                     {
                         "run": run,
                         "outcome": rep.get("gen_outcome"),
                         "quality": (rep.get("quality_gate") or {}).get("status"),
                         "rec": rep.get("review_recommendation"),
-                        "fake": _is_fake(gen, rep),
+                        "run_kind": rk,  # None == historical / no field
+                        "heuristic_fake": _heuristic_fake(gen, rep),
                     }
                 )
         except sqlite3.Error as exc:
@@ -106,7 +109,7 @@ def _summary(label: str, rows: list) -> None:
 
 
 def main(argv: list) -> int:
-    ap = argparse.ArgumentParser(description="Read-only benchmark audit (P1-T4)")
+    ap = argparse.ArgumentParser(description="Read-only benchmark audit (P1-T4 / run_kind)")
     ap.add_argument(
         "--dir", default="var/benchmark", help="benchmark root (default: var/benchmark)"
     )
@@ -124,19 +127,38 @@ def main(argv: list) -> int:
         )
         return 2
 
-    fake = [r for r in rows if r["fake"]]
-    real = [r for r in rows if not r["fake"]]
+    authoritative = [r for r in rows if r["run_kind"] is not None]
+    unknown = [r for r in rows if r["run_kind"] is None]
     print(f"bench.db files : {len(dbs)}   generation rows : {len(rows)}")
-    print(f"  fake/dry-run (heuristic): {len(fake)}   real-model (heuristic): {len(real)}")
-    print(f"  fake by run : {dict(Counter(r['run'] for r in fake))}")
+    print(f"  authoritative run_kind present : {len(authoritative)}")
+    print(f"  historical / no run_kind       : {len(unknown)}  (classified heuristically)")
+    print(f"  authoritative run_kind dist    : {dict(Counter(r['run_kind'] for r in authoritative))}")
+    print(
+        "  heuristic (unknown rows)       : "
+        f"{dict(Counter('fake' if r['heuristic_fake'] else 'real' for r in unknown))}"
+    )
+    print(
+        "  fake-ish by run (heuristic)    : "
+        f"{dict(Counter(r['run'] for r in unknown if r['heuristic_fake']))}"
+    )
 
-    _summary("RAW (all rows, incl. fake)", rows)
-    _summary("REAL-MODEL ONLY (heuristic)", real)
+    _summary("RAW (all rows, all kinds)", rows)
+    _summary(
+        "HEADLINE -- REAL only (authoritative run_kind == real)",
+        [r for r in rows if r["run_kind"] == "real"],
+    )
+    _summary(
+        "HISTORICAL fallback -- REAL (heuristic, unknown provenance, NOT authoritative)",
+        [r for r in unknown if not r["heuristic_fake"]],
+    )
 
     print(
-        "\nLIMITATION: current benchmark schema lacks explicit run_kind; fake/real"
-        "\nseparation is therefore heuristic or incomplete until P1-T3 is implemented."
-        '\n(heuristic = "FAKE CLIENT PLACEHOLDER" in test_source OR model == "fake-1")'
+        f"\nLIMITATION: {len(authoritative)}/{len(rows)} rows carry an authoritative "
+        f"run_kind (docs/43); {len(unknown)} are historical (no field) and split "
+        'heuristically ("FAKE CLIENT PLACEHOLDER" / model == "fake-1"), which is '
+        "incomplete.\nHeadline model-quality metrics use authoritative run_kind == real "
+        "only; fake/dryrun/smoke and unknown rows are raw/audit counts. Re-run "
+        "benchmarks so new rows carry run_kind. Historical bench.db is never mutated."
     )
     return 0
 

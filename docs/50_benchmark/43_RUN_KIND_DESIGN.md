@@ -134,6 +134,39 @@ Each slice is small and paused until approved.
    `generate_pipeline` taking an optional `run_kind` param defaulting to derived?
    (Recommend: yes — producer-owned, minimal surface.)
 
-> Design only. Nothing implemented. `run_kind` stays paused until explicit approval; the
-> companion `DECISIONS_AND_FAILURES.md` (P1-T5) should record the contamination incident
-> this field prevents.
+## 12. Decisions confirmed + minimal slice implemented (2026-06-11)
+
+Owner confirmed §11: (1) keep all four kinds, `dryrun`/`smoke` **not** merged into `fake`,
+headline = `real` only; (2) **no** historical backfill, historical `bench.db` read-only,
+audit keeps a **labeled** heuristic fallback; (3) the producer sets `run_kind` at
+generation time, `generate_pipeline` takes an optional param but **never** infers from
+artifacts/source, and **"a fake client can never produce `real`" is a regression-tested
+invariant**.
+
+**Implemented (minimal effective slice):**
+- `app/llm/run_kind.py` — `RUN_KINDS` + `resolve_run_kind(client_is_fake, override)` with
+  the guard (override `real` on a fake client raises).
+- `app/pipeline/generate_pipeline.py` — optional `run_kind` param; sets
+  `bundle["run_kind"]` from the resolved client at the GENERATE step (never from source).
+- `app/benchmark/{runner,models}.py` — `run_benchmark`/`run_case` thread an optional
+  override; `BenchCaseResult.run_kind`; `_completed_result` stamps it from the bundle.
+- `app/ledger/{models,ingest}.py` — `JudgedRecord.run_kind`, copied on ingest.
+- `scripts/run_benchmark.py` — `--run-kind {real,fake,dryrun,smoke}` flag.
+- `scripts/audit_bench.py` — prefers the authoritative field; **HEADLINE = real only**;
+  labeled heuristic fallback for historical rows; never mutates `bench.db`.
+- `tests/test_run_kind.py` — the invariant (fake → never `real`), override validation,
+  ledger carry.
+
+Validation: full suite **229 passed, 4 skipped**; `audit_bench.py` on historical data
+reports `0 authoritative / 80 heuristic` and reproduces docs/42 §A under the clearly-
+labeled "historical fallback" view (real-heuristic n=67: compile 61% / pass 25% /
+green-FAIL 0/17).
+
+**Deferred (S2 — separate follow-up, NOT this slice):** defaulting the benchmark
+`aggregate()` and the ledger analytics (`aggregate_badcases` / `author_profile` /
+`ledger_summary`) to `run_kind == real`. The field is already plumbed into `JudgedRecord`,
+so this is a small filter-only change; today the actual cross-run contamination surface is
+handled by `audit_bench.py`. No P3, no Defects4J, no multi-model.
+
+> The companion `DECISIONS_AND_FAILURES.md` (P1-T5) should record the contamination
+> incident this field prevents.

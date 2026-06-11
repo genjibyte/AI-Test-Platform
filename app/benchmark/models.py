@@ -95,6 +95,7 @@ class BenchCaseResult(BaseModel):
     coverage_status: str = COVERAGE_UNAVAILABLE  # available | unavailable
     production_code_touched: Optional[bool] = None
     model: Optional[str] = None
+    run_kind: Optional[str] = None            # real|fake|dryrun|smoke (docs/43); headline=real
     conclusion: Optional[str] = None
     repair_rounds: Optional[int] = None
     repair_final_outcome: Optional[str] = None

@@ -29,6 +29,7 @@ def record_from_bench_case(
         target_method=result.target_method,
         provenance=provenance,
         test_fingerprint=fingerprint_source(test_source),
+        run_kind=result.run_kind,
         gen_outcome=result.gen_outcome,
         compiled=result.compiled,
         executed=result.executed,

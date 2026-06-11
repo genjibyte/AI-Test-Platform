@@ -32,13 +32,22 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Phase 2.5 mini-benchmark")
     parser.add_argument("spec", help="path to a benchmark spec JSON")
     parser.add_argument("--out", default="var/benchmark/run", help="output directory")
+    parser.add_argument(
+        "--run-kind",
+        default=None,
+        choices=["real", "fake", "dryrun", "smoke"],
+        help="override run_kind for this run (docs/43). Default: derived from the "
+        "client (real client -> real, fake client -> fake). A fake client can never "
+        "be 'real'. Use 'dryrun'/'smoke' to keep fake-client harness runs out of "
+        "headline model-quality metrics.",
+    )
     args = parser.parse_args(argv)
 
     spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
     cases = load_spec(spec)
     out = Path(args.out)
 
-    report = run_benchmark(cases, workdir=out)
+    report = run_benchmark(cases, workdir=out, run_kind=args.run_kind)
 
     (out / "report.json").write_text(
         report.model_dump_json(indent=2), encoding="utf-8"

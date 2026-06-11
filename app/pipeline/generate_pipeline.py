@@ -36,6 +36,8 @@ from app.generate.gen_executor import (
 from app.generate.generation import dry_generate
 from app.generate.test_writer import TestWriteError, write_generated_test
 from app.llm.client import LLMClient, LLMRequestError, get_client
+from app.llm.fake_client import FakeLLMClient
+from app.llm.run_kind import resolve_run_kind
 from app.llm.schema import LLMOutputError
 from app.models.job import Job, JobStatus
 from app.quality.generated_test_preflight import evaluate_generated_test_preflight
@@ -97,6 +99,7 @@ def run_generation(
     maven_extra_args: Optional[Sequence[str]] = None,
     repair_compile_failures: bool = False,
     max_repair_rounds: int = 1,
+    run_kind: Optional[str] = None,
 ) -> Job:
     bundle = _empty_bundle()
 
@@ -140,8 +143,12 @@ def run_generation(
     # --- GENERATE (LLM -> artifact -> independent test file) --------------
     repo.update_status(job.id, JobStatus.GENERATE)
     job = repo.get(job.id)
+    client = client or get_client()
+    # run_kind is decided at generation time by the producer (docs/43); a fake client
+    # can never be 'real'. Persisted in the bundle; never reconstructed from artifacts.
+    bundle["run_kind"] = resolve_run_kind(isinstance(client, FakeLLMClient), run_kind)
     try:
-        result = dry_generate(snapshot, client or get_client())
+        result = dry_generate(snapshot, client)
     except LLMRequestError as exc:  # auth / quota / network / bad model name
         return _gen_fail(repo, job, bundle, f"LLM request failed: {exc}")
     except LLMOutputError as exc:   # model returned unparseable / off-schema JSON

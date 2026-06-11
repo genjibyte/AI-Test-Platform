@@ -58,6 +58,7 @@ class JudgedRecord(BaseModel):
     # provenance + identity
     provenance: Provenance
     test_fingerprint: Optional[str] = None
+    run_kind: Optional[str] = None       # real|fake|dryrun|smoke (docs/43); headline=real
 
     # judging facts (projected from BenchCaseResult -- no recomputation)
     gen_outcome: Optional[str] = None

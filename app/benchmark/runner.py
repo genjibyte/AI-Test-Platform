@@ -182,6 +182,7 @@ def _completed_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
         coverage_status=cov_status,
         production_code_touched=rep.get("production_code_touched"),
         model=rep.get("model"),
+        run_kind=(job.generation or {}).get("run_kind"),
         conclusion=rep.get("conclusion"),
         repair_rounds=repair.get("repair_rounds") if repair.get("enabled") else None,
         repair_final_outcome=repair.get("final_outcome"),
@@ -201,6 +202,7 @@ def run_case(
     client: LLMClient,
     mirror_uri: str,
     maven_extra_args: Optional[list[str]] = None,
+    run_kind: Optional[str] = None,
 ) -> BenchCaseResult:
     """Judge the repo, then (if buildable) generate one test for the target."""
     t0 = time.monotonic()
@@ -220,6 +222,7 @@ def run_case(
         maven_extra_args=maven_extra_args,
         repair_compile_failures=get_settings().repair_compile_failures,
         max_repair_rounds=get_settings().repair_max_rounds,
+        run_kind=run_kind,  # producer sets it at generation time (docs/43)
     )
     return _completed_result(case, job, t0)
 
@@ -244,6 +247,7 @@ def run_benchmark(
     cases: List[BenchCase],
     workdir: Path,
     client: Optional[LLMClient] = None,
+    run_kind: Optional[str] = None,
 ) -> BenchReport:
     workdir = Path(workdir).resolve()  # absolute: required for file:// mirror URIs
     workdir.mkdir(parents=True, exist_ok=True)
@@ -289,7 +293,7 @@ def run_benchmark(
                 )
                 continue
         results.append(
-            run_case(case, repo_db, client, mirrors[mkey], maven_extra_args)
+            run_case(case, repo_db, client, mirrors[mkey], maven_extra_args, run_kind)
         )
 
     model = next((r.model for r in results if r.model), settings.llm_model)
