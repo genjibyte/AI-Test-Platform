@@ -69,4 +69,7 @@
 
 ## Knowledge (agent memory)
 
+- [Knowledge Index](/docs/knowledge/README.md)
 - [External Agent & Test Generation KB](/docs/knowledge/EXTERNAL_AGENT_AND_TESTGEN_KB.md)
+- [Benchmark Sources & Strategy](/docs/knowledge/BENCHMARK_SOURCES_AND_STRATEGY.md)
+- [Internet & Tech Business KB (test-value invariants)](/docs/knowledge/INTERNET_TECH_BUSINESS_KB.md)
