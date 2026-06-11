@@ -30,15 +30,18 @@ tests:
 ## Current state (2026-06-11)
 - Done: judge + minimal generation pipeline; quality gate + review policy (advisory,
   never auto-accept); preflight + oracle-safe compile-repair (gated off); ledger
-  P1/P2 (`app/ledger/`).
+  P1/P2 (`app/ledger/`); `run_kind` **minimal slice** (producer-set provenance + the
+  "fake can never be real" guard, docs/43) — its S2 filter-only follow-up (default
+  headline/ledger queries to `real`) is **deferred**, not done.
 - **PAUSED — foundation-hardening phase.** All feature/design work is paused,
-  including P3 / `submit_candidate`, the `run_kind` schema, and new repair/preflight
-  buckets, until foundation hardening is done. Do **not** resume features without
-  explicit approval.
+  including P3 / `submit_candidate` and new repair/preflight buckets, until foundation
+  hardening is done. Do **not** resume features without explicit approval.
 - Branch `main`; commits are often stacked **locally and unpushed**.
-- Data caveat: historical `var/benchmark/*/bench.db` mixes real + fake/dry-run jobs
-  (see `docs/00_foundation/42_AI_TEST_FAILURE_EMPIRICAL_AUDIT.md` §A). **There is no
-  `run_kind` field yet.**
+- Data caveat: **new** benchmark runs carry the authoritative `run_kind` field;
+  **historical** `var/benchmark/*/bench.db` rows have no field, so their fake/real split
+  stays heuristic (`scripts/audit_bench.py`, labeled). Historical data is read-only —
+  never backfilled (see `docs/00_foundation/42_AI_TEST_FAILURE_EMPIRICAL_AUDIT.md` §A,
+  `docs/50_benchmark/43_RUN_KIND_DESIGN.md`).
 
 ## Read first
 1. `docs/00_foundation/00_PROJECT_CHARTER.md` — top constraint
