@@ -44,7 +44,8 @@ tests:
 1. `docs/00_foundation/00_PROJECT_CHARTER.md` — top constraint
 2. `docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md` — thesis
 3. `docs/00_foundation/42_AI_TEST_FAILURE_EMPIRICAL_AUDIT.md` — real data + §A reproducibility
-4. `docs/README.md` — doc index
+4. `docs/knowledge/EXTERNAL_AGENT_AND_TESTGEN_KB.md` — external lessons + immediate rules (judge-not-generate, run_kind, headline-metrics)
+5. `docs/README.md` — doc index
 
 ## Toolchain (this machine)
 - Python: **use the venv** → `& "E:\AI-Test-Platform\.venv\Scripts\python.exe"`.

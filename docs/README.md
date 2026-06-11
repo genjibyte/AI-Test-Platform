@@ -66,3 +66,7 @@
 - [32 Generated Test Preflight Gate](/docs/70_preflight/32_GENERATED_TEST_PREFLIGHT_GATE.md)
 - [33 Preflight Offline Replay Audit](/docs/70_preflight/33_PREFLIGHT_OFFLINE_REPLAY_AUDIT.md)
 - [36 Preflight Overload Ambiguity Design](/docs/70_preflight/36_PREFLIGHT_OVERLOAD_AMBIGUITY_DESIGN.md)
+
+## Knowledge (agent memory)
+
+- [External Agent & Test Generation KB](/docs/knowledge/EXTERNAL_AGENT_AND_TESTGEN_KB.md)
