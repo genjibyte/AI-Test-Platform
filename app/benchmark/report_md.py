@@ -18,6 +18,7 @@ def _plain(v) -> str:
 
 def render_markdown(report: BenchReport) -> str:
     a = report.aggregate
+    hr = a.get("headline_real") or {}
     lines = [
         "# Real-Repo Benchmark Report",
         "",
@@ -48,6 +49,18 @@ def render_markdown(report: BenchReport) -> str:
         "accept_rate: —",
         f"- recommendation_distribution: {a.get('recommendation_distribution', {})}  "
         "(advisory; conclusion stays NEED_HUMAN_REVIEW)",
+        f"- run_kind_counts: {a.get('run_kind_counts', {})}  "
+        "(rates above are RAW / all kinds)",
+        "",
+        "## Headline — REAL only (docs/43)",
+        "",
+        f"- generation_attempted: {hr.get('generation_attempted')}  "
+        f"compile_pass_rate: {_pct(hr.get('compile_pass_rate'))}  "
+        f"gen_test_pass_rate: {_pct(hr.get('gen_test_pass_rate'))}",
+        f"- quality_gate_pass_rate: {_pct(hr.get('quality_gate_pass_rate'))}  "
+        f"need_human_review_rate: {_pct(hr.get('need_human_review_rate'))}",
+        f"- recommendation_distribution: {hr.get('recommendation_distribution', {})}  "
+        "(fake/dryrun/smoke/unknown excluded)",
         "",
         "## Per-case",
         "",

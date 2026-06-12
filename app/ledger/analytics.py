@@ -17,8 +17,17 @@ from typing import Callable, List, Optional
 from pydantic import BaseModel, Field
 
 from app.ledger.models import JudgedRecord
+from app.llm.run_kind import is_real
 
 _EXAMPLE_CAP = 10
+
+
+def real_records(records: List[JudgedRecord]) -> List[JudgedRecord]:
+    """Authoritative ``real``-only subset for headline metrics (docs/43 §4). Excludes
+    fake/dryrun/smoke and None (historical / no field). The other analytics functions
+    stay pure over whatever list they're given; callers filter via this helper, and
+    ``ledger_summary`` exposes a real-only headline block alongside the raw digest."""
+    return [r for r in records if is_real(r.run_kind)]
 
 
 def badcase_signature(record: JudgedRecord) -> Optional[str]:
@@ -135,8 +144,14 @@ def compare_authors_on_target(
 
 def ledger_summary(records: List[JudgedRecord], *, top: int = 10) -> dict:
     """One-shot read-only digest of the whole ledger (counts + top badcases + author
-    profiles). The single convenience entry over the analytics functions."""
+    profiles). The single convenience entry over the analytics functions.
+
+    The top-level digest is RAW (all run_kinds). ``run_kind_counts`` surfaces the
+    provenance split (None -> "unknown", never dropped) and ``headline_real`` is the
+    authoritative real-only view (docs/43 §4): real compile/pass rates and badcases so
+    fake/dryrun/smoke can never inflate the ledger headline."""
     authors = sorted({r.provenance.author_id for r in records})
+    real = real_records(records)
     return {
         "records": len(records),
         "authors": authors,
@@ -145,4 +160,13 @@ def ledger_summary(records: List[JudgedRecord], *, top: int = 10) -> dict:
         ),
         "top_badcases": [s.model_dump() for s in aggregate_badcases(records)[:top]],
         "author_profiles": [author_profile(records, a) for a in authors],
+        "run_kind_counts": dict(
+            Counter((r.run_kind or "unknown") for r in records).most_common()
+        ),
+        "headline_real": {
+            "records": len(real),
+            "compile_rate": _rate(real, lambda r: r.compiled is True),
+            "pass_rate": _rate(real, lambda r: r.passed is True),
+            "top_badcases": [s.model_dump() for s in aggregate_badcases(real)[:top]],
+        },
     }

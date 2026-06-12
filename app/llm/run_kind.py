@@ -36,3 +36,11 @@ def resolve_run_kind(client_is_fake: bool, override: Optional[str] = None) -> st
             )
         return kind
     return "fake" if client_is_fake else "real"
+
+
+def is_real(run_kind: Optional[str]) -> bool:
+    """True iff a row is authoritative ``real`` -- the ONLY kind that may enter
+    headline model-quality metrics (docs/43 §4). ``fake``/``dryrun``/``smoke`` and
+    ``None`` (historical / no field) are excluded from headline. This mirrors
+    ``scripts/audit_bench.py`` exactly: real is strict, unknown is never headline."""
+    return run_kind == HEADLINE_KIND

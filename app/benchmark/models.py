@@ -11,6 +11,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.llm.run_kind import is_real
+
 # --- Failure taxonomy (Phase 2.5) ------------------------------------------
 # One bucket per (repo, target) case. None == clean PASS. These are FACTS about
 # what blocked the generated test, ordered roughly outermost (repo) to innermost
@@ -155,6 +157,11 @@ def aggregate(cases: List[BenchCaseResult]) -> dict:
     (i.e. repos that judged), so an unbuildable repo doesn't dilute compile rate."""
     n = len(cases)
     attempted = [c for c in cases if c.repo_judged]
+    # Headline = REAL only (docs/43 §4): the top-level rates below are RAW (all kinds);
+    # ``headline_real`` recomputes model-quality numbers over authoritative real rows
+    # so fake/dryrun/smoke/unknown can never inflate the headline. Mirrors audit_bench.
+    real_attempted = [c for c in attempted if is_real(c.run_kind)]
+    real_quality = [c for c in real_attempted if c.quality_gate_status is not None]
     failures = Counter(c.failure_type for c in cases if c.failure_type)
     setup_failures = sum(1 for c in cases if c.failure_type == "LLM_CONFIG_FAILED")
     clone_failures = sum(1 for c in cases if c.failure_type == "REPO_CLONE_FAILED")
@@ -216,6 +223,31 @@ def aggregate(cases: List[BenchCaseResult]) -> dict:
             ).most_common()
         ),
         "accept_rate": None,
+        # run_kind provenance (docs/43). ``run_kind_counts`` is over ALL cases; None
+        # (historical / no field) is surfaced as "unknown", never silently dropped.
+        "run_kind_counts": dict(
+            Counter((c.run_kind or "unknown") for c in cases).most_common()
+        ),
+        # THE headline model-quality view: authoritative real rows only. Separate from
+        # the raw rates above and clearly labeled (docs/43 §4/§6).
+        "headline_real": {
+            "generation_attempted": len(real_attempted),
+            "compile_pass_rate": _rate(real_attempted, lambda c: c.compiled is True),
+            "gen_test_pass_rate": _rate(real_attempted, lambda c: c.passed is True),
+            "quality_gate_pass_rate": _rate(
+                real_quality, lambda c: c.quality_gate_status == "PASS"
+            ),
+            "need_human_review_rate": _rate(
+                real_attempted, lambda c: c.conclusion == "NEED_HUMAN_REVIEW"
+            ),
+            "recommendation_distribution": dict(
+                Counter(
+                    c.review_recommendation
+                    for c in real_attempted
+                    if c.review_recommendation is not None
+                ).most_common()
+            ),
+        },
     }
 
 
