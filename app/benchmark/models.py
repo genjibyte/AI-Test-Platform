@@ -58,6 +58,12 @@ class BenchCase(BaseModel):
     target_class: str
     target_method: Optional[str] = None
     name: Optional[str] = None
+    # docs/45 S1: business-invariant tags (manifest-set, advisory). Declared intent,
+    # NOT verified value; carried read-only and never change judging.
+    business_domain: Optional[str] = None
+    business_pattern: Optional[str] = None
+    expected_invariant: Optional[str] = None
+    risk_level: Optional[str] = None
 
     def label(self) -> str:
         return self.name or f"{self.target_class}#{self.target_method or '*'}"
@@ -96,6 +102,11 @@ class BenchCaseResult(BaseModel):
     production_code_touched: Optional[bool] = None
     model: Optional[str] = None
     run_kind: Optional[str] = None            # real|fake|dryrun|smoke (docs/43); headline=real
+    # docs/45 S1: business-invariant tags carried read-only from the case (advisory).
+    business_domain: Optional[str] = None
+    business_pattern: Optional[str] = None
+    expected_invariant: Optional[str] = None
+    risk_level: Optional[str] = None
     conclusion: Optional[str] = None
     repair_rounds: Optional[int] = None
     repair_final_outcome: Optional[str] = None

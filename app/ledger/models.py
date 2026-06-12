@@ -59,6 +59,12 @@ class JudgedRecord(BaseModel):
     provenance: Provenance
     test_fingerprint: Optional[str] = None
     run_kind: Optional[str] = None       # real|fake|dryrun|smoke (docs/43); headline=real
+    # docs/45 S1: business-invariant tags carried read-only from the result (advisory;
+    # declared intent, not verified value).
+    business_domain: Optional[str] = None
+    business_pattern: Optional[str] = None
+    expected_invariant: Optional[str] = None
+    risk_level: Optional[str] = None
 
     # judging facts (projected from BenchCaseResult -- no recomputation)
     gen_outcome: Optional[str] = None
