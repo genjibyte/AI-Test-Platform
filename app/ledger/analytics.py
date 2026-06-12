@@ -188,3 +188,16 @@ def business_summary(records: List[JudgedRecord], *, run_kind: Optional[str] = N
         "by_domain": dict(by_domain.most_common()),
         "by_pattern": dict(by_pattern.most_common()),
     }
+
+
+def oracle_strength_summary(records: List[JudgedRecord], *, run_kind: Optional[str] = None) -> dict:
+    """docs/46 S2: descriptive group-by of ledger records by advisory oracle_strength
+    (counts). Composes with ``run_kind`` (headline real-only); un-analyzed -> ``unknown``.
+    Pure description -- no judging, no accept/score (the estimate is STRUCTURAL/advisory)."""
+    records = _filter_kind(records, run_kind)
+    by_strength = Counter((r.oracle_strength or "unknown") for r in records)
+    return {
+        "run_kind_filter": run_kind,
+        "records": len(records),
+        "by_oracle_strength": dict(by_strength.most_common()),
+    }

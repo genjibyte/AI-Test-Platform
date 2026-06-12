@@ -21,6 +21,7 @@ from app.ledger.analytics import (
     business_summary,
     compare_authors_on_target,
     ledger_summary,
+    oracle_strength_summary,
 )
 
 __all__ = [
@@ -39,4 +40,5 @@ __all__ = [
     "business_summary",
     "compare_authors_on_target",
     "ledger_summary",
+    "oracle_strength_summary",
 ]
