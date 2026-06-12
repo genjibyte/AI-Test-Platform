@@ -223,6 +223,9 @@ def test_clean_pass_is_strong_with_reasons_and_invariant():
     rs = r["review_summary"]
     assert rs["recommendation_reasons"] == ["clean_pass"]
     assert rs["invariants"]["auto_accept_blocked"] is True
+    # docs/46 S1: the advisory structural oracle-strength estimate surfaces here
+    assert rs["oracle_strength_estimate"]["oracle_strength"] == "structural_ok"
+    assert rs["oracle_strength_estimate"]["semantic_strength"] == "human_review"
 
 
 def test_machine_repaired_pass_downgrades_from_strong():
