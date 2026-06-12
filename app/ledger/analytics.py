@@ -21,6 +21,15 @@ from app.ledger.models import JudgedRecord
 _EXAMPLE_CAP = 10
 
 
+def _filter_kind(records: List[JudgedRecord], run_kind: Optional[str]) -> List[JudgedRecord]:
+    """docs/43 S2: restrict to one ``run_kind`` (e.g. headline ``real``). ``None``
+    keeps all kinds (back-compat). Historical rows have ``run_kind is None`` and are
+    therefore excluded from any specific-kind view (e.g. ``real``)."""
+    if run_kind is None:
+        return records
+    return [r for r in records if r.run_kind == run_kind]
+
+
 def badcase_signature(record: JudgedRecord) -> Optional[str]:
     """A coarse, deterministic failure signature, or ``None`` for a non-failing
     record. Form: ``<failure_type>@<target_class>#<target_method|*>``. The
@@ -44,8 +53,12 @@ class BadcaseStat(BaseModel):
     examples: List[str] = Field(default_factory=list)   # record_ids (capped)
 
 
-def aggregate_badcases(records: List[JudgedRecord]) -> List[BadcaseStat]:
-    """Group failing records by signature, most frequent first (ties by signature)."""
+def aggregate_badcases(
+    records: List[JudgedRecord], *, run_kind: Optional[str] = None
+) -> List[BadcaseStat]:
+    """Group failing records by signature, most frequent first (ties by signature).
+    ``run_kind`` (docs/43 S2): restrict to that kind first; ``real`` = headline."""
+    records = _filter_kind(records, run_kind)
     groups: dict[str, List[JudgedRecord]] = {}
     for r in records:
         sig = badcase_signature(r)
@@ -79,9 +92,16 @@ def _rate(records: List[JudgedRecord], pred: Callable[[JudgedRecord], bool]) -> 
     return round(sum(1 for r in records if pred(r)) / len(records), 4)
 
 
-def author_profile(records: List[JudgedRecord], author_id: str) -> dict:
-    """Usability picture for one author (human / agent / generator) across the ledger."""
-    rs = [r for r in records if r.provenance.author_id == author_id]
+def author_profile(
+    records: List[JudgedRecord], author_id: str, *, run_kind: Optional[str] = None
+) -> dict:
+    """Usability picture for one author (human / agent / generator) across the ledger.
+    ``run_kind`` (docs/43 S2): restrict to that kind first; ``real`` = headline."""
+    rs = [
+        r
+        for r in _filter_kind(records, run_kind)
+        if r.provenance.author_id == author_id
+    ]
     return {
         "author_id": author_id,
         "records": len(rs),
@@ -133,11 +153,16 @@ def compare_authors_on_target(
     }
 
 
-def ledger_summary(records: List[JudgedRecord], *, top: int = 10) -> dict:
+def ledger_summary(
+    records: List[JudgedRecord], *, top: int = 10, run_kind: Optional[str] = None
+) -> dict:
     """One-shot read-only digest of the whole ledger (counts + top badcases + author
-    profiles). The single convenience entry over the analytics functions."""
+    profiles). The single convenience entry over the analytics functions.
+    ``run_kind`` (docs/43 S2): restrict to that kind first; ``real`` = headline."""
+    records = _filter_kind(records, run_kind)
     authors = sorted({r.provenance.author_id for r in records})
     return {
+        "run_kind_filter": run_kind,
         "records": len(records),
         "authors": authors,
         "targets": len(

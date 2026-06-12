@@ -162,11 +162,16 @@ reports `0 authoritative / 80 heuristic` and reproduces docs/42 §A under the cl
 labeled "historical fallback" view (real-heuristic n=67: compile 61% / pass 25% /
 green-FAIL 0/17).
 
-**Deferred (S2 — separate follow-up, NOT this slice):** defaulting the benchmark
-`aggregate()` and the ledger analytics (`aggregate_badcases` / `author_profile` /
-`ledger_summary`) to `run_kind == real`. The field is already plumbed into `JudgedRecord`,
-so this is a small filter-only change; today the actual cross-run contamination surface is
-handled by `audit_bench.py`. No P3, no Defects4J, no multi-model.
+**S2 — implemented (filter-only, 2026-06-12, branch `feat/run-kind-s2`).** `aggregate()`
+and the ledger analytics (`aggregate_badcases` / `author_profile` / `ledger_summary`)
+gained an optional keyword-only `run_kind` filter; headline views default to
+`run_kind == "real"`, with `fake`/`dryrun`/`smoke` and historical `None` (unknown) rows
+excluded. Default `None` keeps the raw all-kinds view (back-compat), and `report_md`
+renders RAW + HEADLINE(real) side by side. Pure read/filter — no judging/quality-gate/
+oracle change; `audit_bench.py` and the "fake can never be real" invariant untouched.
+Acceptance: full suite green (231 passed, 4 e2e skipped) + new regression tests in
+`test_benchmark.py` / `test_ledger.py`; `audit_bench.py` still reproduces docs/42 §A.
+No P3, no Defects4J, no multi-model.
 
 > The companion `DECISIONS_AND_FAILURES.md` (P1-T5) should record the contamination
 > incident this field prevents.

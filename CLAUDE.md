@@ -27,12 +27,13 @@ tests:
 - If you cannot show judging evidence, say so — do not fill the gap with a confident-
   sounding but unverified claim.
 
-## Current state (2026-06-11)
+## Current state (2026-06-12)
 - Done: judge + minimal generation pipeline; quality gate + review policy (advisory,
   never auto-accept); preflight + oracle-safe compile-repair (gated off); ledger
   P1/P2 (`app/ledger/`); `run_kind` **minimal slice** (producer-set provenance + the
-  "fake can never be real" guard, docs/43) — its S2 filter-only follow-up (default
-  headline/ledger queries to `real`) is **deferred**, not done.
+  "fake can never be real" guard, docs/43) plus its **S2 filter-only follow-up — done**
+  (`aggregate()` + ledger analytics default headline views to `run_kind=="real"`;
+  fake/dryrun/smoke + historical unknown excluded; back-compat; docs/43 §12).
 - **PAUSED — foundation-hardening phase.** All feature/design work is paused,
   including P3 / `submit_candidate` and new repair/preflight buckets, until foundation
   hardening is done. Do **not** resume features without explicit approval.

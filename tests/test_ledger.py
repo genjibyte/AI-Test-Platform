@@ -102,7 +102,7 @@ def test_record_report_ingests_all_cases_with_provenance(tmp_path):
 # --- P2 analytics (docs/41 section 5) --------------------------------------------
 
 def _rec(failure_type=None, author="gen", target_class="com.x.C", target_method="m",
-         passed=None, compiled=None, recommendation=None, created_at=None):
+         passed=None, compiled=None, recommendation=None, created_at=None, run_kind=None):
     return JudgedRecord(
         record_id=str(uuid.uuid4()),
         created_at=created_at or "2026-01-01T00:00:00+00:00",
@@ -114,6 +114,7 @@ def _rec(failure_type=None, author="gen", target_class="com.x.C", target_method=
         passed=passed,
         compiled=compiled,
         review_recommendation=recommendation,
+        run_kind=run_kind,
     )
 
 
@@ -186,3 +187,26 @@ def test_ledger_summary_digest():
     assert summ["targets"] == 1
     assert summ["top_badcases"][0]["failure_type"] == "TEST_FAILURE"
     assert len(summ["author_profiles"]) == 2
+
+
+def test_analytics_run_kind_filter_real_only():
+    # docs/43 S2: headline analytics use run_kind == "real"; fake + historical None
+    # are excluded. The default (no filter) stays all-kinds for back-compat.
+    records = [
+        _rec(author="genA", failure_type="TEST_FAILURE", passed=False, run_kind="real"),
+        _rec(author="genA", failure_type="TEST_FAILURE", passed=False, run_kind="fake"),
+        _rec(author="genB", failure_type="COMPILE_FAILURE", passed=False, run_kind=None),
+    ]
+    # back-compat: no filter sees all kinds (two distinct signatures)
+    assert len(aggregate_badcases(records)) == 2
+    # headline real-only: only the one real record survives
+    real_bad = aggregate_badcases(records, run_kind="real")
+    assert len(real_bad) == 1
+    assert real_bad[0].signature == "TEST_FAILURE@com.x.C#m" and real_bad[0].count == 1
+    # author_profile honours the filter
+    assert author_profile(records, "genA")["records"] == 2
+    assert author_profile(records, "genA", run_kind="real")["records"] == 1
+    # ledger_summary honours the filter and is self-describing
+    assert ledger_summary(records)["run_kind_filter"] is None
+    summ = ledger_summary(records, run_kind="real")
+    assert summ["run_kind_filter"] == "real" and summ["records"] == 1
