@@ -9,6 +9,7 @@ from app.benchmark.business_tags import (
     BUSINESS_DOMAINS,
     BUSINESS_PATTERNS,
     RISK_LEVELS,
+    business_review_rubric,
     is_known_domain,
     is_known_pattern,
     is_known_risk,
@@ -152,3 +153,42 @@ def test_report_md_renders_business_section():
     report = BenchReport(cases=[case], aggregate=aggregate([case]))
     md = render_markdown(report)
     assert "Business tags" in md and "by_pattern" in md and "idempotency" in md
+
+
+# --- S3: advisory human-review rubric (docs/45 S3) -------------------------------
+
+def test_business_review_rubric_is_advisory_and_untrusted():
+    r = business_review_rubric(
+        business_domain="Payments", business_pattern="idempotency",
+        expected_invariant="no duplicate charge", risk_level="HIGH",
+        declared_invariant="model says it checks dedup",
+    )
+    # authoritative (manifest) facts, normalized
+    assert r["business_domain"] == "payments" and r["risk_level"] == "high"
+    assert r["expected_invariant"] == "no duplicate charge"
+    # a model-declared invariant is captured but NEVER trusted (anti-hallucination)
+    assert r["declared_invariant"] == "model says it checks dedup"
+    assert r["declared_invariant_trusted"] is False
+    # the human fills these; the platform never computes them
+    assert r["oracle_strength"] is None and r["fake_green_risk"] is None
+    assert r["human_review_note"] is None
+    # a tag never accepts a candidate
+    assert r["auto_accept_blocked"] is True
+
+
+def test_review_summary_with_rubric_attaches_only_when_tagged():
+    from app.benchmark.runner import _review_summary_with_rubric
+    tagged = BenchCase(repo_url="u", target_class="C",
+                       business_domain="payments", expected_invariant="no dup charge")
+    untagged = BenchCase(repo_url="u", target_class="C")
+    base = {"invariants": {"auto_accept_blocked": True}}
+    # untagged -> review summary returned unchanged (no noise added)
+    assert _review_summary_with_rubric(base, untagged) is base
+    # tagged -> business_rubric attached; original keys preserved; base not mutated
+    out = _review_summary_with_rubric(base, tagged)
+    assert "business_rubric" in out and out["invariants"] == {"auto_accept_blocked": True}
+    assert out["business_rubric"]["expected_invariant"] == "no dup charge"
+    assert "business_rubric" not in base
+    # None review summary + tagged -> a fresh dict with just the rubric
+    only = _review_summary_with_rubric(None, tagged)
+    assert set(only.keys()) == {"business_rubric"}
