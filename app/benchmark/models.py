@@ -150,9 +150,17 @@ def _rate(rows: List[BenchCaseResult], pred) -> Optional[float]:
     return round(sum(1 for r in rows if pred(r)) / len(rows), 4)
 
 
-def aggregate(cases: List[BenchCaseResult]) -> dict:
+def aggregate(cases: List[BenchCaseResult], *, run_kind: Optional[str] = None) -> dict:
     """Aggregate metrics (docs/07 §8). Rates are over generation-ATTEMPTED cases
-    (i.e. repos that judged), so an unbuildable repo doesn't dilute compile rate."""
+    (i.e. repos that judged), so an unbuildable repo doesn't dilute compile rate.
+
+    ``run_kind`` (docs/43 S2): when set, restrict to rows with that exact
+    ``run_kind`` BEFORE aggregating. ``run_kind="real"`` is the headline
+    model-quality view -- ``fake``/``dryrun``/``smoke`` and historical ``None``
+    (unknown) rows are excluded. Default ``None`` keeps the raw all-kinds view
+    (back-compat). Pure filter; no judging/quality-gate change."""
+    if run_kind is not None:
+        cases = [c for c in cases if c.run_kind == run_kind]
     n = len(cases)
     attempted = [c for c in cases if c.repo_judged]
     failures = Counter(c.failure_type for c in cases if c.failure_type)
@@ -167,6 +175,7 @@ def aggregate(cases: List[BenchCaseResult]) -> dict:
     ]
     quality_checked = [c for c in attempted if c.quality_gate_status is not None]
     return {
+        "run_kind_filter": run_kind,
         "total_cases": n,
         "repos": len({c.repo_url for c in cases}),
         "buildable_repos": len({c.repo_url for c in cases if c.repo_judged}),

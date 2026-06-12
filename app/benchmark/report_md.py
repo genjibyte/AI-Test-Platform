@@ -1,7 +1,7 @@
 """Render a BenchReport to Markdown (docs/07 §8 style). Pure formatting."""
 from __future__ import annotations
 
-from app.benchmark.models import BenchReport
+from app.benchmark.models import BenchReport, aggregate
 
 
 def _pct(v) -> str:
@@ -16,16 +16,10 @@ def _plain(v) -> str:
     return "—" if v is None else str(v)
 
 
-def render_markdown(report: BenchReport) -> str:
-    a = report.aggregate
-    lines = [
-        "# Real-Repo Benchmark Report",
-        "",
-        f"- provider: `{report.provider}`  model: `{report.model}`",
-        f"- generated_at: {report.generated_at}",
-        f"- maven: `{report.maven}`",
-        "",
-        "## Aggregate",
+def _aggregate_lines(a: dict, title: str) -> list:
+    """Render one aggregate dict. Same shape for RAW and the real headline (docs/43 S2)."""
+    return [
+        f"## {title}",
         "",
         f"- total_cases: {a.get('total_cases')}  repos: {a.get('repos')}  "
         f"buildable_repos: {a.get('buildable_repos')}  "
@@ -49,6 +43,26 @@ def render_markdown(report: BenchReport) -> str:
         f"- recommendation_distribution: {a.get('recommendation_distribution', {})}  "
         "(advisory; conclusion stays NEED_HUMAN_REVIEW)",
         "",
+    ]
+
+
+def render_markdown(report: BenchReport) -> str:
+    # Headline (real-only) is recomputed from the cases so fake/dryrun/smoke and
+    # historical (unknown run_kind) rows never inflate model-quality numbers (docs/43 S2).
+    lines = [
+        "# Real-Repo Benchmark Report",
+        "",
+        f"- provider: `{report.provider}`  model: `{report.model}`",
+        f"- generated_at: {report.generated_at}",
+        f"- maven: `{report.maven}`",
+        "",
+    ]
+    lines += _aggregate_lines(report.aggregate, "Aggregate — RAW (all run_kinds)")
+    lines += _aggregate_lines(
+        aggregate(report.cases, run_kind="real"),
+        "Aggregate — HEADLINE (real only; fake/dryrun/smoke/unknown excluded)",
+    )
+    lines += [
         "## Per-case",
         "",
         "| case | judged | compiled | passed | failure | repair | quality | "

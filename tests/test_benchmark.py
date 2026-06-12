@@ -125,6 +125,31 @@ def test_aggregate_empty():
     assert a["compile_pass_rate"] is None
 
 
+def test_aggregate_run_kind_real_excludes_non_real():
+    # docs/43 S2: the headline (real) view excludes fake/dryrun/smoke AND historical
+    # None (unknown); the default (no filter) stays raw all-kinds for back-compat.
+    cases = [
+        _pass("real_ok", run_kind="real"),
+        _pass("real_cf", run_kind="real", gen_outcome="COMPILE_FAILURE",
+              compiled=False, executed=False, passed=False, target_improved=None,
+              coverage_dropped=None, coverage_status=COVERAGE_UNAVAILABLE,
+              failure_type="COMPILE_FAILURE", quality_gate_status="FAIL",
+              quality_blockers=1),
+        _pass("fake1", run_kind="fake"),
+        _pass("dry1", run_kind="dryrun"),
+        _pass("smoke1", run_kind="smoke"),
+        _pass("hist", run_kind=None),            # historical / unknown
+    ]
+    raw = aggregate(cases)                         # back-compat: all kinds
+    real = aggregate(cases, run_kind="real")       # headline
+    assert raw["run_kind_filter"] is None and raw["total_cases"] == 6
+    assert real["run_kind_filter"] == "real"
+    assert real["total_cases"] == 2                # only the two real rows
+    assert real["generation_attempted"] == 2
+    assert real["compile_pass_rate"] == 0.5        # 1 of 2 real compiled
+    assert real["gen_test_pass_rate"] == 0.5
+
+
 def test_render_markdown_has_facts():
     report = BenchReport(
         provider="fake", model="fake-1", generated_at="2026-06-06",
@@ -138,6 +163,9 @@ def test_render_markdown_has_facts():
     assert "setup_failures" in md
     assert "deepseek" not in md.lower()  # no hardcoded model
     assert "| a |" in md
+    # docs/43 S2: both the raw and the real-only headline aggregate sections render
+    assert "RAW (all run_kinds)" in md
+    assert "HEADLINE (real only" in md
 
 
 def test_completed_result_carries_review_summary_failures():
