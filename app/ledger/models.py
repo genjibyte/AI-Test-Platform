@@ -65,6 +65,7 @@ class JudgedRecord(BaseModel):
     business_pattern: Optional[str] = None
     expected_invariant: Optional[str] = None
     risk_level: Optional[str] = None
+    oracle_strength: Optional[str] = None    # docs/46 S2: advisory structural estimate (read-only)
 
     # judging facts (projected from BenchCaseResult -- no recomputation)
     gen_outcome: Optional[str] = None

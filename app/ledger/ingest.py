@@ -34,6 +34,7 @@ def record_from_bench_case(
         business_pattern=result.business_pattern,
         expected_invariant=result.expected_invariant,
         risk_level=result.risk_level,
+        oracle_strength=result.oracle_strength,
         gen_outcome=result.gen_outcome,
         compiled=result.compiled,
         executed=result.executed,

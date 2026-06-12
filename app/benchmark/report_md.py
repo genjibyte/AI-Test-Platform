@@ -1,7 +1,12 @@
 """Render a BenchReport to Markdown (docs/07 §8 style). Pure formatting."""
 from __future__ import annotations
 
-from app.benchmark.models import BenchReport, aggregate, business_breakdown
+from app.benchmark.models import (
+    BenchReport,
+    aggregate,
+    business_breakdown,
+    oracle_strength_breakdown,
+)
 
 
 def _pct(v) -> str:
@@ -58,6 +63,19 @@ def _business_lines(bd: dict, title: str) -> list:
     ]
 
 
+def _oracle_lines(bd: dict, title: str) -> list:
+    """Advisory oracle-strength group-by (docs/46 S2). STRUCTURAL counts only; un-analyzed
+    -> unknown. Semantic strength stays human review."""
+    return [
+        f"## {title}",
+        "",
+        f"- analyzed total: {bd.get('total')}  (run_kind_filter: {bd.get('run_kind_filter')})",
+        f"- by_oracle_strength: {bd.get('by_oracle_strength')}",
+        "  (structural estimate only; semantic strength stays human review)",
+        "",
+    ]
+
+
 def render_markdown(report: BenchReport) -> str:
     # Headline (real-only) is recomputed from the cases so fake/dryrun/smoke and
     # historical (unknown run_kind) rows never inflate model-quality numbers (docs/43 S2).
@@ -79,6 +97,13 @@ def render_markdown(report: BenchReport) -> str:
     )
     lines += _business_lines(
         business_breakdown(report.cases, run_kind="real"), "Business tags — HEADLINE (real only)"
+    )
+    lines += _oracle_lines(
+        oracle_strength_breakdown(report.cases), "Oracle strength — RAW (all run_kinds)"
+    )
+    lines += _oracle_lines(
+        oracle_strength_breakdown(report.cases, run_kind="real"),
+        "Oracle strength — HEADLINE (real only)",
     )
     lines += [
         "## Per-case",

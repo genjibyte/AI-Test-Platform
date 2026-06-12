@@ -224,6 +224,7 @@ def _completed_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
         quality_warnings=len(quality.get("warnings") or []),
         review_recommendation=rep.get("review_recommendation"),
         review_summary=_review_summary_with_rubric(rep.get("review_summary"), case),
+        oracle_strength=((rep.get("review_summary") or {}).get("oracle_strength_estimate") or {}).get("oracle_strength"),
         runtime_ms=int((time.monotonic() - t0) * 1000),
         error=(job.generation or {}).get("error"),
     )

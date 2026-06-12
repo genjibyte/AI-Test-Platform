@@ -109,6 +109,8 @@ class BenchCaseResult(BaseModel):
     business_pattern: Optional[str] = None
     expected_invariant: Optional[str] = None
     risk_level: Optional[str] = None
+    # docs/46 S2: advisory structural oracle-strength estimate, carried read-only from review.
+    oracle_strength: Optional[str] = None
     conclusion: Optional[str] = None
     repair_rounds: Optional[int] = None
     repair_final_outcome: Optional[str] = None
@@ -256,6 +258,22 @@ def business_breakdown(cases: List[BenchCaseResult], *, run_kind: Optional[str] 
         "total": len(cases),
         "by_domain": dict(by_domain.most_common()),
         "by_pattern": dict(by_pattern.most_common()),
+    }
+
+
+def oracle_strength_breakdown(cases: List[BenchCaseResult], *, run_kind: Optional[str] = None) -> dict:
+    """docs/46 S2: descriptive group-by of cases by advisory oracle_strength (counts only).
+
+    Composes with ``run_kind`` (headline real-only, like docs/43 S2); un-analyzed rows go
+    to an ``unknown`` bucket. Pure description -- no judging / quality-gate change, no
+    accept/score (the estimate is STRUCTURAL and advisory)."""
+    if run_kind is not None:
+        cases = [c for c in cases if c.run_kind == run_kind]
+    by_strength = Counter((c.oracle_strength or "unknown") for c in cases)
+    return {
+        "run_kind_filter": run_kind,
+        "total": len(cases),
+        "by_oracle_strength": dict(by_strength.most_common()),
     }
 
 
