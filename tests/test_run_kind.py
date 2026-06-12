@@ -111,3 +111,21 @@ def test_ledger_headline_real_excludes_nonreal_rows():
     assert hr["pass_rate"] == 1.0
     # the fake TEST_FAILURE and unknown COMPILE_FAILURE are NOT headline badcases.
     assert hr["top_badcases"] == []
+
+
+def test_smoke_kind_excluded_from_headline_in_both_surfaces():
+    # smoke is a "not real" intent kind (docs/43 §6). A smoke PASS -- which would
+    # otherwise inflate pass rate -- must stay out of the headline in BOTH the
+    # benchmark aggregate and the ledger digest. (is_real covers smoke at the unit
+    # level; this closes it at the integration level.)
+    a = aggregate([_bench("r", "real", passed=True), _bench("s", "smoke", passed=True)])
+    assert a["run_kind_counts"] == {"real": 1, "smoke": 1}
+    assert a["gen_test_pass_rate"] == 1.0                     # RAW: both passed
+    assert a["headline_real"]["generation_attempted"] == 1    # smoke excluded
+    assert a["headline_real"]["gen_test_pass_rate"] == 1.0    # only the real row
+
+    records = [_judged("a", "real", passed=True), _judged("s", "smoke", passed=True)]
+    assert [r.record_id for r in real_records(records)] == ["a"]   # smoke filtered out
+    hr = ledger_summary(records)["headline_real"]
+    assert hr["records"] == 1
+    assert hr["pass_rate"] == 1.0
