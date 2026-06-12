@@ -16,6 +16,7 @@ from typing import Callable, List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.benchmark.business_tags import normalize_tag
 from app.ledger.models import JudgedRecord
 
 _EXAMPLE_CAP = 10
@@ -170,4 +171,20 @@ def ledger_summary(
         ),
         "top_badcases": [s.model_dump() for s in aggregate_badcases(records)[:top]],
         "author_profiles": [author_profile(records, a) for a in authors],
+    }
+
+
+def business_summary(records: List[JudgedRecord], *, run_kind: Optional[str] = None) -> dict:
+    """docs/45 S2: descriptive group-by of ledger records by business tag (counts).
+
+    Composes with ``run_kind`` (headline real-only); untagged -> ``unknown``; tags are
+    normalized (case-insensitive). Pure description -- no judging, no accept/score."""
+    records = _filter_kind(records, run_kind)
+    by_domain = Counter(normalize_tag(r.business_domain) or "unknown" for r in records)
+    by_pattern = Counter(normalize_tag(r.business_pattern) or "unknown" for r in records)
+    return {
+        "run_kind_filter": run_kind,
+        "records": len(records),
+        "by_domain": dict(by_domain.most_common()),
+        "by_pattern": dict(by_pattern.most_common()),
     }
