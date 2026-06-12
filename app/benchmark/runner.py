@@ -90,6 +90,17 @@ def _tail(path: Optional[str], limit: int = 12000) -> str:
     return text[-limit:]
 
 
+def _case_tags(case: BenchCase) -> dict:
+    """Carry the manifest's business-invariant tags onto a result (docs/45 S1).
+    Read-only metadata (declared intent, not verified value); never changes judging."""
+    return {
+        "business_domain": case.business_domain,
+        "business_pattern": case.business_pattern,
+        "expected_invariant": case.expected_invariant,
+        "risk_level": case.risk_level,
+    }
+
+
 def _case_failure(
     case: BenchCase,
     t0: float,
@@ -98,6 +109,7 @@ def _case_failure(
 ) -> BenchCaseResult:
     """Record a case-level setup failure before a job can be judged."""
     return BenchCaseResult(
+        **_case_tags(case),
         name=case.label(),
         repo_url=case.repo_url,
         branch=case.branch,
@@ -115,6 +127,7 @@ def _case_failure(
 def _baseline_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
     """Repo failed to judge — record the baseline failure, no generation."""
     return BenchCaseResult(
+        **_case_tags(case),
         name=case.label(),
         repo_url=case.repo_url,
         branch=case.branch,
@@ -156,6 +169,7 @@ def _completed_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
     cov_status = COVERAGE_AVAILABLE if cov_available else COVERAGE_UNAVAILABLE
 
     return BenchCaseResult(
+        **_case_tags(case),
         name=case.label(),
         repo_url=case.repo_url,
         branch=case.branch,
