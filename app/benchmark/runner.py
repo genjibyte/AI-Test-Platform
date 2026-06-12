@@ -20,6 +20,7 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
+from app.benchmark.business_tags import business_review_rubric
 from app.benchmark.models import (
     COVERAGE_AVAILABLE,
     COVERAGE_UNAVAILABLE,
@@ -99,6 +100,24 @@ def _case_tags(case: BenchCase) -> dict:
         "expected_invariant": case.expected_invariant,
         "risk_level": case.risk_level,
     }
+
+
+def _review_summary_with_rubric(
+    review_summary: Optional[dict], case: BenchCase
+) -> Optional[dict]:
+    """docs/45 S3: attach the ADVISORY business-review rubric to the review summary when
+    the case carries business tags. Additive + advisory only -- it never changes the
+    recommendation, conclusion, or accept (auto_accept stays blocked)."""
+    if not (case.business_domain or case.business_pattern or case.expected_invariant):
+        return review_summary
+    enriched = dict(review_summary or {})
+    enriched["business_rubric"] = business_review_rubric(
+        business_domain=case.business_domain,
+        business_pattern=case.business_pattern,
+        expected_invariant=case.expected_invariant,
+        risk_level=case.risk_level,
+    )
+    return enriched
 
 
 def _case_failure(
@@ -204,7 +223,7 @@ def _completed_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
         quality_blockers=len(quality.get("blocking_issues") or []),
         quality_warnings=len(quality.get("warnings") or []),
         review_recommendation=rep.get("review_recommendation"),
-        review_summary=rep.get("review_summary"),
+        review_summary=_review_summary_with_rubric(rep.get("review_summary"), case),
         runtime_ms=int((time.monotonic() - t0) * 1000),
         error=(job.generation or {}).get("error"),
     )
