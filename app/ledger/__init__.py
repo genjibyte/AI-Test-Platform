@@ -18,6 +18,7 @@ from app.ledger.analytics import (
     aggregate_badcases,
     author_profile,
     badcase_signature,
+    business_summary,
     compare_authors_on_target,
     ledger_summary,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "badcase_signature",
     "aggregate_badcases",
     "author_profile",
+    "business_summary",
     "compare_authors_on_target",
     "ledger_summary",
 ]

@@ -1,7 +1,7 @@
 """Render a BenchReport to Markdown (docs/07 §8 style). Pure formatting."""
 from __future__ import annotations
 
-from app.benchmark.models import BenchReport, aggregate
+from app.benchmark.models import BenchReport, aggregate, business_breakdown
 
 
 def _pct(v) -> str:
@@ -46,6 +46,18 @@ def _aggregate_lines(a: dict, title: str) -> list:
     ]
 
 
+def _business_lines(bd: dict, title: str) -> list:
+    """Descriptive business-tag group-by (docs/45 S2). Counts only; untagged -> unknown."""
+    return [
+        f"## {title}",
+        "",
+        f"- tagged total: {bd.get('total')}  (run_kind_filter: {bd.get('run_kind_filter')})",
+        f"- by_domain: {bd.get('by_domain')}",
+        f"- by_pattern: {bd.get('by_pattern')}",
+        "",
+    ]
+
+
 def render_markdown(report: BenchReport) -> str:
     # Headline (real-only) is recomputed from the cases so fake/dryrun/smoke and
     # historical (unknown run_kind) rows never inflate model-quality numbers (docs/43 S2).
@@ -61,6 +73,12 @@ def render_markdown(report: BenchReport) -> str:
     lines += _aggregate_lines(
         aggregate(report.cases, run_kind="real"),
         "Aggregate — HEADLINE (real only; fake/dryrun/smoke/unknown excluded)",
+    )
+    lines += _business_lines(
+        business_breakdown(report.cases), "Business tags — RAW (all run_kinds)"
+    )
+    lines += _business_lines(
+        business_breakdown(report.cases, run_kind="real"), "Business tags — HEADLINE (real only)"
     )
     lines += [
         "## Per-case",

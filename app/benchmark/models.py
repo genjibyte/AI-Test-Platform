@@ -11,6 +11,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.benchmark.business_tags import normalize_tag
+
 # --- Failure taxonomy (Phase 2.5) ------------------------------------------
 # One bucket per (repo, target) case. None == clean PASS. These are FACTS about
 # what blocked the generated test, ordered roughly outermost (repo) to innermost
@@ -236,6 +238,24 @@ def aggregate(cases: List[BenchCaseResult], *, run_kind: Optional[str] = None) -
             ).most_common()
         ),
         "accept_rate": None,
+    }
+
+
+def business_breakdown(cases: List[BenchCaseResult], *, run_kind: Optional[str] = None) -> dict:
+    """docs/45 S2: descriptive group-by of cases by business tag (counts only).
+
+    Composes with ``run_kind`` (headline real-only, like docs/43 S2); untagged rows go to
+    an ``unknown`` bucket; tags are normalized (case-insensitive). Pure description --
+    no judging / quality-gate change, no accept/score."""
+    if run_kind is not None:
+        cases = [c for c in cases if c.run_kind == run_kind]
+    by_domain = Counter(normalize_tag(c.business_domain) or "unknown" for c in cases)
+    by_pattern = Counter(normalize_tag(c.business_pattern) or "unknown" for c in cases)
+    return {
+        "run_kind_filter": run_kind,
+        "total": len(cases),
+        "by_domain": dict(by_domain.most_common()),
+        "by_pattern": dict(by_pattern.most_common()),
     }
 
 

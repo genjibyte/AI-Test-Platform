@@ -3,6 +3,8 @@
 Tags are advisory metadata -- declared intent, NOT verified value -- carried read-only
 case -> result -> record. They never change judging (conclusion stays NEED_HUMAN_REVIEW).
 """
+import uuid
+
 from app.benchmark.business_tags import (
     BUSINESS_DOMAINS,
     BUSINESS_PATTERNS,
@@ -12,10 +14,16 @@ from app.benchmark.business_tags import (
     is_known_risk,
     normalize_tag,
 )
-from app.benchmark.models import BenchCase, BenchCaseResult, load_spec
+from app.benchmark.models import (
+    BenchCase,
+    BenchCaseResult,
+    business_breakdown,
+    load_spec,
+)
 from app.benchmark.runner import run_benchmark
+from app.ledger.analytics import business_summary
 from app.ledger.ingest import record_from_bench_case
-from app.ledger.models import Provenance
+from app.ledger.models import JudgedRecord, Provenance
 
 
 def test_vocab_always_allows_other_and_unknown():
@@ -90,3 +98,57 @@ def test_runner_carries_case_tags_even_on_setup_failure(tmp_path, monkeypatch):
     assert r.failure_type == "LLM_CONFIG_FAILED"          # the _case_failure path
     assert r.business_domain == "payments" and r.business_pattern == "idempotency"
     assert r.expected_invariant == "no duplicate charge" and r.risk_level == "high"
+
+
+# --- S2: descriptive group-by (docs/45 S2) ---------------------------------------
+
+def _bcr(**kw):
+    base = dict(name="x", repo_url="u", target_class="C", repo_judged=True)
+    base.update(kw)
+    return BenchCaseResult(**base)
+
+
+def test_business_breakdown_groups_normalizes_and_composes_with_run_kind():
+    cases = [
+        _bcr(run_kind="real", business_domain="payments", business_pattern="idempotency"),
+        _bcr(run_kind="real", business_domain="Payments", business_pattern="state_transition"),
+        _bcr(run_kind="fake", business_domain="payments", business_pattern="idempotency"),
+        _bcr(run_kind="real"),  # untagged real -> unknown bucket
+    ]
+    raw = business_breakdown(cases)
+    real = business_breakdown(cases, run_kind="real")
+    assert raw["total"] == 4 and raw["by_domain"]["payments"] == 3   # "Payments" normalizes in
+    assert real["run_kind_filter"] == "real" and real["total"] == 3  # fake excluded
+    assert real["by_domain"] == {"payments": 2, "unknown": 1}
+    assert real["by_pattern"] == {"idempotency": 1, "state_transition": 1, "unknown": 1}
+
+
+def _jr(domain=None, pattern=None, run_kind=None):
+    return JudgedRecord(
+        record_id=str(uuid.uuid4()), repo_url="u", target_class="C",
+        provenance=Provenance(author_type="platform_generator", author_id="m"),
+        business_domain=domain, business_pattern=pattern, run_kind=run_kind,
+    )
+
+
+def test_business_summary_groups_ledger_records_and_composes_with_run_kind():
+    records = [
+        _jr("payments", "idempotency", "real"),
+        _jr("payments", "idempotency", "fake"),
+        _jr(None, None, "real"),
+    ]
+    raw = business_summary(records)
+    real = business_summary(records, run_kind="real")
+    assert raw["records"] == 3 and raw["by_domain"]["payments"] == 2
+    assert real["run_kind_filter"] == "real" and real["records"] == 2
+    assert real["by_domain"] == {"payments": 1, "unknown": 1}
+
+
+def test_report_md_renders_business_section():
+    from app.benchmark.models import BenchReport, aggregate
+    from app.benchmark.report_md import render_markdown
+    case = _bcr(run_kind="real", business_domain="payments", business_pattern="idempotency",
+                gen_outcome="PASS", passed=True, conclusion="NEED_HUMAN_REVIEW")
+    report = BenchReport(cases=[case], aggregate=aggregate([case]))
+    md = render_markdown(report)
+    assert "Business tags" in md and "by_pattern" in md and "idempotency" in md
