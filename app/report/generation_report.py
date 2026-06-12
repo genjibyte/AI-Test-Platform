@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from app.quality.oracle_strength import estimate_oracle_strength
 from app.quality.test_quality_gate import evaluate_test_quality
 from app.review.review_policy import build_review_summary, recommend_with_reasons
 
@@ -115,6 +116,9 @@ def assemble_generation_report(generation: dict) -> dict:
         recommendation=review_recommendation,
         recommendation_reasons=review_reasons,
     )
+    # docs/46 S1: advisory STRUCTURAL oracle-strength estimate, rolled up from the quality
+    # gate. Advisory only -- it does NOT change the recommendation/conclusion set above.
+    review_summary["oracle_strength_estimate"] = estimate_oracle_strength(quality_dict)
 
     return {
         "target_class": target.get("target_class") or result.get("target_class"),
