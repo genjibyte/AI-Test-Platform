@@ -12,5 +12,12 @@ from app.mutation.pit import (
     build_pit_command,
     parse_pit_report,
 )
+from app.mutation.run import run_pit
 
-__all__ = ["PIT_VERSION", "MutationResult", "build_pit_command", "parse_pit_report"]
+__all__ = [
+    "PIT_VERSION",
+    "MutationResult",
+    "build_pit_command",
+    "parse_pit_report",
+    "run_pit",
+]

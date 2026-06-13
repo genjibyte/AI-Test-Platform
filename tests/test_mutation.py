@@ -2,10 +2,13 @@
 stubbed PIT XML report and build the command string. Mutation evidence is advisory and
 never changes a verdict.
 """
+import subprocess
+
 from app.mutation import (
     PIT_VERSION,
     build_pit_command,
     parse_pit_report,
+    run_pit,
 )
 
 _REPORT = """<?xml version="1.0" encoding="UTF-8"?>
@@ -45,3 +48,39 @@ def test_build_pit_command_is_commandline_no_pom_edit():
     assert "-DoutputFormats=XML" in cmd
     # configuration is via -D only -- the command never edits a pom
     assert not any("pom" in part.lower() for part in cmd)
+
+
+# --- run_pit: gated execution layer, exercised offline with an injected runner ----
+
+def test_run_pit_parses_report_via_injected_runner(tmp_path):
+    def fake_runner(cmd, **kw):
+        rpt = tmp_path / "target" / "pit-reports"
+        rpt.mkdir(parents=True, exist_ok=True)
+        (rpt / "mutations.xml").write_text(_REPORT, encoding="utf-8")
+
+        class _P:
+            returncode = 0
+
+        return _P()
+
+    res = run_pit(tmp_path, "com.x.Calc", "com.x.CalcTest", runner=fake_runner)
+    assert res.available is True and res.mutation_score == 0.6
+
+
+def test_run_pit_unavailable_when_no_report(tmp_path):
+    def fake_runner(cmd, **kw):
+        class _P:
+            returncode = 1
+
+        return _P()
+
+    res = run_pit(tmp_path, "com.x.Calc", "com.x.CalcTest", runner=fake_runner)
+    assert res.available is False and res.mutation_score is None
+
+
+def test_run_pit_unavailable_on_timeout(tmp_path):
+    def fake_runner(cmd, **kw):
+        raise subprocess.TimeoutExpired(cmd, 1)
+
+    assert run_pit(tmp_path, "com.x.Calc", "com.x.CalcTest", runner=fake_runner).available is False
+
