@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     repair_compile_failures: bool = False  # TESTAGENT_REPAIR_COMPILE_FAILURES
     repair_max_rounds: int = 1             # TESTAGENT_REPAIR_MAX_ROUNDS
 
+    # docs/46 S3 opt-in mutation evidence (PIT). Default OFF -- when enabled, a benchmark
+    # runs PIT per candidate and records an advisory mutation_score (never auto-accepts).
+    mutation_enabled: bool = False         # TESTAGENT_MUTATION_ENABLED
+
     @property
     def db_path(self) -> Path:
         return self.data_dir / "testagent.db"

@@ -84,3 +84,43 @@ def test_run_pit_unavailable_on_timeout(tmp_path):
 
     assert run_pit(tmp_path, "com.x.Calc", "com.x.CalcTest", runner=fake_runner).available is False
 
+
+# --- gated benchmark wire-in (docs/46 S3 #1) -------------------------------------
+
+def test_maybe_mutation_score_gated_off_then_enabled(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.benchmark import runner as R
+    from app.mutation.pit import MutationResult
+
+    job = SimpleNamespace(id="j1", generation={"execution": {"generated_class": "com.x.CalcTest"}})
+    case = SimpleNamespace(target_class="com.x.Calc")
+
+    def _boom(*a, **k):
+        raise AssertionError("run_pit must not be called when mutation is disabled")
+
+    # default OFF -> None, and run_pit is never reached
+    monkeypatch.setattr(R, "get_settings", lambda: SimpleNamespace(mutation_enabled=False))
+    monkeypatch.setattr(R, "run_pit", _boom)
+    assert R._maybe_mutation_score(job, case) is None
+
+    # enabled -> runs run_pit (stubbed) in the existing workspace repo_dir -> score
+    monkeypatch.setattr(R, "get_settings", lambda: SimpleNamespace(mutation_enabled=True))
+    monkeypatch.setattr(R, "Workspace", lambda job_id: SimpleNamespace(repo_dir=tmp_path))
+    monkeypatch.setattr(R, "run_pit", lambda *a, **k: MutationResult(available=True, mutation_score=0.6))
+    assert R._maybe_mutation_score(job, case) == 0.6
+
+
+def test_mutation_score_carries_to_ledger():
+    from app.benchmark.models import BenchCaseResult
+    from app.ledger.ingest import record_from_bench_case
+    from app.ledger.models import Provenance
+
+    prov = Provenance(author_type="platform_generator", author_id="m")
+    res = BenchCaseResult(name="c", repo_url="u", target_class="C",
+                          conclusion="NEED_HUMAN_REVIEW", mutation_score=0.6)
+    assert record_from_bench_case(res, prov).mutation_score == 0.6
+    bare = BenchCaseResult(name="c", repo_url="u", target_class="C",
+                           conclusion="NEED_HUMAN_REVIEW")
+    assert record_from_bench_case(bare, prov).mutation_score is None
+

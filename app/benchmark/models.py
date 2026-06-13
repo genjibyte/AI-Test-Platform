@@ -111,6 +111,8 @@ class BenchCaseResult(BaseModel):
     risk_level: Optional[str] = None
     # docs/46 S2: advisory structural oracle-strength estimate, carried read-only from review.
     oracle_strength: Optional[str] = None
+    # docs/46 S3: advisory PIT mutation score (only when mutation is enabled; else None).
+    mutation_score: Optional[float] = None
     conclusion: Optional[str] = None
     repair_rounds: Optional[int] = None
     repair_final_outcome: Optional[str] = None

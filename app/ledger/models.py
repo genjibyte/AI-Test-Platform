@@ -66,6 +66,7 @@ class JudgedRecord(BaseModel):
     expected_invariant: Optional[str] = None
     risk_level: Optional[str] = None
     oracle_strength: Optional[str] = None    # docs/46 S2: advisory structural estimate (read-only)
+    mutation_score: Optional[float] = None   # docs/46 S3: advisory PIT mutation score (read-only)
 
     # judging facts (projected from BenchCaseResult -- no recomputation)
     gen_outcome: Optional[str] = None

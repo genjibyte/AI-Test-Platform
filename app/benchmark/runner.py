@@ -32,10 +32,12 @@ from app.benchmark.models import (
 )
 from app.config import get_settings
 from app.llm.client import LLMClient, get_client
+from app.mutation.run import run_pit
 from app.models.job import Job, JobStatus, now_iso
 from app.pipeline.generate_pipeline import run_generation
 from app.pipeline.judge_pipeline import run_pipeline
 from app.report.generation_report import assemble_generation_report
+from app.runtime.workspace import Workspace
 from app.storage.db import get_connection, init_db
 from app.storage.job_repo import JobRepo
 
@@ -230,6 +232,25 @@ def _completed_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
     )
 
 
+def _maybe_mutation_score(job: Job, case: BenchCase) -> Optional[float]:
+    """docs/46 S3: gated, best-effort PIT mutation score. OFF by default
+    (``mutation_enabled``); never raises -- any issue degrades to ``None`` so mutation
+    stays ADVISORY and NEVER blocks the benchmark. Runs in the live workspace right after
+    generation (built classes still present); the score never auto-accepts a candidate."""
+    if not get_settings().mutation_enabled:
+        return None
+    try:
+        fqcn = ((job.generation or {}).get("execution") or {}).get("generated_class")
+        if not fqcn:
+            return None
+        repo_dir = Workspace(job.id).repo_dir
+        if not repo_dir.exists():
+            return None
+        return run_pit(repo_dir, case.target_class, fqcn).mutation_score
+    except Exception:  # noqa: BLE001 - mutation is advisory, never fatal
+        return None
+
+
 def run_case(
     case: BenchCase,
     repo_db: JobRepo,
@@ -258,7 +279,9 @@ def run_case(
         max_repair_rounds=get_settings().repair_max_rounds,
         run_kind=run_kind,  # producer sets it at generation time (docs/43)
     )
-    return _completed_result(case, job, t0)
+    result = _completed_result(case, job, t0)
+    result.mutation_score = _maybe_mutation_score(job, case)  # docs/46 S3: gated, advisory
+    return result
 
 
 def _precipitate(report: BenchReport, workdir: Path) -> None:
