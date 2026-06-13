@@ -171,6 +171,30 @@ as a verdict. Together with `run_kind` (real-only headlines) and business tags (
 candidate protects), oracle strength completes the *"is this generated test actually
 valuable?"* picture — while the **judgment stays human**, never auto-accepted.
 
+## 14. Real PIT run — validation + JUnit5 finding (2026-06-13)
+
+The dormant mutation subsystem (`app/mutation/`, merged gated-off in `5c4365f`) was
+exercised once for real against a throwaway copy of `samples/calc` (gitignored
+`var/pit_run/calc`; the fixture and the live benchmark were untouched, `mutation_enabled`
+stayed `False`).
+
+- **Validation (good):** PIT reported *Generated 5 / Killed 4 / 80%*. `parse_pit_report`
+  on the real `mutations.xml` returned `total=5, detected=4, killed=4, survived=1,
+  mutation_score=0.8` — i.e. `0.8 == PIT's 80%`. The real report format
+  (`<mutation detected='true' status='KILLED' …>`) matches the parser exactly, so the one
+  previously-untested assumption (the report schema) is **confirmed correct**.
+- **Finding (refines §3 / §5 / §8):** `samples/calc` is **JUnit 5**, and PIT only discovers
+  JUnit 5 tests when the **`pitest-junit5-plugin`** is on the pitest-maven plugin's
+  classpath. The pure command-line, **no-pom-edit** `build_pit_command` cannot supply that
+  plugin, so a vanilla run finds **no tests** on a JUnit 5 target — the run only succeeded
+  because the throwaway pom declared the junit5 plugin. **So "command-line, no pom edit"
+  holds for JUnit 4 but NOT for JUnit 5 (the modern norm)** — the concrete form of the
+  "per-repo feasibility varies" caveat (§4).
+- **Implication:** before mutation is useful on real (mostly JUnit 5) targets, the PIT
+  invocation must be **JUnit5-aware** (provide the junit5 plugin), which effectively needs
+  plugin/pom configuration — a follow-up. Until then mutation gracefully reports
+  `available=False` on JUnit 5 targets (advisory; never blocks judging).
+
 ---
 
 > This design records the signal it adds; it grants no new scope and changes no judging
