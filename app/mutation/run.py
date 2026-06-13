@@ -12,7 +12,13 @@ import subprocess
 from pathlib import Path
 from typing import Callable, Union
 
-from app.mutation.pit import MutationResult, build_pit_command, parse_pit_report
+from app.mutation.pit import (
+    PIT_VERSION,
+    MutationResult,
+    build_pit_command,
+    build_pit_pom,
+    parse_pit_report,
+)
 
 # PIT writes its XML report here under the (built) repo dir.
 _PIT_REPORT_REL = "target/pit-reports/mutations.xml"
@@ -33,7 +39,29 @@ def run_pit(
     for offline tests (so PIT is never actually invoked under unit tests). Returns
     ``available=False`` on timeout, launch error, or a missing report."""
     repo_dir = Path(repo_dir)
-    cmd = build_pit_command(target_classes, target_tests, mvn=mvn)
+    pom = repo_dir / "pom.xml"
+    try:
+        if pom.exists():
+            # JUnit5-aware (docs/46 §14): write a SIDECAR pom (original + pitest-maven,
+            # plus pitest-junit5-plugin when JUnit5) and run it with ``-f`` -- the original
+            # pom is never edited. Falls back to the plain command-line goal when no pom.
+            sidecar = repo_dir / "pom-pit.xml"
+            sidecar.write_text(
+                build_pit_pom(
+                    pom.read_text(encoding="utf-8", errors="replace"),
+                    target_classes=target_classes,
+                    target_tests=target_tests,
+                ),
+                encoding="utf-8",
+            )
+            cmd = [
+                mvn, "-f", str(sidecar), "test-compile",
+                f"org.pitest:pitest-maven:{PIT_VERSION}:mutationCoverage",
+            ]
+        else:
+            cmd = build_pit_command(target_classes, target_tests, mvn=mvn)
+    except OSError:
+        return MutationResult(available=False)
     try:
         runner(cmd, cwd=str(repo_dir), capture_output=True, text=True, timeout=timeout)
     except (subprocess.TimeoutExpired, OSError):
