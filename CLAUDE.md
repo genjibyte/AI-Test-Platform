@@ -27,16 +27,23 @@ tests:
 - If you cannot show judging evidence, say so — do not fill the gap with a confident-
   sounding but unverified claim.
 
-## Current state (2026-06-12)
+## Current state (2026-06-13)
 - Done: judge + minimal generation pipeline; quality gate + review policy (advisory,
   never auto-accept); preflight + oracle-safe compile-repair (gated off); ledger
   P1/P2 (`app/ledger/`); `run_kind` **minimal slice** (producer-set provenance + the
   "fake can never be real" guard, docs/43) plus its **S2 filter-only follow-up — done**
   (`aggregate()` + ledger analytics default headline views to `run_kind=="real"`;
   fake/dryrun/smoke + historical unknown excluded; back-compat; docs/43 §12).
-- **PAUSED — foundation-hardening phase.** All feature/design work is paused,
-  including P3 / `submit_candidate` and new repair/preflight buckets, until foundation
-  hardening is done. Do **not** resume features without explicit approval.
+  **Value-judgment signal layer (advisory; none feed the recommendation/`conclusion`),
+  owner-approved 2026-06-13:** business-invariant tags (S1–S3, docs/45), oracle-strength
+  **structural** estimate rolled up from the quality gate (S1+S2, docs/46), and a
+  **dormant gated** PIT **mutation** subsystem (`app/mutation/`, `mutation_enabled=False`,
+  docs/46 S3 — the real semantic signal; never runs PIT unless explicitly enabled).
+- **Foundation-hardening pause lifted (owner-approved); the value-judgment signal layer
+  landed (2026-06-13).** Still **not** built — do not start without explicit approval:
+  P3 / `submit_candidate`, Defects4J, multi-model experiments. Mutation stays **gated off**
+  (`mutation_enabled=False`); the JUnit5-aware PIT sidecar (`build_pit_pom`) is validated
+  but **unmerged** on `feat/mutation-junit5`. Every new signal stays advisory; never auto-accept.
 - Branch `main`; commits are often stacked **locally and unpushed**.
 - Data caveat: **new** benchmark runs carry the authoritative `run_kind` field;
   **historical** `var/benchmark/*/bench.db` rows have no field, so their fake/real split
