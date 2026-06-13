@@ -7,17 +7,23 @@ PARSE a PIT XML report, but it NEVER invokes Maven/PIT itself. Actually running 
 ``conclusion`` stays ``NEED_HUMAN_REVIEW``.
 """
 from app.mutation.pit import (
+    JUNIT5_PLUGIN_VERSION,
     PIT_VERSION,
     MutationResult,
     build_pit_command,
+    build_pit_pom,
+    is_junit5_pom,
     parse_pit_report,
 )
 from app.mutation.run import run_pit
 
 __all__ = [
+    "JUNIT5_PLUGIN_VERSION",
     "PIT_VERSION",
     "MutationResult",
     "build_pit_command",
+    "build_pit_pom",
+    "is_junit5_pom",
     "parse_pit_report",
     "run_pit",
 ]

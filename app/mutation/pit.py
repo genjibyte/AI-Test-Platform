@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field
 # Pinned PIT plugin version -- fetched by Maven AT RUNTIME only when mutation is actually
 # run (a manual step). This module adds no Python dependency and invokes nothing.
 PIT_VERSION = "1.15.0"
+# pitest-junit5-plugin -- required for PIT to discover JUnit 5 tests (docs/46 §14 finding).
+JUNIT5_PLUGIN_VERSION = "1.2.1"
 
 # PIT statuses that count as "detected" (the test suite caught the mutant).
 _DETECTED_STATUSES = {"KILLED", "TIMED_OUT"}
@@ -82,3 +84,71 @@ def build_pit_command(
         "-DoutputFormats=XML",
         "-DtimestampedReports=false",
     ]
+
+
+def is_junit5_pom(pom_text: Optional[str]) -> bool:
+    """Heuristic: does this Maven pom use JUnit 5 (Jupiter)? PIT needs the
+    pitest-junit5-plugin to discover tests for such targets (docs/46 §14)."""
+    t = pom_text or ""
+    return "junit-jupiter" in t or "org.junit.jupiter" in t
+
+
+def _pit_plugin_xml(
+    target_classes: str, target_tests: str, *, junit5: bool, pit_version: str, junit5_version: str
+) -> str:
+    dep = ""
+    if junit5:
+        dep = (
+            "      <dependencies>\n"
+            "        <dependency>\n"
+            "          <groupId>org.pitest</groupId>\n"
+            "          <artifactId>pitest-junit5-plugin</artifactId>\n"
+            f"          <version>{junit5_version}</version>\n"
+            "        </dependency>\n"
+            "      </dependencies>\n"
+        )
+    return (
+        "    <plugin>\n"
+        "      <groupId>org.pitest</groupId>\n"
+        "      <artifactId>pitest-maven</artifactId>\n"
+        f"      <version>{pit_version}</version>\n"
+        f"{dep}"
+        "      <configuration>\n"
+        f"        <targetClasses><param>{target_classes}</param></targetClasses>\n"
+        f"        <targetTests><param>{target_tests}</param></targetTests>\n"
+        "        <outputFormats><param>XML</param></outputFormats>\n"
+        "        <timestampedReports>false</timestampedReports>\n"
+        "      </configuration>\n"
+        "    </plugin>\n"
+    )
+
+
+def build_pit_pom(
+    pom_text: str,
+    *,
+    target_classes: str,
+    target_tests: str,
+    junit5: Optional[bool] = None,
+    pit_version: str = PIT_VERSION,
+    junit5_version: str = JUNIT5_PLUGIN_VERSION,
+) -> str:
+    """docs/46 §14 (JUnit5-aware): return a SIDECAR pom -- the original plus the
+    pitest-maven plugin (and pitest-junit5-plugin for JUnit 5) -- so PIT can run on JUnit 5
+    targets WITHOUT editing the original pom (write it as a separate file and run
+    ``mvn -f``). ``junit5`` is auto-detected when ``None``. Pure text injection
+    (namespace-agnostic); offline; runs nothing."""
+    if junit5 is None:
+        junit5 = is_junit5_pom(pom_text)
+    block = _pit_plugin_xml(
+        target_classes, target_tests, junit5=junit5,
+        pit_version=pit_version, junit5_version=junit5_version,
+    )
+    if "</plugins>" in pom_text:
+        return pom_text.replace("</plugins>", block + "  </plugins>", 1)
+    if "</build>" in pom_text:
+        return pom_text.replace("</build>", f"  <plugins>\n{block}  </plugins>\n  </build>", 1)
+    if "</project>" in pom_text:
+        return pom_text.replace(
+            "</project>", f"  <build>\n  <plugins>\n{block}  </plugins>\n  </build>\n</project>", 1
+        )
+    return pom_text
