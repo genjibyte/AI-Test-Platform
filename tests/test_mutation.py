@@ -87,6 +87,34 @@ def test_run_pit_unavailable_on_timeout(tmp_path):
     assert run_pit(tmp_path, "com.x.Calc", "com.x.CalcTest", runner=fake_runner).available is False
 
 
+def test_run_pit_writes_junit5_sidecar_and_uses_dash_f(tmp_path):
+    # JUnit5 pom present -> run_pit writes a sidecar pom-pit.xml (with the junit5 plugin)
+    # and runs it via `mvn -f`, WITHOUT editing the original pom (docs/46 §14).
+    (tmp_path / "pom.xml").write_text(
+        "<project><dependencies><dependency><artifactId>junit-jupiter</artifactId>"
+        "</dependency></dependencies><build><plugins></plugins></build></project>",
+        encoding="utf-8")
+    seen = {}
+
+    def fake_runner(cmd, **kw):
+        seen["cmd"] = cmd
+        rpt = tmp_path / "target" / "pit-reports"
+        rpt.mkdir(parents=True, exist_ok=True)
+        (rpt / "mutations.xml").write_text(_REPORT, encoding="utf-8")
+
+        class _P:
+            returncode = 0
+
+        return _P()
+
+    res = run_pit(tmp_path, "com.x.Calc", "com.x.CalcTest", runner=fake_runner)
+    assert res.available is True and res.mutation_score == 0.6
+    assert "-f" in seen["cmd"]                       # ran the sidecar via -f
+    sidecar = tmp_path / "pom-pit.xml"
+    assert sidecar.exists()                          # a separate file; original pom untouched
+    assert "pitest-junit5-plugin" in sidecar.read_text(encoding="utf-8")
+
+
 # --- gated benchmark wire-in (docs/46 S3 #1) -------------------------------------
 
 def test_maybe_mutation_score_gated_off_then_enabled(tmp_path, monkeypatch):
