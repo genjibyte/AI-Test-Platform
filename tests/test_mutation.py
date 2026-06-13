@@ -7,6 +7,8 @@ import subprocess
 from app.mutation import (
     PIT_VERSION,
     build_pit_command,
+    build_pit_pom,
+    is_junit5_pom,
     parse_pit_report,
     run_pit,
 )
@@ -123,4 +125,37 @@ def test_mutation_score_carries_to_ledger():
     bare = BenchCaseResult(name="c", repo_url="u", target_class="C",
                            conclusion="NEED_HUMAN_REVIEW")
     assert record_from_bench_case(bare, prov).mutation_score is None
+
+
+# --- JUnit5-aware sidecar pom (docs/46 section 14) -------------------------------
+
+def test_is_junit5_pom_detection():
+    assert is_junit5_pom("<artifactId>junit-jupiter</artifactId>")
+    assert is_junit5_pom("<groupId>org.junit.jupiter</groupId>")
+    assert not is_junit5_pom("<artifactId>junit</artifactId><version>4.13.2</version>")
+    assert not is_junit5_pom(None)
+
+
+def test_build_pit_pom_injects_into_existing_plugins_and_adds_junit5():
+    pom = ("<project>\n  <build>\n    <plugins>\n      <plugin>existing</plugin>\n"
+           "    </plugins>\n  </build>\n</project>\n")
+    out = build_pit_pom(pom, target_classes="com.x.C", target_tests="com.x.CT", junit5=True)
+    assert "pitest-maven" in out and "pitest-junit5-plugin" in out
+    assert "<param>com.x.C</param>" in out and "<param>com.x.CT</param>" in out
+    assert "<plugin>existing</plugin>" in out          # original preserved
+    assert out.count("</plugins>") == 1                # not duplicated
+
+
+def test_build_pit_pom_junit4_omits_junit5_plugin():
+    pom = "<project><build><plugins></plugins></build></project>"
+    out = build_pit_pom(pom, target_classes="com.x.C", target_tests="com.x.CT", junit5=False)
+    assert "pitest-maven" in out and "pitest-junit5-plugin" not in out
+
+
+def test_build_pit_pom_synthesizes_build_when_absent_and_autodetects_junit5():
+    pom = ("<project>\n  <dependencies><dependency>"
+           "<artifactId>junit-jupiter</artifactId></dependency></dependencies>\n</project>\n")
+    out = build_pit_pom(pom, target_classes="com.x.C", target_tests="com.x.CT")  # autodetect
+    assert "<build>" in out and "<plugins>" in out
+    assert "pitest-maven" in out and "pitest-junit5-plugin" in out  # autodetected JUnit5
 
