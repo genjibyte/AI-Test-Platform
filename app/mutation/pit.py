@@ -37,11 +37,35 @@ class MutationResult(BaseModel):
     timed_out: int = 0
     mutation_score: Optional[float] = None     # detected / total (None when unavailable)
     status_counts: dict = Field(default_factory=dict)
+    # docs/48 S3: opt-in per-mutation rows (line/method/status/mutator/detected) for line-scoped
+    # invariant verification. Empty unless parse_pit_report(..., include_mutations=True).
+    mutations: list = Field(default_factory=list)
 
 
-def parse_pit_report(xml_text: Optional[str]) -> MutationResult:
+def _mutation_row(m) -> dict:
+    """One PIT <mutation> element -> a flat row. ``lineNumber``/``mutatedMethod``/``mutator``
+    are CHILD elements (not attributes); ``status``/``detected`` are attributes."""
+    raw_line = m.findtext("lineNumber")
+    try:
+        line = int(raw_line) if raw_line is not None else None
+    except ValueError:
+        line = None
+    return {
+        "line": line,
+        "method": m.findtext("mutatedMethod"),
+        "status": (m.get("status") or "UNKNOWN").upper(),
+        "mutator": (m.findtext("mutator") or "").rsplit(".", 1)[-1],   # short mutator name
+        "detected": (m.get("detected") or "").strip().lower() == "true",
+    }
+
+
+def parse_pit_report(
+    xml_text: Optional[str], *, include_mutations: bool = False
+) -> MutationResult:
     """Parse a PIT ``mutations.xml`` string into a MutationResult. Never raises; empty or
-    malformed input -> ``available=False`` (mutation unavailable)."""
+    malformed input -> ``available=False`` (mutation unavailable). With
+    ``include_mutations=True`` also returns per-mutation rows (docs/48 S3); default off keeps
+    the return shape unchanged (back-compat with docs/46)."""
     if not xml_text or not xml_text.strip():
         return MutationResult(available=False)
     try:
@@ -64,7 +88,56 @@ def parse_pit_report(xml_text: Optional[str]) -> MutationResult:
         timed_out=status.get("TIMED_OUT", 0),
         mutation_score=round(detected / total, 4),
         status_counts=dict(status),
+        mutations=[_mutation_row(m) for m in muts] if include_mutations else [],
     )
+
+
+def parse_line_spec(spec: Optional[str]) -> set:
+    """Parse an invariant ``target_lines`` spec ("125", "130-143", "120,125,130-132") into a set
+    of ints. None/garbage -> empty set (non-blocking)."""
+    out: set = set()
+    if not spec or not isinstance(spec, str):
+        return out
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            a, _, b = part.partition("-")
+            try:
+                lo, hi = int(a), int(b)
+            except ValueError:
+                continue
+            if lo <= hi:
+                out.update(range(lo, hi + 1))
+        else:
+            try:
+                out.add(int(part))
+            except ValueError:
+                continue
+    return out
+
+
+def scoped_mutation_score(
+    mutations: list, *, lines: Optional[set] = None, method: Optional[str] = None
+) -> Optional[float]:
+    """docs/48 S3: detected/total restricted to an invariant's ``lines`` and/or ``method``.
+    Returns None when nothing is in scope (cannot score -> the verifier stays 'unpinned')."""
+    if not mutations:
+        return None
+    has_line_scope = bool(lines)
+    has_method_scope = bool(method)
+    if not (has_line_scope or has_method_scope):
+        return None
+    sel = [
+        r for r in mutations
+        if (has_line_scope and r.get("line") in lines)
+        or (has_method_scope and r.get("method") == method)
+    ]
+    if not sel:
+        return None
+    detected = sum(1 for r in sel if r.get("detected"))
+    return round(detected / len(sel), 4)
 
 
 def build_pit_command(

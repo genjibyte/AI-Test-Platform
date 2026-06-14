@@ -1,8 +1,9 @@
 # 48 — Business-invariant *verification* (design, 2026-06-14)
 
-> **Status: S1+S2 implemented 2026-06-14 (descriptor + carry + structural verification); S3
-> (gated semantic / line-scoped mutation) DESIGN ONLY, not approved for code.** Sequel to `45`
-> (invariant *tagging* —
+> **Status: S1+S2+S3 implemented 2026-06-14.** S3 = the offline semantic core (per-mutation
+> parse + line-scoping + `pinned` roll-up) + a real-repo validation; the *live-benchmark*
+> auto-scoping (running gated PIT per invariant inside the runner) is the remaining wire-in.
+> Sequel to `45` (invariant *tagging* —
 > declared intent) and `46` (oracle-strength / mutation). Roadmap item **#1** of `docs/00_foundation/47`.
 > Every signal here is **advisory**: it feeds `review_summary` only, never
 > `recommend_with_reasons` / `conclusion`; `auto_accept` stays blocked; `conclusion` stays
@@ -117,9 +118,21 @@ decides whether the declared invariant was the *right* property.
   `runner._review_summary_with_rubric`. Honest under coverage-off: `addressed=None` → `unknown`
   with the `asserted` fact still surfaced. Non-anchoring (model-declared) invariants are never
   structurally blessed (§2). Advisory; no verdict change. (`tests/test_invariants.py`, +11.)
-- **S3 — semantic verification (gated):** line-scoped mutation (`pinned`), behind
-  `mutation_enabled` (so it inherits `46`'s gating); requires the §5 parser extension + a
-  survivor *explanation* hook (real-gap vs equivalent vs trivial).
+- **S3 — semantic verification (gated) — DONE 2026-06-14 (offline core + validated):**
+  `parse_pit_report(..., include_mutations=True)` (back-compat) returns per-mutation rows;
+  `parse_line_spec` + `scoped_mutation_score` (`app/mutation/pit.py`) restrict the score to an
+  invariant's lines/method; `estimate_invariant_strength(..., scoped_mutation_score=)` reaches
+  `pinned` ONLY when all invariant-scoped mutants are killed, else stays `asserted_unpinned` +
+  `scoped_mutants_survive` (gap OR equivalent — never auto-condemned; explanation = roadmap #3).
+  `invariant_review_view(..., mutations=)` scopes per invariant. `run_pit(..., include_mutations=)`
+  threads rows. A non-anchoring invariant is never `pinned` even with a perfect score (§2).
+  **Validated on a real repo** (commons-cli `OptionValidator.validate()`, gated PIT): whole-class
+  0.8947, `validate()`-scoped **0.8** (8/10; survivors = the L125 `validate(null)` coverage gap +
+  the L136 `>`→`>=` equivalent mutant) → honest **`asserted_unpinned`**, not a false `pinned`.
+  (`tests/test_mutation.py`/`test_invariants.py`, +10.)
+  **Remaining wire-in (deferred, needs approval):** have the runner run gated PIT with
+  `include_mutations` and pass per-invariant `mutations` into `invariant_review_view` so the live
+  benchmark can reach `pinned` automatically.
 
 ## 7. Scope guards — what this is NOT
 - Not a correctness oracle: never decides the invariant is *true*, never compares to a "right"
