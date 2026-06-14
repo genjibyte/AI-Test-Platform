@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from app.quality.mock_smells import detect_mock_smells
 from app.quality.oracle_strength import estimate_oracle_strength
 from app.quality.test_quality_gate import evaluate_test_quality
 from app.review.review_policy import build_review_summary, recommend_with_reasons
@@ -83,12 +84,14 @@ def assemble_generation_report(generation: dict) -> dict:
         "dependency_assumptions": result.get("dependency_assumptions", []),
     }
     production_code_touched = bool(write.get("production_code_touched", False))
+    test_source = write.get("content") or result.get("test_source") or ""
+    target_class = target.get("target_class") or result.get("target_class")
     quality = evaluate_test_quality(
-        write.get("content") or result.get("test_source") or "",
+        test_source,
         execution=execution,
         coverage_delta=coverage,
         production_code_touched=production_code_touched,
-        target_class=target.get("target_class") or result.get("target_class"),
+        target_class=target_class,
         target_method=target.get("target_method") or result.get("target_method"),
         grounding=grounding,
     )
@@ -119,6 +122,9 @@ def assemble_generation_report(generation: dict) -> dict:
     # docs/46 S1: advisory STRUCTURAL oracle-strength estimate, rolled up from the quality
     # gate. Advisory only -- it does NOT change the recommendation/conclusion set above.
     review_summary["oracle_strength_estimate"] = estimate_oracle_strength(quality_dict)
+    # docs/51 #4 S1: advisory mock / external-dependency smells (judge-side). Surfaced for review
+    # only -- it does NOT change the recommendation/conclusion and does NOT touch the quality gate.
+    review_summary["mock_smells"] = detect_mock_smells(test_source, target_class=target_class)
 
     return {
         "target_class": target.get("target_class") or result.get("target_class"),
