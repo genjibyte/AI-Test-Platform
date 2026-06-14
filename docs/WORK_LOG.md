@@ -8,12 +8,11 @@
 
 ## 0. Project audit (2026-06-13; re-verified 2026-06-14) — evidence-based, all PASS
 
-- **State:** branch `main` @ HEAD (push pending — owner authorized this push), working tree clean,
-  only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit + real-repo mutation run +
-  invariant-verification #1 complete + survived-mutant classify #3 S1+S2 + docs index tidy.)
-- **Tests:** full suite **315 passed / 4 skipped** (319 `<testcase>` nodes, 0 fail / 0 error;
-  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 304 #1 complete → 312
-  #3 S1 → 315 #3 S2.)
+- **State:** branch `main` @ HEAD, **2 commits ahead of `origin/main`** (push is human-only),
+  working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit + real-repo
+  mutation run + #1 invariant-verification complete + #3 survived-mutant classify + #6 retrieval S1.)
+- **Tests:** full suite **323 passed / 4 skipped** (327 `<testcase>` nodes, 0 fail / 0 error;
+  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 315 #3 S2 → 323 #6 S1.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -111,9 +110,15 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
   - **S2**: invariant view attaches scoped classified survivors (`verified["survivors"]`);
     `run_case` puts whole-run survivors on `review_summary["mutation_survivors"]` (gated);
     `report_md` renders an advisory "Survived mutants" section. All advisory; verdict unchanged.
-- **Deferred — do NOT start without explicit approval:** other roadmap items (#2 context retrieval,
-  #4 mock library, #5 multi-round repair, #6 ledger RAG), P3 / `submit_candidate`, Defects4J,
-  multi-model experiments.
+- **IN PROGRESS — #6 badcase memory / retrieval** (design `docs/50`): judge-side precedent.
+  - **S1** (`app/ledger/retrieval.py` `find_similar` / `find_similar_in_store`): explainable
+    structural similarity over the ledger (same target/method/class, failure_type, business_pattern,
+    fingerprint, repo — each with a reason); advisory, read-only, returns only real records, no
+    embeddings. Changes no verdict.
+  - **S2 (pending, needs approval):** richer root-cause/fix schema on `JudgedRecord` so a retrieved
+    prior is actionable; **S3 (optional, gated):** semantic/embedding retrieval w/ explainable fallback.
+- **Deferred — do NOT start without explicit approval:** #6 S2/S3; #2 context retrieval,
+  #4 mock library, #5 multi-round repair; P3 / `submit_candidate`, Defects4J, multi-model experiments.
 
 ## 5. Forbidden / red-lines (unchanged)
 

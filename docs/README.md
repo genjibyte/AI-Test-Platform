@@ -61,6 +61,7 @@
 - [46 Oracle-Strength + Mutation Signal Design](/docs/50_benchmark/46_ORACLE_STRENGTH_SIGNAL_DESIGN.md)
 - [48 Business-Invariant Verification Design](/docs/50_benchmark/48_BUSINESS_INVARIANT_VERIFICATION_DESIGN.md)
 - [49 Survived-Mutant Classification Design](/docs/50_benchmark/49_SURVIVED_MUTANT_CLASSIFICATION_DESIGN.md)
+- [50 Badcase Retrieval Design (#6)](/docs/50_benchmark/50_BADCASE_RETRIEVAL_DESIGN.md)
 
 ## 60 Context V3
 
