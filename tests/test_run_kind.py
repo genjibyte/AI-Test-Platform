@@ -27,7 +27,9 @@ def test_overrides_are_validated_and_guarded():
     assert resolve_run_kind(client_is_fake=False, override="smoke") == "smoke"
     with pytest.raises(ValueError):
         resolve_run_kind(client_is_fake=False, override="bogus")
-    assert set(RUN_KINDS) == {"real", "fake", "dryrun", "smoke"}
+    # docs/53 added 'external' for submit_candidate; the generator path's
+    # resolve_run_kind never returns it (validated in test_submit_candidate).
+    assert set(RUN_KINDS) == {"real", "fake", "dryrun", "smoke", "external"}
 
 
 def _case(run_kind):

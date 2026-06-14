@@ -68,6 +68,10 @@ class TestGenerationResult(BaseModel):
     notes: Optional[str] = None
     model: Optional[str] = None
     trusted: bool = False  # generated tests are NEVER trusted (docs/07 P2)
+    # docs/53 — submit_candidate path stamps the caller-declared producer here.
+    # None on the generator path; non-empty on the submit_candidate path. Never used
+    # as a warrant (trusted stays False either way).
+    producer_id: Optional[str] = None
 
     # v2 grounding metadata (carried from the payload; optional)
     used_apis: List[str] = Field(default_factory=list)
