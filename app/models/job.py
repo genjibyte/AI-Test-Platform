@@ -1,18 +1,22 @@
-"""Job entity + state machine (P1-T02, extended P2-T10).
+"""Job entity + state machine (P1-T02, extended P2-T10, docs/53).
 
 A Job is one judging run over a target repository, optionally followed by one
-Phase 2 generation run on top of the judged baseline::
+Phase 2 producer run (generator OR external submit) on top of the judged baseline::
 
     CREATED -> IMPORTING -> BUILDING -> PARSING -> DONE          (Phase 1 judging)
                   |            |           |          |
                   +------------+-----------+----------+--> FAILED  (terminal)
 
-    DONE -> TARGET_SELECT -> CONTEXT -> GENERATE -> GEN_EXECUTE   (Phase 2 generation)
-              -> COMPARE -> GEN_DONE
-              (any Phase 2 step may short-circuit to GEN_FAILED)
+    DONE -> TARGET_SELECT -> CONTEXT --+--> GENERATE -> GEN_EXECUTE -> COMPARE -> GEN_DONE
+                                       |
+                                       +--> SUBMIT_EXECUTE      -> COMPARE -> SUBMIT_DONE
+              (generator step may short-circuit to GEN_FAILED;
+               submit_candidate step may short-circuit to SUBMIT_FAILED)
 
-FAILED / GEN_DONE / GEN_FAILED are terminal. Phase 1 has no Generate/Fix states;
-Phase 2 generation only starts from a judged (DONE) job.
+FAILED / GEN_DONE / GEN_FAILED / SUBMIT_DONE / SUBMIT_FAILED are terminal. Phase 1
+has no Generate/Fix states; either producer path only starts from a judged (DONE)
+job. The two producer paths share TARGET_SELECT and CONTEXT but never collide --
+a single job picks exactly one path.
 """
 from __future__ import annotations
 
@@ -40,10 +44,17 @@ class JobStatus(str, enum.Enum):
     COMPARE = "COMPARE"
     GEN_DONE = "GEN_DONE"
     GEN_FAILED = "GEN_FAILED"
+    # Phase 2 — external submit (docs/53). Shares TARGET_SELECT + CONTEXT with the
+    # generator path but has its own EXECUTE / DONE / FAILED so audit trails record
+    # which producer path a job took.
+    SUBMIT_EXECUTE = "SUBMIT_EXECUTE"
+    SUBMIT_DONE = "SUBMIT_DONE"
+    SUBMIT_FAILED = "SUBMIT_FAILED"
 
 
 # Allowed forward transitions. Any non-terminal Phase 1 state may also go to
-# FAILED; any Phase 2 step may short-circuit to GEN_FAILED.
+# FAILED. Phase 2 steps short-circuit to GEN_FAILED on the generator path or
+# SUBMIT_FAILED on the submit_candidate path (docs/53).
 _ALLOWED: dict[JobStatus, set[JobStatus]] = {
     JobStatus.CREATED: {JobStatus.IMPORTING, JobStatus.FAILED},
     JobStatus.IMPORTING: {JobStatus.BUILDING, JobStatus.FAILED},
@@ -51,13 +62,26 @@ _ALLOWED: dict[JobStatus, set[JobStatus]] = {
     JobStatus.PARSING: {JobStatus.DONE, JobStatus.FAILED},
     JobStatus.DONE: {JobStatus.TARGET_SELECT},
     JobStatus.FAILED: set(),
-    JobStatus.TARGET_SELECT: {JobStatus.CONTEXT, JobStatus.GEN_FAILED},
-    JobStatus.CONTEXT: {JobStatus.GENERATE, JobStatus.GEN_FAILED},
+    JobStatus.TARGET_SELECT: {JobStatus.CONTEXT, JobStatus.GEN_FAILED, JobStatus.SUBMIT_FAILED},
+    JobStatus.CONTEXT: {
+        JobStatus.GENERATE,
+        JobStatus.SUBMIT_EXECUTE,
+        JobStatus.GEN_FAILED,
+        JobStatus.SUBMIT_FAILED,
+    },
     JobStatus.GENERATE: {JobStatus.GEN_EXECUTE, JobStatus.GEN_FAILED},
     JobStatus.GEN_EXECUTE: {JobStatus.COMPARE, JobStatus.GEN_FAILED},
-    JobStatus.COMPARE: {JobStatus.GEN_DONE, JobStatus.GEN_FAILED},
+    JobStatus.SUBMIT_EXECUTE: {JobStatus.COMPARE, JobStatus.SUBMIT_FAILED},
+    JobStatus.COMPARE: {
+        JobStatus.GEN_DONE,
+        JobStatus.SUBMIT_DONE,
+        JobStatus.GEN_FAILED,
+        JobStatus.SUBMIT_FAILED,
+    },
     JobStatus.GEN_DONE: set(),
     JobStatus.GEN_FAILED: set(),
+    JobStatus.SUBMIT_DONE: set(),
+    JobStatus.SUBMIT_FAILED: set(),
 }
 
 
