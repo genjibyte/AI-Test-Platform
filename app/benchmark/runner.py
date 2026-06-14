@@ -35,6 +35,7 @@ from app.config import get_settings
 from app.llm.client import LLMClient, get_client
 from app.mutation.pit import MutationResult
 from app.mutation.run import run_pit
+from app.mutation.survivors import classify_survivors
 from app.models.job import Job, JobStatus, now_iso
 from app.pipeline.generate_pipeline import run_generation
 from app.pipeline.judge_pipeline import run_pipeline
@@ -263,8 +264,9 @@ def _maybe_mutation(job: Job, case: BenchCase) -> Optional[MutationResult]:
         repo_dir = Workspace(job.id).repo_dir
         if not repo_dir.exists():
             return None
-        include = bool(getattr(case, "invariants", None))   # rows only when invariants need them
-        return run_pit(repo_dir, case.target_class, fqcn, include_mutations=include)
+        # include per-mutation rows so survivors can be classified (docs/49) and invariants
+        # line-scoped (docs/48); cheap, and this only runs when mutation is gated ON.
+        return run_pit(repo_dir, case.target_class, fqcn, include_mutations=True)
     except Exception:  # noqa: BLE001 - mutation is advisory, never fatal
         return None
 
@@ -286,6 +288,19 @@ def _attach_invariant_mutations(
         oracle_strength=result.oracle_strength,
         mutations=mres.mutations,
     )
+
+
+def _attach_mutation_survivors(
+    result: BenchCaseResult, mres: Optional[MutationResult]
+) -> None:
+    """docs/49 S2: attach the classified survived mutants to ``review_summary`` (advisory).
+    A no-op unless a gated mutation run produced per-mutation rows; never changes a verdict."""
+    if mres is None or not mres.mutations:
+        return
+    rs = result.review_summary
+    if not isinstance(rs, dict):
+        return
+    rs["mutation_survivors"] = classify_survivors(mres.mutations)
 
 
 def run_case(
@@ -320,6 +335,7 @@ def run_case(
     mres = _maybe_mutation(job, case)                         # docs/46 S3: gated, advisory
     result.mutation_score = mres.mutation_score if mres else None
     _attach_invariant_mutations(result, case, mres)          # docs/48 S3: live invariant pinning
+    _attach_mutation_survivors(result, mres)                 # docs/49 S2: explain survivors
     return result
 
 

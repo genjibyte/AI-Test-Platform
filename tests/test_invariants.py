@@ -332,3 +332,41 @@ def test_attach_invariant_mutations_noop_without_rows_or_invariants():
                           mutations=[{"line": 1, "method": "m", "status": "KILLED", "detected": True}])
     R._attach_invariant_mutations(r2, BenchCase(repo_url="u", target_class="C"), mres)
     assert r2.review_summary == rs
+
+
+# --- #3 S2: survivors surfaced in the invariant view + runner ---------------------
+
+def test_view_attaches_classified_survivors_per_invariant():
+    inv = InvariantDescriptor(statement="x", source="manifest", target_method="validate")
+    rows = [
+        {"line": 1, "method": "validate", "status": "KILLED",
+         "mutator": "MathMutator", "detected": True},
+        {"line": 2, "method": "validate", "status": "SURVIVED",
+         "mutator": "ConditionalsBoundaryMutator", "detected": False},
+    ]
+    v = invariant_review_view([inv], verify=True, oracle_strength="structural_ok",
+                              mutations=rows)["invariants"][0]["verified"]
+    assert v["invariant_strength"] == "asserted_unpinned"
+    assert len(v["survivors"]) == 1                       # only the SURVIVED mutant, explained
+    assert v["survivors"][0]["category"] == "survived_maybe_equivalent"
+
+
+def test_attach_mutation_survivors_to_review_summary():
+    from app.benchmark import runner as R
+    from app.benchmark.models import BenchCaseResult
+    from app.mutation.pit import MutationResult
+
+    result = BenchCaseResult(name="c", repo_url="u", target_class="C",
+                             conclusion="NEED_HUMAN_REVIEW", review_summary={})
+    mres = MutationResult(available=True, mutation_score=0.5, mutations=[
+        {"line": 1, "method": "m", "status": "SURVIVED", "mutator": "MathMutator", "detected": False},
+        {"line": 2, "method": "m", "status": "KILLED", "mutator": "MathMutator", "detected": True},
+    ])
+    R._attach_mutation_survivors(result, mres)
+    ms = result.review_summary["mutation_survivors"]
+    assert ms["total_survivors"] == 1 and ms["counts"]["survived_weak_oracle"] == 1
+    assert result.conclusion == "NEED_HUMAN_REVIEW"      # verdict never changes
+    # no rows -> no-op
+    r2 = BenchCaseResult(name="c", repo_url="u", target_class="C", review_summary={})
+    R._attach_mutation_survivors(r2, None)
+    assert "mutation_survivors" not in r2.review_summary

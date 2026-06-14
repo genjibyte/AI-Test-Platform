@@ -76,6 +76,32 @@ def _oracle_lines(bd: dict, title: str) -> list:
     ]
 
 
+def _survivor_lines(report: BenchReport) -> list:
+    """Aggregate survived-mutant classification across cases (docs/49 S2). Advisory: explains
+    survivors (coverage gap vs weak oracle vs maybe-equivalent); never a verdict. Rendered only
+    when a gated mutation run produced per-mutation rows (else omitted entirely)."""
+    agg = {"not_covered": 0, "survived_weak_oracle": 0,
+           "survived_maybe_equivalent": 0, "survived_unclassified": 0}
+    total = 0
+    for c in report.cases:
+        ms = (c.review_summary or {}).get("mutation_survivors") if c.review_summary else None
+        if not ms:
+            continue
+        for k in agg:
+            agg[k] += (ms.get("counts") or {}).get(k, 0)
+        total += ms.get("total_survivors", 0)
+    if total == 0:
+        return []
+    return [
+        "## Survived mutants — classification (advisory)",
+        "",
+        f"- total_survivors: {total}",
+        f"- by_category: {agg}",
+        "  (advisory; survival is not proof a test is weak — equivalence is undecidable)",
+        "",
+    ]
+
+
 def render_markdown(report: BenchReport) -> str:
     # Headline (real-only) is recomputed from the cases so fake/dryrun/smoke and
     # historical (unknown run_kind) rows never inflate model-quality numbers (docs/43 S2).
@@ -105,6 +131,7 @@ def render_markdown(report: BenchReport) -> str:
         oracle_strength_breakdown(report.cases, run_kind="real"),
         "Oracle strength — HEADLINE (real only)",
     )
+    lines += _survivor_lines(report)
     lines += [
         "## Per-case",
         "",

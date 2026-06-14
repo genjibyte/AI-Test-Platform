@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 from app.benchmark.business_tags import normalize_tag
 from app.mutation.pit import parse_line_spec, scoped_mutation_score
+from app.mutation.survivors import classify_survivors
 
 # docs/48 §1 -- the invariant kinds we target (extensible; "other"/"unknown" always allowed).
 INVARIANT_KINDS = (
@@ -175,22 +176,27 @@ def estimate_invariant_strength(
 
 
 def _scope(descriptor: InvariantDescriptor, mutations: list):
-    """Line-scope mutation evidence to an invariant -> ``(scoped_score, ran)``. ``ran`` is True
-    when >=1 scoped mutant executed (killed/survived => the test reaches the invariant's lines),
-    False when all scoped mutants are NO_COVERAGE, None when nothing is in scope. The ``ran``
-    flag lets mutation evidence imply ``addressed`` even when line coverage is skipped."""
+    """Line-scope mutation evidence to an invariant -> ``(scoped_score, ran, scoped_rows)``.
+    ``ran`` is True when >=1 scoped mutant executed (killed/survived => the test reaches the
+    invariant's lines), False when all scoped mutants are NO_COVERAGE; both are None / ``[]`` when
+    nothing is in scope. ``ran`` lets mutation evidence imply ``addressed`` even with coverage off;
+    ``scoped_rows`` feed survivor classification (docs/49)."""
     lines = parse_line_spec(descriptor.target_lines)
     method = descriptor.target_method
-    score = scoped_mutation_score(mutations, lines=lines, method=method)
-    if score is None:
-        return None, None
     has_line = bool(lines)
-    ran = any(
-        ((has_line and r.get("line") in lines) or (method and r.get("method") == method))
-        and (r.get("status") or "").upper() != "NO_COVERAGE"
-        for r in mutations
-    )
-    return score, ran
+    has_method = bool(method)
+    if not (has_line or has_method):
+        return None, None, []
+    rows = [
+        r for r in mutations
+        if (has_line and r.get("line") in lines) or (has_method and r.get("method") == method)
+    ]
+    if not rows:
+        return None, None, []
+    detected = sum(1 for r in rows if r.get("detected"))
+    score = round(detected / len(rows), 4)
+    ran = any((r.get("status") or "").upper() != "NO_COVERAGE" for r in rows)
+    return score, ran, rows
 
 
 def invariant_review_view(
@@ -216,17 +222,22 @@ def invariant_review_view(
         verified = None
         if verify:
             scoped = None
+            scoped_rows: list = []
             addressed_eff = addressed
             if mutations:
                 # docs/48 S3: line-scope mutation evidence to this invariant. A scoped mutant
                 # that RAN proves the test reaches the lines -> addressed (even with coverage off).
-                scoped, ran = _scope(d, mutations)
+                scoped, ran, scoped_rows = _scope(d, mutations)
                 if ran is not None and addressed_eff is None:
                     addressed_eff = ran
             verified = estimate_invariant_strength(
                 d, addressed=addressed_eff, oracle_strength=oracle_strength,
                 assertion_names=assertion_names, scoped_mutation_score=scoped,
             )
+            # docs/49 S2: explain THIS invariant's survivors (why scoped_mutants_survive).
+            survs = classify_survivors(scoped_rows)["survivors"] if scoped_rows else []
+            if survs:
+                verified["survivors"] = survs
         items.append({
             "id": d.id,
             "statement": d.statement,

@@ -1,6 +1,6 @@
 # 49 — Survived-mutant classification (design, 2026-06-14)
 
-> **Status: DESIGN.** Roadmap item **#3** of `docs/00_foundation/47`. Builds on `46` (mutation)
+> **Status: S1+S2 implemented 2026-06-14.** Roadmap item **#3** of `docs/00_foundation/47`. Builds on `46` (mutation)
 > and `48` (the `scoped_mutants_survive` reason). Every output here is **advisory**: it feeds
 > `review_summary` / the report only, never `recommend_with_reasons` / `conclusion`;
 > `auto_accept` stays blocked; `conclusion` stays `NEED_HUMAN_REVIEW`; `trusted=False`.
@@ -70,10 +70,14 @@ The table is **non-blocking and extensible**; an unknown mutator is allowed. An
   per-mutation rows exist (i.e. a gated run with `include_mutations`); otherwise omitted.
 
 ## 5. Slices
-- **S1 — classifier core (offline):** `app/mutation/survivors.py` `classify_survivors` + the
-  mutator map + roll-up. Pure, fully unit-tested, no PIT. Mirrors prior S1s.
-- **S2 — surface:** enrich the invariant view's survivors (`48`) + add the report section. Wire
-  through the gated rows already produced by `run_case` (`48` live wire-in).
+- **S1 — classifier core (offline) — DONE:** `app/mutation/survivors.py` `classify_survivors` +
+  the mutator map + roll-up. Pure, unit-tested, no PIT.
+- **S2 — surface — DONE 2026-06-14:** (1) the invariant view attaches each anchoring invariant's
+  scoped, classified survivors to `verified["survivors"]` (explaining `scoped_mutants_survive`);
+  (2) `run_case._attach_mutation_survivors` puts whole-run `classify_survivors` on
+  `review_summary["mutation_survivors"]` (gated; `_maybe_mutation` now always requests rows);
+  (3) `report_md._survivor_lines` renders an advisory "Survived mutants" aggregate section (omitted
+  when no rows). All advisory; verdict unchanged.
 
 ## 6. Scope guards — what this is NOT
 - Never asserts a mutant *is* equivalent (undecidable); `maybe_equivalent` is an advisory hint.

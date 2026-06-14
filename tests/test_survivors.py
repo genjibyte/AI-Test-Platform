@@ -66,3 +66,20 @@ def test_matches_commons_cli_validate_real_finding():
     cats = {s["line"]: s["category"] for s in classify_survivors(rows)["survivors"]}
     assert cats[125] == "not_covered"                 # validate(null) untested -> coverage gap
     assert cats[136] == "survived_maybe_equivalent"   # >->= equivalent -> review, not condemned
+
+
+def test_report_md_renders_survivor_section_when_present_else_omits():
+    from app.benchmark.models import BenchCaseResult, BenchReport, aggregate
+    from app.benchmark.report_md import render_markdown
+
+    surv = classify_survivors([
+        {"line": 1, "method": "m", "status": "SURVIVED", "mutator": "MathMutator", "detected": False},
+    ])
+    case = BenchCaseResult(name="c", repo_url="u", target_class="C", conclusion="NEED_HUMAN_REVIEW",
+                           review_summary={"mutation_survivors": surv})
+    md = render_markdown(BenchReport(cases=[case], aggregate=aggregate([case])))
+    assert "Survived mutants" in md and "survived_weak_oracle" in md
+    # omitted entirely when no mutation rows (gated off)
+    bare = BenchCaseResult(name="c", repo_url="u", target_class="C", conclusion="NEED_HUMAN_REVIEW")
+    md2 = render_markdown(BenchReport(cases=[bare], aggregate=aggregate([bare])))
+    assert "Survived mutants" not in md2
