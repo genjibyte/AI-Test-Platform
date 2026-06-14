@@ -62,6 +62,7 @@
 - [48 Business-Invariant Verification Design](/docs/50_benchmark/48_BUSINESS_INVARIANT_VERIFICATION_DESIGN.md)
 - [49 Survived-Mutant Classification Design](/docs/50_benchmark/49_SURVIVED_MUTANT_CLASSIFICATION_DESIGN.md)
 - [50 Badcase Retrieval Design (#6)](/docs/50_benchmark/50_BADCASE_RETRIEVAL_DESIGN.md)
+- [51 Mock / External-Dependency Smell Design (#4 judge-side)](/docs/50_benchmark/51_MOCK_SMELL_DESIGN.md)
 
 ## 60 Context V3
 

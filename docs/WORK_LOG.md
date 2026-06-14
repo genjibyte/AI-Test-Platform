@@ -8,11 +8,11 @@
 
 ## 0. Project audit (2026-06-13; re-verified 2026-06-14) — evidence-based, all PASS
 
-- **State:** branch `main` @ HEAD (pushing this batch — owner authorized), working tree clean,
-  only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit + real-repo mutation run +
-  #1 invariant-verification complete + #3 survived-mutant classify + #6 retrieval S1+S2+S3.)
-- **Tests:** full suite **329 passed / 4 skipped** (333 `<testcase>` nodes, 0 fail / 0 error;
-  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 325 #6 S2 → 329 #6 S3.)
+- **State:** branch `main` @ HEAD, **2 commits ahead of `origin/main`** (push is human-only),
+  working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit + real-repo
+  mutation run + #1 invariant-verification + #3 survivor classify + #6 retrieval + #4 mock-smell S1.)
+- **Tests:** full suite **339 passed / 4 skipped** (343 `<testcase>` nodes, 0 fail / 0 error;
+  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 329 #6 S3 → 339 #4 mock-smell S1.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -120,8 +120,14 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
   - **S3**: `find_similar(..., query_text=)` adds a **no-dependency** token-overlap (Jaccard,
     stdlib) over declared free-text (`reason: text_overlap`); explainable, never replaces structural
     signals. **Embedding retrieval stays DEFERRED** (new dep or API/cost → needs explicit approval).
-- **Deferred — do NOT start without explicit approval:** #6 embedding retrieval (dep/API); #2 context
-  retrieval, #4 mock library, #5 multi-round repair; P3 / `submit_candidate`, Defects4J, multi-model.
+- **DONE 2026-06-14 — #4 mock/external-dependency smell (judge-side slice)** (design `docs/51`):
+  `app/quality/mock_smells.py` `detect_mock_smells` flags `mock_of_target` / `stub_returns_null` /
+  `loose_matchers` / `real_dependency` (the gate already blocks sleep/random/time/IO). Surfaced as
+  `review_summary["mock_smells"]` **after** the recommendation — advisory, **does NOT touch the
+  quality gate**, changes no verdict. The generation-side **mock pattern library is deferred**.
+- **Deferred — do NOT start without explicit approval:** #6 embedding retrieval (dep/API); #4 mock
+  pattern library (producer-side); #2 context retrieval, #5 multi-round repair; P3 /
+  `submit_candidate`, Defects4J, multi-model.
 
 ## 5. Forbidden / red-lines (unchanged)
 
