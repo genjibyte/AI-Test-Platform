@@ -1,9 +1,10 @@
 # 48 — Business-invariant *verification* (design, 2026-06-14)
 
-> **Status: S1+S2+S3 implemented 2026-06-14.** S3 = the offline semantic core (per-mutation
-> parse + line-scoping + `pinned` roll-up) + a real-repo validation; the *live-benchmark*
-> auto-scoping (running gated PIT per invariant inside the runner) is the remaining wire-in.
-> Sequel to `45` (invariant *tagging* —
+> **Status: S1+S2+S3 implemented 2026-06-14, including the live-benchmark wire-in.** The runner
+> runs gated PIT once (per-mutation rows when invariants are declared) and re-scopes the invariant
+> view, so the live benchmark reaches `pinned` automatically (gated; unit-tested). A full
+> end-to-end live run with *real generation* needs a model/API (not run; cost-gated). #1 is
+> functionally complete. Sequel to `45` (invariant *tagging* —
 > declared intent) and `46` (oracle-strength / mutation). Roadmap item **#1** of `docs/00_foundation/47`.
 > Every signal here is **advisory**: it feeds `review_summary` only, never
 > `recommend_with_reasons` / `conclusion`; `auto_accept` stays blocked; `conclusion` stays
@@ -130,9 +131,15 @@ decides whether the declared invariant was the *right* property.
   0.8947, `validate()`-scoped **0.8** (8/10; survivors = the L125 `validate(null)` coverage gap +
   the L136 `>`→`>=` equivalent mutant) → honest **`asserted_unpinned`**, not a false `pinned`.
   (`tests/test_mutation.py`/`test_invariants.py`, +10.)
-  **Remaining wire-in (deferred, needs approval):** have the runner run gated PIT with
-  `include_mutations` and pass per-invariant `mutations` into `invariant_review_view` so the live
-  benchmark can reach `pinned` automatically.
+  **Live-benchmark wire-in — DONE 2026-06-14:** `run_case` runs gated PIT once via
+  `_maybe_mutation` (per-mutation rows when the case declares invariants) and
+  `_attach_invariant_mutations` re-scopes `review_summary["invariant_review"]` with those rows, so
+  the live benchmark reaches `pinned` automatically. Mutation evidence implies reachability — a
+  scoped mutant that RAN means the test addresses the lines, so `pinned` works even with line
+  coverage off (`_scope` derives `addressed`); all-`NO_COVERAGE` -> `unaddressed`. Gated/advisory;
+  verdict unchanged. A full end-to-end run with *real generation* (a model writing the test) was
+  not executed — it needs API/cost approval; the wire-in glue is unit-tested and the PIT/scoping
+  path was validated on commons-cli.
 
 ## 7. Scope guards — what this is NOT
 - Not a correctness oracle: never decides the invariant is *true*, never compares to a "right"

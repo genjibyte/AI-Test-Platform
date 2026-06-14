@@ -174,6 +174,25 @@ def estimate_invariant_strength(
                        scoped_mutation_score=scoped_mutation_score)
 
 
+def _scope(descriptor: InvariantDescriptor, mutations: list):
+    """Line-scope mutation evidence to an invariant -> ``(scoped_score, ran)``. ``ran`` is True
+    when >=1 scoped mutant executed (killed/survived => the test reaches the invariant's lines),
+    False when all scoped mutants are NO_COVERAGE, None when nothing is in scope. The ``ran``
+    flag lets mutation evidence imply ``addressed`` even when line coverage is skipped."""
+    lines = parse_line_spec(descriptor.target_lines)
+    method = descriptor.target_method
+    score = scoped_mutation_score(mutations, lines=lines, method=method)
+    if score is None:
+        return None, None
+    has_line = bool(lines)
+    ran = any(
+        ((has_line and r.get("line") in lines) or (method and r.get("method") == method))
+        and (r.get("status") or "").upper() != "NO_COVERAGE"
+        for r in mutations
+    )
+    return score, ran
+
+
 def invariant_review_view(
     invariants: List[InvariantDescriptor],
     *,
@@ -197,13 +216,15 @@ def invariant_review_view(
         verified = None
         if verify:
             scoped = None
+            addressed_eff = addressed
             if mutations:
-                # docs/48 S3: restrict the mutation score to this invariant's lines/method.
-                scoped = scoped_mutation_score(
-                    mutations, lines=parse_line_spec(d.target_lines), method=d.target_method,
-                )
+                # docs/48 S3: line-scope mutation evidence to this invariant. A scoped mutant
+                # that RAN proves the test reaches the lines -> addressed (even with coverage off).
+                scoped, ran = _scope(d, mutations)
+                if ran is not None and addressed_eff is None:
+                    addressed_eff = ran
             verified = estimate_invariant_strength(
-                d, addressed=addressed, oracle_strength=oracle_strength,
+                d, addressed=addressed_eff, oracle_strength=oracle_strength,
                 assertion_names=assertion_names, scoped_mutation_score=scoped,
             )
         items.append({
@@ -222,5 +243,5 @@ def invariant_review_view(
         "invariants": items,
         "count": len(items),
         "auto_accept_blocked": True,             # declaring an invariant never accepts a candidate
-        "note": "declared intent; verification is structural + advisory (docs/48 S1/S2)",
+        "note": "declared intent; verification is structural + (gated) mutation, advisory (docs/48)",
     }

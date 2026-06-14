@@ -273,3 +273,62 @@ def test_non_anchoring_never_pinned_even_with_perfect_mutation():
     v = invariant_review_view([inv], verify=True, oracle_strength="structural_ok",
                               addressed=True, mutations=rows)["invariants"][0]["verified"]
     assert v["invariant_strength"] == "unknown" and v["anchoring"] is False
+
+
+# --- S3 live wire-in: mutation evidence implies coverage; runner re-scoping ------
+
+def test_view_mutations_imply_addressed_and_can_pin_without_coverage():
+    # coverage off (addressed=None) but a KILLED scoped mutant proves the test reaches the
+    # lines -> addressed, and all-killed -> pinned (docs/48 S3 live wire-in).
+    inv = InvariantDescriptor(statement="x", source="manifest", target_method="validate")
+    rows = [{"line": 10, "method": "validate", "status": "KILLED", "mutator": "M", "detected": True}]
+    v = invariant_review_view([inv], verify=True, oracle_strength="structural_ok",
+                              addressed=None, mutations=rows)["invariants"][0]["verified"]
+    assert v["addressed"] is True and v["invariant_strength"] == "pinned"
+
+
+def test_view_all_no_coverage_scoped_is_unaddressed():
+    inv = InvariantDescriptor(statement="x", source="manifest", target_method="validate")
+    rows = [{"line": 10, "method": "validate", "status": "NO_COVERAGE", "mutator": "M", "detected": False}]
+    v = invariant_review_view([inv], verify=True, oracle_strength="structural_ok",
+                              addressed=None, mutations=rows)["invariants"][0]["verified"]
+    assert v["addressed"] is False and v["invariant_strength"] == "unaddressed"
+
+
+def test_attach_invariant_mutations_rescopes_to_pinned():
+    from app.benchmark import runner as R
+    from app.benchmark.models import BenchCase, BenchCaseResult
+    from app.mutation.pit import MutationResult
+
+    inv = InvariantDescriptor(statement="x", source="manifest", target_method="validate")
+    case = BenchCase(repo_url="u", target_class="C", invariants=[inv])
+    result = BenchCaseResult(name="c", repo_url="u", target_class="C",
+                             conclusion="NEED_HUMAN_REVIEW", oracle_strength="structural_ok",
+                             review_summary={"invariant_review": {"invariants": [{"verified": None}]}})
+    mres = MutationResult(available=True, mutation_score=1.0,
+                          mutations=[{"line": 1, "method": "validate", "status": "KILLED",
+                                      "mutator": "M", "detected": True}])
+    R._attach_invariant_mutations(result, case, mres)
+    v = result.review_summary["invariant_review"]["invariants"][0]["verified"]
+    assert v["invariant_strength"] == "pinned"
+    assert result.conclusion == "NEED_HUMAN_REVIEW"           # verdict never changes
+
+
+def test_attach_invariant_mutations_noop_without_rows_or_invariants():
+    from app.benchmark import runner as R
+    from app.benchmark.models import BenchCase, BenchCaseResult
+    from app.mutation.pit import MutationResult
+
+    rs = {"invariant_review": {"invariants": [{"verified": None}]}}
+    # no mutation result -> no-op
+    case = BenchCase(repo_url="u", target_class="C",
+                     invariants=[InvariantDescriptor(statement="x", source="manifest")])
+    r1 = BenchCaseResult(name="c", repo_url="u", target_class="C", review_summary=dict(rs))
+    R._attach_invariant_mutations(r1, case, None)
+    assert r1.review_summary == rs
+    # no invariants on the case -> no-op even with rows
+    r2 = BenchCaseResult(name="c", repo_url="u", target_class="C", review_summary=dict(rs))
+    mres = MutationResult(available=True,
+                          mutations=[{"line": 1, "method": "m", "status": "KILLED", "detected": True}])
+    R._attach_invariant_mutations(r2, BenchCase(repo_url="u", target_class="C"), mres)
+    assert r2.review_summary == rs

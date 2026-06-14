@@ -33,6 +33,7 @@ from app.benchmark.models import (
 )
 from app.config import get_settings
 from app.llm.client import LLMClient, get_client
+from app.mutation.pit import MutationResult
 from app.mutation.run import run_pit
 from app.models.job import Job, JobStatus, now_iso
 from app.pipeline.generate_pipeline import run_generation
@@ -247,11 +248,12 @@ def _completed_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
     )
 
 
-def _maybe_mutation_score(job: Job, case: BenchCase) -> Optional[float]:
-    """docs/46 S3: gated, best-effort PIT mutation score. OFF by default
-    (``mutation_enabled``); never raises -- any issue degrades to ``None`` so mutation
-    stays ADVISORY and NEVER blocks the benchmark. Runs in the live workspace right after
-    generation (built classes still present); the score never auto-accepts a candidate."""
+def _maybe_mutation(job: Job, case: BenchCase) -> Optional[MutationResult]:
+    """docs/46 S3 + docs/48 S3: gated, best-effort PIT run. OFF by default (``mutation_enabled``);
+    never raises -- any issue degrades to ``None`` so mutation stays ADVISORY and NEVER blocks the
+    benchmark. Returns the full MutationResult (per-mutation rows when the case declares invariants,
+    for line-scoped verification). Runs in the live workspace right after generation (built classes
+    still present); the score never auto-accepts a candidate."""
     if not get_settings().mutation_enabled:
         return None
     try:
@@ -261,9 +263,29 @@ def _maybe_mutation_score(job: Job, case: BenchCase) -> Optional[float]:
         repo_dir = Workspace(job.id).repo_dir
         if not repo_dir.exists():
             return None
-        return run_pit(repo_dir, case.target_class, fqcn).mutation_score
+        include = bool(getattr(case, "invariants", None))   # rows only when invariants need them
+        return run_pit(repo_dir, case.target_class, fqcn, include_mutations=include)
     except Exception:  # noqa: BLE001 - mutation is advisory, never fatal
         return None
+
+
+def _attach_invariant_mutations(
+    result: BenchCaseResult, case: BenchCase, mres: Optional[MutationResult]
+) -> None:
+    """docs/48 S3 live wire-in: re-scope ``review_summary["invariant_review"]`` with the PIT
+    per-mutation rows so the LIVE benchmark can reach ``pinned``. Gated/advisory -- a no-op unless
+    the case declares invariants AND a mutation run produced rows; never changes a verdict."""
+    if not getattr(case, "invariants", None) or mres is None or not mres.mutations:
+        return
+    rs = result.review_summary
+    if not isinstance(rs, dict) or "invariant_review" not in rs:
+        return
+    rs["invariant_review"] = invariant_review_view(
+        list(case.invariants),
+        verify=True,
+        oracle_strength=result.oracle_strength,
+        mutations=mres.mutations,
+    )
 
 
 def run_case(
@@ -295,7 +317,9 @@ def run_case(
         run_kind=run_kind,  # producer sets it at generation time (docs/43)
     )
     result = _completed_result(case, job, t0)
-    result.mutation_score = _maybe_mutation_score(job, case)  # docs/46 S3: gated, advisory
+    mres = _maybe_mutation(job, case)                         # docs/46 S3: gated, advisory
+    result.mutation_score = mres.mutation_score if mres else None
+    _attach_invariant_mutations(result, case, mres)          # docs/48 S3: live invariant pinning
     return result
 
 
