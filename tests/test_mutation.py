@@ -164,7 +164,7 @@ def test_run_pit_falls_back_when_mvn_unresolved(tmp_path, monkeypatch):
 
 # --- gated benchmark wire-in (docs/46 S3 #1) -------------------------------------
 
-def test_maybe_mutation_score_gated_off_then_enabled(tmp_path, monkeypatch):
+def test_maybe_mutation_gated_off_then_enabled(tmp_path, monkeypatch):
     from types import SimpleNamespace
 
     from app.benchmark import runner as R
@@ -179,13 +179,13 @@ def test_maybe_mutation_score_gated_off_then_enabled(tmp_path, monkeypatch):
     # default OFF -> None, and run_pit is never reached
     monkeypatch.setattr(R, "get_settings", lambda: SimpleNamespace(mutation_enabled=False))
     monkeypatch.setattr(R, "run_pit", _boom)
-    assert R._maybe_mutation_score(job, case) is None
+    assert R._maybe_mutation(job, case) is None
 
-    # enabled -> runs run_pit (stubbed) in the existing workspace repo_dir -> score
+    # enabled -> runs run_pit (stubbed) in the existing workspace repo_dir -> full result
     monkeypatch.setattr(R, "get_settings", lambda: SimpleNamespace(mutation_enabled=True))
     monkeypatch.setattr(R, "Workspace", lambda job_id: SimpleNamespace(repo_dir=tmp_path))
     monkeypatch.setattr(R, "run_pit", lambda *a, **k: MutationResult(available=True, mutation_score=0.6))
-    assert R._maybe_mutation_score(job, case) == 0.6
+    assert R._maybe_mutation(job, case).mutation_score == 0.6
 
 
 def test_mutation_score_carries_to_ledger():
