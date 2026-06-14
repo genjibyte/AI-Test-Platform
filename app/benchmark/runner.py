@@ -36,6 +36,7 @@ from app.llm.client import LLMClient, get_client
 from app.mutation.pit import MutationResult
 from app.mutation.run import run_pit
 from app.mutation.survivors import classify_survivors
+from app.review.review_digest import build_review_digest
 from app.models.job import Job, JobStatus, now_iso
 from app.pipeline.generate_pipeline import run_generation
 from app.pipeline.judge_pipeline import run_pipeline
@@ -303,6 +304,14 @@ def _attach_mutation_survivors(
     rs["mutation_survivors"] = classify_survivors(mres.mutations)
 
 
+def _attach_digest(result: BenchCaseResult) -> None:
+    """docs/52: (re)build the review digest AFTER all benchmark-layer signals are attached, so the
+    digest also reflects invariant/mutation/business signals. Advisory; never changes a verdict."""
+    rs = result.review_summary
+    if isinstance(rs, dict):
+        rs["digest"] = build_review_digest(rs)
+
+
 def run_case(
     case: BenchCase,
     repo_db: JobRepo,
@@ -336,6 +345,7 @@ def run_case(
     result.mutation_score = mres.mutation_score if mres else None
     _attach_invariant_mutations(result, case, mres)          # docs/48 S3: live invariant pinning
     _attach_mutation_survivors(result, mres)                 # docs/49 S2: explain survivors
+    _attach_digest(result)                                   # docs/52: roll up all signals last
     return result
 
 

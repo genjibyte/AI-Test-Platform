@@ -23,6 +23,7 @@ from typing import Optional
 from app.quality.mock_smells import detect_mock_smells
 from app.quality.oracle_strength import estimate_oracle_strength
 from app.quality.test_quality_gate import evaluate_test_quality
+from app.review.review_digest import build_review_digest
 from app.review.review_policy import build_review_summary, recommend_with_reasons
 
 CONCLUSION = "NEED_HUMAN_REVIEW"  # invariant for all of Phase 2
@@ -125,6 +126,9 @@ def assemble_generation_report(generation: dict) -> dict:
     # docs/51 #4 S1: advisory mock / external-dependency smells (judge-side). Surfaced for review
     # only -- it does NOT change the recommendation/conclusion and does NOT touch the quality gate.
     review_summary["mock_smells"] = detect_mock_smells(test_source, target_class=target_class)
+    # docs/52: advisory review digest -- a prioritized roll-up of the signals above for the
+    # reviewer. Built last; reads only what's present; changes no recommendation/conclusion.
+    review_summary["digest"] = build_review_digest(review_summary)
 
     return {
         "target_class": target.get("target_class") or result.get("target_class"),
