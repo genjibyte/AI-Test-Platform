@@ -8,12 +8,12 @@
 
 ## 0. Project audit (2026-06-13; re-verified 2026-06-14) — evidence-based, all PASS
 
-- **State:** branch `main` @ `595ce20` (the WORK_LOG commit), **synced with `origin/main`**,
-  0 unpushed, working tree clean, only `main` exists (all feature branches merged + deleted).
-  Repo healthy. (Original audit was taken at `c800a08`, the commit before this log.)
-- **Tests:** full suite **265 passed / 4 skipped** (269 `<testcase>` nodes, 0 fail / 0 error;
-  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (The 2026-06-13 log said
-  266 — a one-count miscount; HEAD is unchanged since, so it was never a regression.)
+- **State:** branch `main` @ `8168263`, **2 commits ahead of `origin/main`** (unpushed:
+  `8168263` mutation mvn-fix, `de3f5bc` count-fix; push is human-only), working tree clean,
+  only `main` exists. Repo healthy. (Audit re-verified 2026-06-14.)
+- **Tests:** full suite **267 passed / 4 skipped** (271 `<testcase>` nodes, 0 fail / 0 error;
+  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (Was 265 on 2026-06-14;
+  +2 are the mvn-resolution regression tests added with `8168263`.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -61,7 +61,7 @@ merges (newest first): `c800a08` run_pit sidecar → `e299553` JUnit5-aware buil
 
 Use the venv python — bare `python` is the Windows Store stub (exit 49, no output):
 `& "E:\AI-Test-Platform\.venv\Scripts\python.exe" …`
-- `… -m pytest -p no:warnings -q` → **265 passed, 4 skipped** (269 `<testcase>`, EXIT=0).
+- `… -m pytest -p no:warnings -q` → **267 passed, 4 skipped** (271 `<testcase>`, EXIT=0).
 - `… scripts/audit_bench.py` → reproduces `docs/42` §A (historical heuristic: real n=67,
   compile 61% / pass 25% / green-FAIL 0/17; 0 authoritative run_kind).
 - Toolchain present: Maven **3.9.9**, JDK **17**, mvn.cmd at
@@ -69,14 +69,17 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
 
 ## 4. Next steps (all need explicit approval / manual trigger)
 
-- **Real gated mutation benchmark run:** `TESTAGENT_MUTATION_ENABLED=1` + a manual
-  benchmark on a real repo (Maven fetches PIT; slow; now JUnit5-capable). Mutation evidence
-  is advisory; never auto-accepts.
+- **DONE 2026-06-14 — gated mutation run through the merged path** (`8168263`, docs/46 §15):
+  real PIT run on throwaway `samples/calc` copies via merged `run_pit`/sidecar →
+  real test **0.8** (verified line-by-line vs PIT raw xml; survivor = `max` `>`→`>=`),
+  **negative control** green-but-empty zero-assertion test → **0.0** (5/5 SURVIVED) =
+  the fake-pass guard proven. Found+fixed a Windows defect (`run_pit` couldn't launch bare
+  `mvn`=`mvn.cmd` → resolved via `shutil.which`). `samples/calc` & live benchmark untouched;
+  `mutation_enabled` back to `False`.
+- **Optional follow-ups:** a gated run on a *larger, real* repo (not the toy `samples/calc`);
+  surface `mutation_score` in report/group-by (bucketed). Both advisory; never auto-accept.
 - **Deferred — do NOT start without explicit approval:** P3 / `submit_candidate`, Defects4J,
   multi-model experiments.
-- **Optional:** surface `mutation_score` in report/group-by (bucketed); delete the
-  gitignored `var/pit_run/` leftover (the Remove-Item guard blocks deleting paths under the
-  project root, so it persists harmlessly).
 
 ## 5. Forbidden / red-lines (unchanged)
 
