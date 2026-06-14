@@ -29,6 +29,9 @@ transitions, boundaries, exception paths, side-effects — not just call signatu
 - **Boundary:** declared-intent stays untrusted; *verifying* an invariant is judge-side and on-
   thesis; *feeding* it to a generator is producer-side. Never let a declared invariant become a
   pass.
+- **Design drafted (2026-06-14, not approved for code):** `docs/50_benchmark/48` — verify the
+  *test pins the declared invariant* (coverage + assertion + line-scoped mutation), advisory;
+  model-declared invariants never self-certify.
 
 ### 2. Context retrieval
 *Goal:* find the most relevant code, DTO, Enum, existing tests, mock examples, config — don't
