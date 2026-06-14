@@ -8,12 +8,12 @@
 
 ## 0. Project audit (2026-06-13; re-verified 2026-06-14) — evidence-based, all PASS
 
-- **State:** branch `main` @ `8168263`, **2 commits ahead of `origin/main`** (unpushed:
-  `8168263` mutation mvn-fix, `de3f5bc` count-fix; push is human-only), working tree clean,
-  only `main` exists. Repo healthy. (Audit re-verified 2026-06-14.)
-- **Tests:** full suite **267 passed / 4 skipped** (271 `<testcase>` nodes, 0 fail / 0 error;
-  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (Was 265 on 2026-06-14;
-  +2 are the mvn-resolution regression tests added with `8168263`.)
+- **State:** branch `main` @ `6f69a3f`, **7 commits ahead of `origin/main`** (push is
+  human-only), working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14:
+  audit + real-repo mutation run + invariant-descriptor S1.)
+- **Tests:** full suite **279 passed / 4 skipped** (283 `<testcase>` nodes, 0 fail / 0 error;
+  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (265 → 267 mvn-fix tests
+  `8168263` → 279 invariant-descriptor S1 `6f69a3f`.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -83,12 +83,17 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
   just counting**.
 - **Optional follow-ups:** classify/explain survived mutants in the report; surface
   `mutation_score` (bucketed) in report/group-by. Both advisory; never auto-accept.
-- **Roadmap (owner, 2026-06-14) — six AI problems to solve later, NOT started:** see
-  `docs/00_foundation/47_SIX_AI_PROBLEMS_ROADMAP.md`. Each needs explicit approval + a design
-  pass first; several already have foundations (assertion-quality ↔ oracle/mutation;
-  badcase-memory ↔ ledger; business-contract ↔ business-invariant tags).
-- **Deferred — do NOT start without explicit approval:** P3 / `submit_candidate`, Defects4J,
-  multi-model experiments.
+- **Roadmap (owner, 2026-06-14) — six AI problems:** see
+  `docs/00_foundation/47_SIX_AI_PROBLEMS_ROADMAP.md` (judge-side #1/#3/#6 on-thesis;
+  producer-side #2/#4/#5 secondary). Each remaining item needs explicit approval + a design pass.
+- **DONE 2026-06-14 — #1 design + S1** (`6f69a3f`, design `docs/48`): "invariant verification"
+  reframed as *does the candidate TEST pin the DECLARED invariant?* (coverage + assertion +
+  line-scoped mutation), never "is the code correct". **S1 landed**: `InvariantDescriptor` +
+  carry through case→result→ledger + advisory `review_summary["invariant_review"]`
+  (`verified=None`); anti-self-certification enforced (model-declared = non-anchoring).
+  **S2 (structural verify) / S3 (gated semantic) are design-only — need approval.**
+- **Deferred — do NOT start without explicit approval:** #1 S2/S3, other roadmap items
+  (#2–#6), P3 / `submit_candidate`, Defects4J, multi-model experiments.
 
 ## 5. Forbidden / red-lines (unchanged)
 
