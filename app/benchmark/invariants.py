@@ -21,6 +21,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from app.benchmark.business_tags import normalize_tag
+from app.mutation.pit import parse_line_spec, scoped_mutation_score
 
 # docs/48 §1 -- the invariant kinds we target (extensible; "other"/"unknown" always allowed).
 INVARIANT_KINDS = (
@@ -114,16 +115,17 @@ def _derive_asserted(
 
 def _inv_result(
     level: str, *, asserted: Optional[bool], addressed: Optional[bool],
-    anchoring: bool, reasons: List[str],
+    anchoring: bool, reasons: List[str], scoped_mutation_score: Optional[float] = None,
 ) -> dict:
     return {
         "invariant_strength": level,
         "asserted": asserted,
         "addressed": addressed,
+        "scoped_mutation_score": scoped_mutation_score,   # docs/48 S3 (None unless gated PIT)
         "anchoring": anchoring,
         "reasons": reasons,
         "advisory": True,
-        "note": "structural (S2); semantic 'pinned' needs mutation (S3, docs/48)",
+        "note": "structural (S2) + optional line-scoped mutation (S3); advisory (docs/48)",
     }
 
 
@@ -133,12 +135,15 @@ def estimate_invariant_strength(
     addressed: Optional[bool] = None,
     oracle_strength: Optional[str] = None,
     assertion_names: Optional[List[str]] = None,
+    scoped_mutation_score: Optional[float] = None,
 ) -> dict:
-    """docs/48 S2: advisory STRUCTURAL roll-up of whether the candidate TEST pins a declared
-    invariant -- ``addressed`` (coverage reachability) + ``asserted`` (right-shape assertion).
-    Pure; never raises; changes no verdict. Reaches at most ``asserted_unpinned`` -- ``pinned``
-    requires line-scoped mutation (S3). A non-anchoring (model-declared) invariant is never
-    structurally blessed (anti-self-certification, §2) -> ``unknown``."""
+    """docs/48 S2+S3: advisory roll-up of whether the candidate TEST pins a declared invariant --
+    ``addressed`` (coverage reachability) + ``asserted`` (right-shape assertion) + optional
+    ``scoped_mutation_score`` (S3, line-scoped mutation; gated). Pure; never raises; changes no
+    verdict. ``pinned`` is reached ONLY with real mutation evidence (all invariant-scoped mutants
+    killed); a surviving scoped mutant keeps it ``asserted_unpinned`` (could be a gap OR an
+    equivalent mutant -- needs explanation, roadmap #3). A non-anchoring (model-declared)
+    invariant is never blessed (anti-self-certification, §2) -> ``unknown``."""
     if not is_anchoring(descriptor):
         return _inv_result("unknown", asserted=None, addressed=None,
                            anchoring=False, reasons=["non_anchoring_model_declared"])
@@ -149,8 +154,14 @@ def estimate_invariant_strength(
     elif addressed is True and asserted is False:
         level = "addressed_unasserted"
     elif addressed is True and asserted is True:
-        level = "asserted_unpinned"              # S2 ceiling; killing mutants is S3
-        reasons.append("pinned_needs_mutation")
+        if scoped_mutation_score is None:
+            level = "asserted_unpinned"          # no mutation evidence (gated off / unavailable)
+            reasons.append("pinned_needs_mutation")
+        elif scoped_mutation_score >= 1.0:
+            level = "pinned"                      # all invariant-scoped mutants killed (S3)
+        else:
+            level = "asserted_unpinned"          # some scoped mutants survive ...
+            reasons.append("scoped_mutants_survive")  # ... gap OR equivalent (explain, #3)
     else:
         # cannot confirm reachability (coverage often skipped) and/or assertion strength
         level = "unknown"
@@ -159,7 +170,8 @@ def estimate_invariant_strength(
         if asserted is None:
             reasons.append("assertion_strength_unknown")
     return _inv_result(level, asserted=asserted, addressed=addressed,
-                       anchoring=True, reasons=reasons)
+                       anchoring=True, reasons=reasons,
+                       scoped_mutation_score=scoped_mutation_score)
 
 
 def invariant_review_view(
@@ -169,21 +181,30 @@ def invariant_review_view(
     oracle_strength: Optional[str] = None,
     addressed: Optional[bool] = None,
     assertion_names: Optional[List[str]] = None,
+    mutations: Optional[list] = None,
 ) -> dict:
-    """ADVISORY surface of the declared invariants for human review (docs/48 S1 + S2).
+    """ADVISORY surface of the declared invariants for human review (docs/48 S1 + S2 + S3).
 
     ``verify=False`` (S1): ``verified`` stays ``None`` -- declarations are only carried. With
     ``verify=True`` (S2): each ANCHORING invariant gets a structural ``estimate_invariant_strength``
-    in ``verified`` (non-anchoring ones still surface ``unknown`` -- they never self-certify).
-    Never a verdict: ``auto_accept_blocked`` stays True; it changes no recommendation/conclusion.
+    in ``verified``. When ``mutations`` (per-mutation PIT rows, gated) are supplied (S3), each
+    invariant additionally gets a line-scoped mutation score, enabling ``pinned``. Non-anchoring
+    invariants still surface ``unknown`` (never self-certify). Never a verdict:
+    ``auto_accept_blocked`` stays True; it changes no recommendation/conclusion.
     """
     items = []
     for d in invariants:
         verified = None
         if verify:
+            scoped = None
+            if mutations:
+                # docs/48 S3: restrict the mutation score to this invariant's lines/method.
+                scoped = scoped_mutation_score(
+                    mutations, lines=parse_line_spec(d.target_lines), method=d.target_method,
+                )
             verified = estimate_invariant_strength(
                 d, addressed=addressed, oracle_strength=oracle_strength,
-                assertion_names=assertion_names,
+                assertion_names=assertion_names, scoped_mutation_score=scoped,
             )
         items.append({
             "id": d.id,

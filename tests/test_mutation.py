@@ -9,8 +9,10 @@ from app.mutation import (
     build_pit_command,
     build_pit_pom,
     is_junit5_pom,
+    parse_line_spec,
     parse_pit_report,
     run_pit,
+    scoped_mutation_score,
 )
 
 _REPORT = """<?xml version="1.0" encoding="UTF-8"?>
@@ -231,4 +233,68 @@ def test_build_pit_pom_synthesizes_build_when_absent_and_autodetects_junit5():
     out = build_pit_pom(pom, target_classes="com.x.C", target_tests="com.x.CT")  # autodetect
     assert "<build>" in out and "<plugins>" in out
     assert "pitest-maven" in out and "pitest-junit5-plugin" in out  # autodetected JUnit5
+
+
+# --- docs/48 S3: per-mutation rows + line-scoped score ---------------------------
+
+_REPORT_FULL = """<?xml version="1.0" encoding="UTF-8"?>
+<mutations>
+  <mutation detected='true' status='KILLED'><mutatedClass>com.x.Calc</mutatedClass><mutatedMethod>add</mutatedMethod><lineNumber>4</lineNumber><mutator>org.pitest.mutationtest.engine.gregor.mutators.MathMutator</mutator></mutation>
+  <mutation detected='false' status='SURVIVED'><mutatedClass>com.x.Calc</mutatedClass><mutatedMethod>max</mutatedMethod><lineNumber>5</lineNumber><mutator>org.pitest.mutationtest.engine.gregor.mutators.ConditionalsBoundaryMutator</mutator></mutation>
+</mutations>
+"""
+
+
+def test_parse_pit_report_include_mutations_rows():
+    r = parse_pit_report(_REPORT_FULL, include_mutations=True)
+    assert len(r.mutations) == 2 and r.total == 2
+    row = r.mutations[0]
+    assert row["line"] == 4 and row["method"] == "add" and row["status"] == "KILLED"
+    assert row["mutator"] == "MathMutator" and row["detected"] is True   # short mutator name
+
+
+def test_parse_pit_report_default_omits_mutations_backcompat():
+    r = parse_pit_report(_REPORT_FULL)                  # default: no per-mutation rows
+    assert r.mutations == [] and r.total == 2 and r.mutation_score == 0.5
+
+
+def test_parse_line_spec_forms():
+    assert parse_line_spec("125") == {125}
+    assert parse_line_spec("130-132") == {130, 131, 132}
+    assert parse_line_spec("120,125,130-131") == {120, 125, 130, 131}
+    assert parse_line_spec(None) == set() and parse_line_spec("junk") == set()
+
+
+def test_scoped_mutation_score_by_line_and_method():
+    rows = parse_pit_report(_REPORT_FULL, include_mutations=True).mutations
+    assert scoped_mutation_score(rows, lines={4}) == 1.0        # add KILLED
+    assert scoped_mutation_score(rows, lines={5}) == 0.0        # max SURVIVED
+    assert scoped_mutation_score(rows, method="max") == 0.0
+    assert scoped_mutation_score(rows, lines={4, 5}) == 0.5     # 1 of 2 killed
+    assert scoped_mutation_score(rows) is None                  # no scope -> cannot score
+    assert scoped_mutation_score(rows, lines={999}) is None     # no match
+    assert scoped_mutation_score([], lines={4}) is None         # no mutations
+
+
+def test_run_pit_include_mutations_threads_rows(tmp_path):
+    (tmp_path / "pom.xml").write_text(
+        "<project><build><plugins></plugins></build></project>", encoding="utf-8")
+
+    def fake_runner(cmd, **kw):
+        rpt = tmp_path / "target" / "pit-reports"
+        rpt.mkdir(parents=True, exist_ok=True)
+        (rpt / "mutations.xml").write_text(_REPORT_FULL, encoding="utf-8")
+
+        class _P:
+            returncode = 0
+
+        return _P()
+
+    res = run_pit(tmp_path, "com.x.Calc", "com.x.CalcTest",
+                  runner=fake_runner, include_mutations=True)
+    assert res.available is True and len(res.mutations) == 2
+    assert res.mutations[0]["method"] == "add"
+    # default (no include_mutations) stays back-compat: rows omitted
+    res2 = run_pit(tmp_path, "com.x.Calc", "com.x.CalcTest", runner=fake_runner)
+    assert res2.available is True and res2.mutations == []
 

@@ -33,12 +33,14 @@ def run_pit(
     mvn: str = "mvn",
     timeout: int = 900,
     runner: Callable = subprocess.run,
+    include_mutations: bool = False,
 ) -> MutationResult:
     """Run PIT ``mutationCoverage`` in ``repo_dir`` and parse the report (docs/46 S3).
 
     Advisory only; never raises. ``runner`` defaults to ``subprocess.run`` but is injectable
     for offline tests (so PIT is never actually invoked under unit tests). Returns
-    ``available=False`` on timeout, launch error, or a missing report."""
+    ``available=False`` on timeout, launch error, or a missing report. ``include_mutations=True``
+    (docs/48 S3) also returns per-mutation rows for line-scoped invariant verification."""
     repo_dir = Path(repo_dir)
     # Windows: bare ``mvn`` is ``mvn.cmd``; subprocess (no shell) cannot launch it and raises
     # FileNotFoundError -> available=False, so the signal would never appear on Windows.
@@ -77,6 +79,9 @@ def run_pit(
     if not report.exists():
         return MutationResult(available=False)
     try:
-        return parse_pit_report(report.read_text(encoding="utf-8", errors="replace"))
+        return parse_pit_report(
+            report.read_text(encoding="utf-8", errors="replace"),
+            include_mutations=include_mutations,
+        )
     except OSError:
         return MutationResult(available=False)

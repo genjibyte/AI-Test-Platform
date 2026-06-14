@@ -13,7 +13,9 @@ from app.mutation.pit import (
     build_pit_command,
     build_pit_pom,
     is_junit5_pom,
+    parse_line_spec,
     parse_pit_report,
+    scoped_mutation_score,
 )
 from app.mutation.run import run_pit
 
@@ -24,6 +26,8 @@ __all__ = [
     "build_pit_command",
     "build_pit_pom",
     "is_junit5_pom",
+    "parse_line_spec",
     "parse_pit_report",
+    "scoped_mutation_score",
     "run_pit",
 ]

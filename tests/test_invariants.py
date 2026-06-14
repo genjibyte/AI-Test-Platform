@@ -226,3 +226,50 @@ def test_review_summary_s2_uses_oracle_strength():
     assert item["verified"]["asserted"] is True                         # reused oracle_strength
     # coverage off in the benchmark -> addressed unknown -> strength unknown, asserted still shown
     assert item["verified"]["invariant_strength"] == "unknown"
+
+
+# --- S3: line-scoped mutation -> pinned (gated semantic) -------------------------
+
+def test_strength_pinned_when_all_scoped_mutants_killed():
+    r = estimate_invariant_strength(_anchor(), addressed=True, oracle_strength="structural_ok",
+                                    scoped_mutation_score=1.0)
+    assert r["invariant_strength"] == "pinned" and r["scoped_mutation_score"] == 1.0
+
+
+def test_strength_survivor_stays_unpinned_not_condemned():
+    # a surviving scoped mutant could be a real gap OR an equivalent mutant (docs/46 §16):
+    # S3 keeps it asserted_unpinned and flags it for explanation -- it does NOT condemn the test.
+    r = estimate_invariant_strength(_anchor(), addressed=True, oracle_strength="structural_ok",
+                                    scoped_mutation_score=0.5)
+    assert r["invariant_strength"] == "asserted_unpinned"
+    assert "scoped_mutants_survive" in r["reasons"]
+
+
+def test_pinned_requires_addressed_and_asserted_not_just_mutation():
+    # mutation alone never pins without reachability + a real assertion
+    assert estimate_invariant_strength(_anchor(), addressed=False,
+                                       scoped_mutation_score=1.0)["invariant_strength"] == "unaddressed"
+    assert estimate_invariant_strength(_anchor(), addressed=True, oracle_strength="none",
+                                       scoped_mutation_score=1.0)["invariant_strength"] == "addressed_unasserted"
+
+
+def test_view_with_mutations_scopes_per_invariant_and_can_pin():
+    inv = InvariantDescriptor(statement="add is exact", kind="boundary", source="manifest",
+                              target_lines="4", target_method="add")
+    rows = [
+        {"line": 4, "method": "add", "status": "KILLED", "mutator": "MathMutator", "detected": True},
+        {"line": 5, "method": "max", "status": "SURVIVED", "mutator": "CB", "detected": False},
+    ]
+    v = invariant_review_view([inv], verify=True, oracle_strength="structural_ok",
+                              addressed=True, mutations=rows)["invariants"][0]["verified"]
+    assert v["scoped_mutation_score"] == 1.0 and v["invariant_strength"] == "pinned"
+
+
+def test_non_anchoring_never_pinned_even_with_perfect_mutation():
+    # anti-self-certification holds at the strongest signal: a model-declared invariant with all
+    # mutants killed is STILL unknown -- it never self-certifies (docs/48 §2).
+    inv = InvariantDescriptor(statement="x", source="model", target_lines="4")
+    rows = [{"line": 4, "method": "add", "status": "KILLED", "mutator": "M", "detected": True}]
+    v = invariant_review_view([inv], verify=True, oracle_strength="structural_ok",
+                              addressed=True, mutations=rows)["invariants"][0]["verified"]
+    assert v["invariant_strength"] == "unknown" and v["anchoring"] is False
