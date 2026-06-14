@@ -1,6 +1,6 @@
 # 50 — Badcase memory / retrieval (design, 2026-06-14)
 
-> **Status: S1 in progress.** Roadmap item **#6** of `docs/00_foundation/47`. Builds on the
+> **Status: S1+S2 implemented 2026-06-14.** Roadmap item **#6** of `docs/00_foundation/47`. Builds on the
 > precipitation ledger (`41`, `app/ledger/`). Every output is **advisory**: retrieval surfaces
 > real past records as priors for human review only — it never feeds `recommend_with_reasons` /
 > `conclusion`, never auto-accepts, and `conclusion` stays `NEED_HUMAN_REVIEW`.
@@ -64,8 +64,12 @@ store.all(), **query)`. Never raises; empty ledger -> `[]`.
 ## 4. Slices
 - **S1 — retrieval engine (offline):** `find_similar` + explainable scoring + store convenience.
   Pure, unit-tested. (This doc's focus.)
-- **S2 — richer precedent schema:** add structured root-cause / fix fields to `JudgedRecord` (why
-  it failed, how it was fixed) so a retrieved prior is *actionable*, not just a label.
+- **S2 — richer precedent schema — DONE 2026-06-14:** `JudgedRecord` gains DECLARED
+  `root_cause` + `fix_note` (advisory, human/external-author set, default None, never
+  platform-fabricated). `find_similar` results now carry the derived `signature`
+  (reusing `badcase_signature` = `failure_type@class#method`) plus the declared
+  `root_cause`/`fix_note`, so a retrieved prior is actionable (derived "why" + declared
+  "how"), not just a label. Read-only; advisory; verdict unchanged.
 - **S3 — (optional, gated) semantic retrieval:** embedding similarity with an explainable
   structural fallback; never replaces the auditable structural signals, never opaque-only.
 

@@ -88,3 +88,26 @@ def test_find_similar_in_store(tmp_path):
     store.append(_rec(target_class="com.y.Other", repo_url="other", rid="B"))
     out = find_similar_in_store(store, target_class="com.x.Calc", target_method="add")
     assert [o["record_id"] for o in out] == ["A"]            # only the relevant record
+
+
+# --- S2: actionable precedent (derived signature + declared root-cause/fix) ------
+
+def test_result_surfaces_signature_and_declared_root_cause():
+    rec = JudgedRecord(
+        record_id="R", repo_url="u", target_class="com.x.Calc", target_method="add",
+        provenance=_PROV, failure_type="COMPILE_FAILURE",
+        root_cause="missing import", fix_note="add import com.x.Helper",
+        conclusion="NEED_HUMAN_REVIEW",
+    )
+    out = find_similar([rec], target_class="com.x.Calc", target_method="add")[0]
+    assert out["signature"] == "COMPILE_FAILURE@com.x.Calc#add"   # derived "why"
+    assert out["root_cause"] == "missing import"                  # declared "how" (advisory)
+    assert out["fix_note"] == "add import com.x.Helper"
+
+
+def test_precedent_fields_default_none_and_signature_none_when_no_failure():
+    assert _rec().root_cause is None and _rec().fix_note is None
+    out = find_similar([_rec(target_class="com.x.Calc", target_method="add")],
+                       target_class="com.x.Calc", target_method="add")[0]
+    assert out["signature"] is None                               # no failure_type -> no signature
+    assert out["root_cause"] is None and out["fix_note"] is None

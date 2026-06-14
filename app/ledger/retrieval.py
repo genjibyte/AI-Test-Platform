@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
+from app.ledger.analytics import badcase_signature
 from app.ledger.models import JudgedRecord
 
 
@@ -85,6 +86,10 @@ def find_similar(
             "conclusion": rec.conclusion,
             "oracle_strength": rec.oracle_strength,
             "mutation_score": rec.mutation_score,
+            # docs/50 S2: actionable precedent -- derived signature + declared root-cause/fix.
+            "signature": badcase_signature(rec),
+            "root_cause": rec.root_cause,
+            "fix_note": rec.fix_note,
         }
         for s, rec, reasons in scored[:top_k]
     ]
