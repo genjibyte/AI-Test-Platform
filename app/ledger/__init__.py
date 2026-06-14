@@ -23,6 +23,7 @@ from app.ledger.analytics import (
     ledger_summary,
     oracle_strength_summary,
 )
+from app.ledger.retrieval import find_similar, find_similar_in_store
 
 __all__ = [
     "AUTHOR_TYPES",
@@ -41,4 +42,7 @@ __all__ = [
     "compare_authors_on_target",
     "ledger_summary",
     "oracle_strength_summary",
+    # retrieval (#6 S1, docs/50)
+    "find_similar",
+    "find_similar_in_store",
 ]
