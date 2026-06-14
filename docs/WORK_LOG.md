@@ -11,8 +11,8 @@
 - **State:** branch `main` @ HEAD, **2 commits ahead of `origin/main`** (push is human-only),
   working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit + real-repo
   mutation run + #1 invariant-verification + #3 survivor classify + #6 retrieval + #4 mock-smell S1.)
-- **Tests:** full suite **339 passed / 4 skipped** (343 `<testcase>` nodes, 0 fail / 0 error;
-  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 329 #6 S3 → 339 #4 mock-smell S1.)
+- **Tests:** full suite **348 passed / 4 skipped** (352 `<testcase>` nodes, 0 fail / 0 error;
+  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 339 #4 mock-smell S1 → 348 #5 review digest.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -51,10 +51,10 @@
 
 ## 2. Git state
 
-`main` @ `c800a08` == `origin/main` (0 unpushed), clean tree, only `main` branch. Recent
-merges (newest first): `c800a08` run_pit sidecar → `e299553` JUnit5-aware builder →
-`5c4365f` dormant mutation core → `ca2edf6` oracle S2 → `e3c597d` oracle S1 →
-`d72f271` business-tags S3 … (run_kind S2 + business-tags + oracle + mutation arc).
+`main` @ `1ad344b`, clean tree, only `main` branch. Recent merges (newest first):
+`1ad344b` review digest → `5c4d00e` docs tidy → `7cd2ff0` survivor classify S2 →
+`d361919` survivor classify S1 → invariant S3 → invariant S2 → invariant S1 →
+retrieval S1-S3 → mock-smell S1 → run_pit sidecar → (run_kind + oracle + mutation arc).
 
 ## 3. Verify commands (venv only)
 
@@ -125,6 +125,13 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
   `loose_matchers` / `real_dependency` (the gate already blocks sleep/random/time/IO). Surfaced as
   `review_summary["mock_smells"]` **after** the recommendation — advisory, **does NOT touch the
   quality gate**, changes no verdict. The generation-side **mock pattern library is deferred**.
+- **DONE 2026-06-14 — #5 review digest (consolidation capstone)** (design `docs/52`):
+  `app/review/review_digest.py` `build_review_digest` reads oracle-strength, mutation survivors,
+  invariant verification, mock smells, quality-gate blockers from `review_summary` → a severity-sorted
+  `{headline, flags:[{signal,severity,message}], flag_count}` checklist. Built twice: once in
+  `generation_report` (per-candidate signals) and again in `runner._attach_digest` (after benchmark-
+  layer signals). Computes nothing new; changes no recommendation/conclusion; `auto_accept_blocked`
+  stays True. 9 tests. **Completes the value-judgment signal layer.**
 - **Deferred — do NOT start without explicit approval:** #6 embedding retrieval (dep/API); #4 mock
   pattern library (producer-side); #2 context retrieval, #5 multi-round repair; P3 /
   `submit_candidate`, Defects4J, multi-model.

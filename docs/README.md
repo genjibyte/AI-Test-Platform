@@ -6,7 +6,8 @@
 > **Start here:** [`WORK_LOG.md`](/docs/WORK_LOG.md) — single context snapshot + latest audit
 > (read it + `CLAUDE.md` to resume). The **value-judgment signal layer** (advisory, never
 > auto-accepts) is docs **43** (run_kind), **45** (business-invariant tags), **46** (oracle-
-> strength + mutation), **48** (invariant verification), **49** (survived-mutant classification);
+> strength + mutation), **48** (invariant verification), **49** (survived-mutant classification),
+> **50** (badcase retrieval), **51** (mock smells), **52** (review digest capstone);
 > the forward roadmap is **47**.
 
 ## 00 Foundation
@@ -63,6 +64,7 @@
 - [49 Survived-Mutant Classification Design](/docs/50_benchmark/49_SURVIVED_MUTANT_CLASSIFICATION_DESIGN.md)
 - [50 Badcase Retrieval Design (#6)](/docs/50_benchmark/50_BADCASE_RETRIEVAL_DESIGN.md)
 - [51 Mock / External-Dependency Smell Design (#4 judge-side)](/docs/50_benchmark/51_MOCK_SMELL_DESIGN.md)
+- [52 Review Digest Design (#5 consolidation capstone)](/docs/50_benchmark/52_REVIEW_DIGEST_DESIGN.md)
 
 ## 60 Context V3
 
