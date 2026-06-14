@@ -1,6 +1,8 @@
 # 50 — Badcase memory / retrieval (design, 2026-06-14)
 
-> **Status: S1+S2 implemented 2026-06-14.** Roadmap item **#6** of `docs/00_foundation/47`. Builds on the
+> **Status: S1+S2+S3 implemented 2026-06-14** (S3 = the no-dependency lexical layer; true
+> embedding retrieval is deferred — it needs a new dependency or an embedding API and the owner's
+> explicit approval). Roadmap item **#6** of `docs/00_foundation/47`. Builds on the
 > precipitation ledger (`41`, `app/ledger/`). Every output is **advisory**: retrieval surfaces
 > real past records as priors for human review only — it never feeds `recommend_with_reasons` /
 > `conclusion`, never auto-accepts, and `conclusion` stays `NEED_HUMAN_REVIEW`.
@@ -70,8 +72,14 @@ store.all(), **query)`. Never raises; empty ledger -> `[]`.
   (reusing `badcase_signature` = `failure_type@class#method`) plus the declared
   `root_cause`/`fix_note`, so a retrieved prior is actionable (derived "why" + declared
   "how"), not just a label. Read-only; advisory; verdict unchanged.
-- **S3 — (optional, gated) semantic retrieval:** embedding similarity with an explainable
-  structural fallback; never replaces the auditable structural signals, never opaque-only.
+- **S3 — explainable lexical layer — DONE 2026-06-14:** `find_similar(..., query_text=)` adds a
+  no-dependency token-overlap (Jaccard, stdlib `re`) between the query text and each record's
+  declared free-text precedent (`root_cause` + `fix_note` + `expected_invariant` + invariant
+  statements), contributing `round(2*jaccard, 4)` with the reason `text_overlap`. Transparent
+  (shared tokens, not a black box); never replaces the structural signals; advisory; verdict
+  unchanged. **Embedding retrieval is DEFERRED** — it needs a new dependency (e.g. a local model)
+  or an embedding API (cost), so it requires the owner's explicit approval (red-line); the lexical
+  layer is the "explainable fallback" promised here, available now without any new dependency.
 
 ## 5. Scope guards — what this is NOT
 - Not a verdict: precedent never flips `conclusion`/`accept`; `auto_accept_blocked` stays True.
