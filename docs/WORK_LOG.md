@@ -8,12 +8,12 @@
 
 ## 0. Project audit (2026-06-13; re-verified 2026-06-14) — evidence-based, all PASS
 
-- **State:** branch `main` @ HEAD, **19 commits ahead of `origin/main`** (push is human-only),
-  working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit +
-  real-repo mutation run + invariant-verification #1 complete + survived-mutant classify #3 S1.)
-- **Tests:** full suite **312 passed / 4 skipped** (316 `<testcase>` nodes, 0 fail / 0 error;
+- **State:** branch `main` @ HEAD (push pending — owner authorized this push), working tree clean,
+  only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit + real-repo mutation run +
+  invariant-verification #1 complete + survived-mutant classify #3 S1+S2 + docs index tidy.)
+- **Tests:** full suite **315 passed / 4 skipped** (319 `<testcase>` nodes, 0 fail / 0 error;
   the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 304 #1 complete → 312
-  #3 survived-mutant classify S1.)
+  #3 S1 → 315 #3 S2.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -103,16 +103,17 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
     once, rows re-scope the invariant view so the LIVE benchmark reaches `pinned` automatically.
     Mutation evidence implies reachability, so `pinned` works even with coverage off. Unit-tested;
     a full end-to-end live run with *real generation* needs API/cost (not run). **#1 complete.**
-- **IN PROGRESS — #3 survived-mutant classification** (design `docs/49`): explain WHY a mutant
+- **DONE 2026-06-14 — #3 survived-mutant classification** (design `docs/49`): explain WHY a mutant
   survived (never assert equivalence — undecidable; never condemn a test).
-  - **S1 done** (`app/mutation/survivors.py` `classify_survivors`): buckets non-killed mutants →
+  - **S1** (`app/mutation/survivors.py` `classify_survivors`): buckets non-killed mutants →
     `not_covered` / `survived_weak_oracle` / `survived_maybe_equivalent` / `survived_unclassified`
-    + mutator explanation + `equivalence_likelihood`; matches the §16 `validate()` finding. Advisory.
-  - **S2 (pending, needs approval):** surface classified survivors in the invariant view
-    (`scoped_mutants_survive`) + a "Survived mutants" section in `report_md.py`.
-- **Deferred — do NOT start without explicit approval:** #3 S2; other roadmap items (#2 context
-  retrieval, #4 mock library, #5 multi-round repair, #6 ledger RAG), P3 / `submit_candidate`,
-  Defects4J, multi-model experiments.
+    + mutator explanation + `equivalence_likelihood`; matches the §16 `validate()` finding.
+  - **S2**: invariant view attaches scoped classified survivors (`verified["survivors"]`);
+    `run_case` puts whole-run survivors on `review_summary["mutation_survivors"]` (gated);
+    `report_md` renders an advisory "Survived mutants" section. All advisory; verdict unchanged.
+- **Deferred — do NOT start without explicit approval:** other roadmap items (#2 context retrieval,
+  #4 mock library, #5 multi-round repair, #6 ledger RAG), P3 / `submit_candidate`, Defects4J,
+  multi-model experiments.
 
 ## 5. Forbidden / red-lines (unchanged)
 

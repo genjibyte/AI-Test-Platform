@@ -2,6 +2,12 @@
 
 > Layered archive for project documents. File names keep their original numeric
 > order; folders provide the working layer.
+>
+> **Start here:** [`WORK_LOG.md`](/docs/WORK_LOG.md) — single context snapshot + latest audit
+> (read it + `CLAUDE.md` to resume). The **value-judgment signal layer** (advisory, never
+> auto-accepts) is docs **43** (run_kind), **45** (business-invariant tags), **46** (oracle-
+> strength + mutation), **48** (invariant verification), **49** (survived-mutant classification);
+> the forward roadmap is **47**.
 
 ## 00 Foundation
 
@@ -13,6 +19,8 @@
 - [24 Phase Next Design](/docs/00_foundation/24_PHASE_NEXT_DESIGN.md)
 - [40 Core Thesis Repositioning](/docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md)
 - [42 AI Test Failure Empirical Audit](/docs/00_foundation/42_AI_TEST_FAILURE_EMPIRICAL_AUDIT.md)
+- [44 Decisions And Failures](/docs/00_foundation/44_DECISIONS_AND_FAILURES.md)
+- [47 Six AI Problems Roadmap](/docs/00_foundation/47_SIX_AI_PROBLEMS_ROADMAP.md)
 
 ## 10 Phase 1
 
@@ -48,7 +56,11 @@
 
 - [23 Benchmark Manifest](/docs/50_benchmark/23_BENCHMARK_MANIFEST.md)
 - [41 Precipitation Layer Design](/docs/50_benchmark/41_PRECIPITATION_LAYER_DESIGN.md)
-- [43 run_kind Design (P1-T3, design-only)](/docs/50_benchmark/43_RUN_KIND_DESIGN.md)
+- [43 run_kind Design](/docs/50_benchmark/43_RUN_KIND_DESIGN.md)
+- [45 Business-Invariant Tagging Design](/docs/50_benchmark/45_BUSINESS_INVARIANT_TAGGING_DESIGN.md)
+- [46 Oracle-Strength + Mutation Signal Design](/docs/50_benchmark/46_ORACLE_STRENGTH_SIGNAL_DESIGN.md)
+- [48 Business-Invariant Verification Design](/docs/50_benchmark/48_BUSINESS_INVARIANT_VERIFICATION_DESIGN.md)
+- [49 Survived-Mutant Classification Design](/docs/50_benchmark/49_SURVIVED_MUTANT_CLASSIFICATION_DESIGN.md)
 
 ## 60 Context V3
 
@@ -66,6 +78,7 @@
 
 - [32 Generated Test Preflight Gate](/docs/70_preflight/32_GENERATED_TEST_PREFLIGHT_GATE.md)
 - [33 Preflight Offline Replay Audit](/docs/70_preflight/33_PREFLIGHT_OFFLINE_REPLAY_AUDIT.md)
+- [34 BooleanUtils Preflight Live Review](/docs/70_preflight/34_BOOLEANUTILS_PREFLIGHT_LIVE_REVIEW.md)
 - [36 Preflight Overload Ambiguity Design](/docs/70_preflight/36_PREFLIGHT_OVERLOAD_AMBIGUITY_DESIGN.md)
 
 ## Knowledge (agent memory)
