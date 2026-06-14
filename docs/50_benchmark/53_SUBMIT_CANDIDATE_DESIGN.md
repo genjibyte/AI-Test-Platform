@@ -1,7 +1,7 @@
 # 53 — submit_candidate: judge any producer (design, 2026-06-14)
 
-> **Status: design, NOT approved for implementation.** Closes the *"judge candidates from
-> ANY producer"* gap implied by the charter (`docs/00_foundation/00_PROJECT_CHARTER.md`)
+> **Status: S1 + S2 implemented (2026-06-15); S3 designed, not started.** Closes the
+> *"judge candidates from ANY producer"* gap implied by the charter (`docs/00_foundation/00_PROJECT_CHARTER.md`)
 > and the thesis repositioning (`docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md`).
 > Every signal already on the platform is reused verbatim; no new judging logic, no new
 > recommendation logic. Verdict invariants are HARD-CODED at the entry point: `trusted=False`,
@@ -222,7 +222,7 @@ its current types and transitions.
 
 ## 9. S-slices (each independently approvable)
 
-### S1 — endpoint + pipeline + bundle (smallest landable)
+### S1 — endpoint + pipeline + bundle (smallest landable) — **DONE 2026-06-15**
 - `JobStatus.SUBMIT_EXECUTE / SUBMIT_DONE / SUBMIT_FAILED` + transitions
 - `run_external_candidate(...)` reusing target / context / preflight / writer / executor /
   compare. **No LLM call**, no repair (default off).
@@ -240,17 +240,24 @@ its current types and transitions.
   - existing generated path **unchanged** (regression: `/generate` still works; aggregates
     still treat `external` as non-real).
 
-### S2 — analytics / digest integration
-- `aggregate()` recognizes `external` as a peer of `real/fake/dryrun/smoke` (already
-  excluded from the headline by the docs/43 §12 default — verified-by-test).
-- Optional `aggregate(..., kind="external")` view for per-producer comparison.
-- Report MD adds the one producer line (§7).
-- Unit tests:
-  - aggregates: a mixed batch of real+external rows yields the same headline as real-only;
-    external query returns external-only.
-  - digest: an external candidate with `mock_of_target` lights a high flag exactly as a
-    generated one would.
-  - non-regression: every test of `docs/43`/`docs/52` still passes.
+### S2 — provenance first-class + charter invariant proven — **DONE 2026-06-15**
+**Audit finding (2026-06-15):** the analytics layer needed **no new code** — `aggregate()`
+(`benchmark/models.py`) and `_filter_kind()` (`ledger/analytics.py`) are generic
+`run_kind == <kind>` filters, so `external` is *already* a peer of `real/fake/dryrun/smoke`:
+`run_kind="real"` excludes it from the headline; `run_kind="external"` gives the per-producer
+view. S2 therefore reduced to **(a)** making provenance first-class and **(b)** proving the
+charter invariant by test.
+- `assemble_generation_report` now surfaces `producer_id` (from `result`, falling back to the
+  bundle) and `run_kind` as top-level provenance — advisory, never a warrant (`trusted` stays
+  `False`). On a generator run `producer_id` is `None` and `run_kind` is `real/...`.
+- API cleanup: whitespace-only `target_method` normalizes to `None`.
+- Unit tests (`tests/test_submit_candidate_s2.py`, 8): external excluded from the real
+  headline (`aggregate` + `aggregate_badcases`); external-only view; all-kinds view; "external
+  cannot masquerade as real" (the parallel to "fake can never be real"); report surfaces
+  producer/run_kind; generator-path back-compat; bundle-fallback for producer_id.
+- **Deferred:** the benchmark **report_md** per-case producer line is moot until external
+  candidates flow through the *benchmark* runner (they don't yet — submit is per-job via the
+  API). Re-open if/when a benchmark ingests external candidates.
 
 ### S3 — invariants + gated mutation
 - `submit_candidate` accepts `invariants` (docs/48 InvariantDescriptor) → flows into bundle
