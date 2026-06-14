@@ -8,12 +8,12 @@
 
 ## 0. Project audit (2026-06-13; re-verified 2026-06-14) — evidence-based, all PASS
 
-- **State:** branch `main` @ `6f69a3f`, **7 commits ahead of `origin/main`** (push is
+- **State:** branch `main` @ `3ce3eb0`, **10 commits ahead of `origin/main`** (push is
   human-only), working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14:
-  audit + real-repo mutation run + invariant-descriptor S1.)
-- **Tests:** full suite **279 passed / 4 skipped** (283 `<testcase>` nodes, 0 fail / 0 error;
-  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (265 → 267 mvn-fix tests
-  `8168263` → 279 invariant-descriptor S1 `6f69a3f`.)
+  audit + real-repo mutation run + invariant-verification S1+S2.)
+- **Tests:** full suite **290 passed / 4 skipped** (294 `<testcase>` nodes, 0 fail / 0 error;
+  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (265 → 267 mvn-fix → 279
+  invariant S1 → 290 invariant S2 `3ce3eb0`.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -86,13 +86,18 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
 - **Roadmap (owner, 2026-06-14) — six AI problems:** see
   `docs/00_foundation/47_SIX_AI_PROBLEMS_ROADMAP.md` (judge-side #1/#3/#6 on-thesis;
   producer-side #2/#4/#5 secondary). Each remaining item needs explicit approval + a design pass.
-- **DONE 2026-06-14 — #1 design + S1** (`6f69a3f`, design `docs/48`): "invariant verification"
+- **DONE 2026-06-14 — #1 design + S1 + S2** (design `docs/48`): "invariant verification"
   reframed as *does the candidate TEST pin the DECLARED invariant?* (coverage + assertion +
-  line-scoped mutation), never "is the code correct". **S1 landed**: `InvariantDescriptor` +
-  carry through case→result→ledger + advisory `review_summary["invariant_review"]`
-  (`verified=None`); anti-self-certification enforced (model-declared = non-anchoring).
-  **S2 (structural verify) / S3 (gated semantic) are design-only — need approval.**
-- **Deferred — do NOT start without explicit approval:** #1 S2/S3, other roadmap items
+  line-scoped mutation), never "is the code correct".
+  - **S1** (`6f69a3f`): `InvariantDescriptor` + carry case→result→ledger + advisory
+    `review_summary["invariant_review"]`; anti-self-certification (model-declared = non-anchoring).
+  - **S2** (`3ce3eb0`): `estimate_invariant_strength` → `invariant_strength`
+    {unaddressed/addressed_unasserted/asserted_unpinned/pinned/unknown}; `asserted` reuses
+    `oracle_strength`; ceiling `asserted_unpinned` (pinned is S3); honest "unknown" when
+    coverage off. All advisory; verdict never changes.
+  - **S3 (gated semantic / line-scoped mutation) is design-only — needs approval** (also needs a
+    back-compat `parse_pit_report` per-mutation extension).
+- **Deferred — do NOT start without explicit approval:** #1 S3, other roadmap items
   (#2–#6), P3 / `submit_candidate`, Defects4J, multi-model experiments.
 
 ## 5. Forbidden / red-lines (unchanged)
