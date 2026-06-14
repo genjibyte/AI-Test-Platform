@@ -1,7 +1,8 @@
 # 48 — Business-invariant *verification* (design, 2026-06-14)
 
-> **Status: S1 implemented 2026-06-14 (descriptor + carry, no verification); S2/S3 DESIGN ONLY,
-> not approved for code.** Sequel to `45` (invariant *tagging* —
+> **Status: S1+S2 implemented 2026-06-14 (descriptor + carry + structural verification); S3
+> (gated semantic / line-scoped mutation) DESIGN ONLY, not approved for code.** Sequel to `45`
+> (invariant *tagging* —
 > declared intent) and `46` (oracle-strength / mutation). Roadmap item **#1** of `docs/00_foundation/47`.
 > Every signal here is **advisory**: it feeds `review_summary` only, never
 > `recommend_with_reasons` / `conclusion`; `auto_accept` stays blocked; `conclusion` stays
@@ -107,8 +108,15 @@ decides whether the declared invariant was the *right* property.
   `review_summary["invariant_review"]` (`verified=None`, `auto_accept_blocked=True`). The
   anti-self-certification rule (§2) is enforced: model-declared invariants are non-anchoring.
   No verification computed. (`tests/test_invariants.py`.)
-- **S2 — structural verification (deterministic):** compute `addressed` (coverage) + `asserted`
-  (quality gate) → `invariant_strength` without mutation. Offline-testable with fixtures.
+- **S2 — structural verification (deterministic) — DONE 2026-06-14:**
+  `estimate_invariant_strength(descriptor, *, addressed, oracle_strength, assertion_names)` in
+  `app/benchmark/invariants.py` rolls `addressed` (coverage reachability) + `asserted` (reuses the
+  already-computed `oracle_strength`; kind-aware `assertThrows` for `exception` when names are
+  available) → `invariant_strength` (ceiling `asserted_unpinned`; **never `pinned`** — that needs
+  S3 mutation). Wired into `invariant_review_view(..., verify=True, oracle_strength=...)` from
+  `runner._review_summary_with_rubric`. Honest under coverage-off: `addressed=None` → `unknown`
+  with the `asserted` fact still surfaced. Non-anchoring (model-declared) invariants are never
+  structurally blessed (§2). Advisory; no verdict change. (`tests/test_invariants.py`, +11.)
 - **S3 — semantic verification (gated):** line-scoped mutation (`pinned`), behind
   `mutation_enabled` (so it inherits `46`'s gating); requires the §5 parser extension + a
   survivor *explanation* hook (real-gap vs equivalent vs trivial).
