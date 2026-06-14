@@ -18,6 +18,7 @@ from app.mutation.pit import (
     scoped_mutation_score,
 )
 from app.mutation.run import run_pit
+from app.mutation.survivors import classify_survivors
 
 __all__ = [
     "JUNIT5_PLUGIN_VERSION",
@@ -25,6 +26,7 @@ __all__ = [
     "MutationResult",
     "build_pit_command",
     "build_pit_pom",
+    "classify_survivors",
     "is_junit5_pom",
     "parse_line_spec",
     "parse_pit_report",
