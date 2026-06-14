@@ -11,8 +11,8 @@
 - **State:** branch `main` @ HEAD, **2 commits ahead of `origin/main`** (push is human-only),
   working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit + real-repo
   mutation run + #1 invariant-verification + #3 survivor classify + #6 retrieval + #4 mock-smell S1.)
-- **Tests:** full suite **381 passed / 4 skipped** (385 `<testcase>` nodes, 0 fail / 0 error;
-  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 348 #5 review digest → 381 docs/53 S1 submit_candidate.)
+- **Tests:** full suite **389 passed / 4 skipped** (393 `<testcase>` nodes, 0 fail / 0 error;
+  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 381 docs/53 S1 submit_candidate → 389 docs/53 S2 provenance.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -144,6 +144,15 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
   `SUBMIT_EXECUTE/SUBMIT_DONE/SUBMIT_FAILED`; on-disk file name `CalcSubmittedTest.java` distinct
   from the generator's `CalcAiGeneratedTest.java` so the two producer paths never collide. 33
   new tests; generator path unaffected.
+- **DONE 2026-06-15 — submit_candidate S2 (provenance + charter invariant)** (design `docs/53` §9):
+  audit found the analytics layer already supports `external` generically (`aggregate` /
+  `_filter_kind` are `run_kind==<kind>` filters), so S2 = (a) `assemble_generation_report` surfaces
+  `producer_id` + `run_kind` as top-level provenance (advisory; `trusted` stays `False`); (b) API
+  whitespace-only `target_method`→`None` cleanup; (c) 8 tests proving "**external never enters the
+  real headline**" (the parallel to "fake can never be real") on `aggregate()` + `aggregate_badcases()`
+  + external-only view + report provenance. Benchmark `report_md` producer line deferred (external
+  candidates don't flow through the benchmark runner yet). **S3 (manifest invariants + gated mutation
+  on external candidates) designed, not started — needs approval.**
 - **Deferred — do NOT start without explicit approval:** #6 embedding retrieval (dep/API); #4 mock
   pattern library (producer-side); #2 context retrieval, #5 multi-round repair; P3 /
   `submit_candidate`, Defects4J, multi-model.
