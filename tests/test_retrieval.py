@@ -111,3 +111,45 @@ def test_precedent_fields_default_none_and_signature_none_when_no_failure():
                        target_class="com.x.Calc", target_method="add")[0]
     assert out["signature"] is None                               # no failure_type -> no signature
     assert out["root_cause"] is None and out["fix_note"] is None
+
+
+# --- S3: no-dependency explainable lexical overlap -------------------------------
+
+def _rec_text(root_cause, rid="R", target_class="com.z.Unrelated", repo_url="other"):
+    return JudgedRecord(record_id=rid, repo_url=repo_url, target_class=target_class,
+                        provenance=_PROV, root_cause=root_cause, conclusion="NEED_HUMAN_REVIEW")
+
+
+def test_query_text_adds_explainable_lexical_overlap():
+    rec = JudgedRecord(record_id="R", repo_url="u", target_class="com.x.Calc",
+                       target_method="add", provenance=_PROV,
+                       root_cause="null pointer when option name is empty",
+                       conclusion="NEED_HUMAN_REVIEW")
+    out = find_similar([rec], target_class="com.x.Calc", target_method="add",
+                       query_text="empty option name handling")[0]
+    assert "text_overlap" in out["reasons"]
+    assert out["score"] > 3                       # +3 structural + lexical bump
+
+
+def test_no_query_text_means_no_lexical_signal():
+    out = find_similar([_rec_text("empty option name", target_class="com.x.Calc")],
+                       target_class="com.x.Calc")  # simple-class match only
+    # without query_text there is no text_overlap; structural score stays an int
+    out2 = find_similar([JudgedRecord(record_id="R", repo_url="u", target_class="com.x.Calc",
+                                      target_method="add", provenance=_PROV,
+                                      root_cause="empty option name",
+                                      conclusion="NEED_HUMAN_REVIEW")],
+                        target_class="com.x.Calc", target_method="add")[0]
+    assert "text_overlap" not in out2["reasons"] and out2["score"] == 3
+
+
+def test_lexical_only_match_surfaces_unrelated_record():
+    rec = _rec_text("division by zero on empty input")     # no structural overlap with the query
+    out = find_similar([rec], target_class="com.x.Calc", query_text="division by zero guard")
+    assert out and out[0]["record_id"] == "R" and out[0]["reasons"] == ["text_overlap"]
+
+
+def test_no_token_overlap_no_signal():
+    rec = _rec_text("completely different words")
+    assert find_similar([rec], target_class="com.x.Calc",
+                        query_text="empty option name") == []
