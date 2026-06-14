@@ -31,6 +31,15 @@ INVARIANT_SOURCES = ("manifest", "human", "model", "unknown")
 # Only these may anchor a real verification target (everything else cannot self-certify).
 ANCHORING_SOURCES = ("manifest", "human")
 
+# docs/48 §4 -- advisory roll-up of how well the candidate TEST pins a declared invariant.
+# S2 reaches at most ``asserted_unpinned`` (structural); ``pinned`` needs mutation (S3).
+INVARIANT_STRENGTHS = (
+    "unaddressed", "addressed_unasserted", "asserted_unpinned", "pinned", "unknown",
+)
+# oracle_strength (docs/46) buckets -> whether a real (non-weak) assertion exists.
+_ASSERTED_TRUE = {"structural_ok", "mixed"}
+_ASSERTED_FALSE = {"none", "weak"}
+
 
 class InvariantDescriptor(BaseModel):
     """One declared business invariant (docs/48 S1). Pure data; carries no verdict."""
@@ -82,15 +91,100 @@ def parse_invariants(raw: object) -> List[InvariantDescriptor]:
     return out
 
 
-def invariant_review_view(invariants: List[InvariantDescriptor]) -> dict:
-    """docs/48 S1: an ADVISORY surface of the declared invariants for human review.
+def _derive_asserted(
+    descriptor: InvariantDescriptor,
+    oracle_strength: Optional[str],
+    assertion_names: Optional[List[str]],
+) -> Optional[bool]:
+    """Does the test carry a right-shape assertion for this invariant? (docs/48 §3, structural)
 
-    ``verified`` is always ``None`` -- S1 carries declarations, it does NOT verify them. A
-    non-anchoring (model-declared) invariant is flagged ``anchoring=False`` (cannot self-certify).
+    Kind-aware when assertion names are available: an ``exception`` invariant wants
+    ``assertThrows``. Otherwise reuse the already-computed ``oracle_strength`` (docs/46):
+    a real (non-weak) assertion exists iff it is ``structural_ok``/``mixed``. Returns None
+    when it cannot be determined."""
+    if assertion_names is not None and normalize_tag(descriptor.kind) == "exception":
+        return any(a == "assertThrows" for a in assertion_names)
+    os = normalize_tag(oracle_strength)
+    if os in _ASSERTED_TRUE:
+        return True
+    if os in _ASSERTED_FALSE:
+        return False
+    return None
+
+
+def _inv_result(
+    level: str, *, asserted: Optional[bool], addressed: Optional[bool],
+    anchoring: bool, reasons: List[str],
+) -> dict:
+    return {
+        "invariant_strength": level,
+        "asserted": asserted,
+        "addressed": addressed,
+        "anchoring": anchoring,
+        "reasons": reasons,
+        "advisory": True,
+        "note": "structural (S2); semantic 'pinned' needs mutation (S3, docs/48)",
+    }
+
+
+def estimate_invariant_strength(
+    descriptor: InvariantDescriptor,
+    *,
+    addressed: Optional[bool] = None,
+    oracle_strength: Optional[str] = None,
+    assertion_names: Optional[List[str]] = None,
+) -> dict:
+    """docs/48 S2: advisory STRUCTURAL roll-up of whether the candidate TEST pins a declared
+    invariant -- ``addressed`` (coverage reachability) + ``asserted`` (right-shape assertion).
+    Pure; never raises; changes no verdict. Reaches at most ``asserted_unpinned`` -- ``pinned``
+    requires line-scoped mutation (S3). A non-anchoring (model-declared) invariant is never
+    structurally blessed (anti-self-certification, §2) -> ``unknown``."""
+    if not is_anchoring(descriptor):
+        return _inv_result("unknown", asserted=None, addressed=None,
+                           anchoring=False, reasons=["non_anchoring_model_declared"])
+    asserted = _derive_asserted(descriptor, oracle_strength, assertion_names)
+    reasons: List[str] = []
+    if addressed is False:
+        level = "unaddressed"
+    elif addressed is True and asserted is False:
+        level = "addressed_unasserted"
+    elif addressed is True and asserted is True:
+        level = "asserted_unpinned"              # S2 ceiling; killing mutants is S3
+        reasons.append("pinned_needs_mutation")
+    else:
+        # cannot confirm reachability (coverage often skipped) and/or assertion strength
+        level = "unknown"
+        if addressed is None:
+            reasons.append("coverage_unavailable")
+        if asserted is None:
+            reasons.append("assertion_strength_unknown")
+    return _inv_result(level, asserted=asserted, addressed=addressed,
+                       anchoring=True, reasons=reasons)
+
+
+def invariant_review_view(
+    invariants: List[InvariantDescriptor],
+    *,
+    verify: bool = False,
+    oracle_strength: Optional[str] = None,
+    addressed: Optional[bool] = None,
+    assertion_names: Optional[List[str]] = None,
+) -> dict:
+    """ADVISORY surface of the declared invariants for human review (docs/48 S1 + S2).
+
+    ``verify=False`` (S1): ``verified`` stays ``None`` -- declarations are only carried. With
+    ``verify=True`` (S2): each ANCHORING invariant gets a structural ``estimate_invariant_strength``
+    in ``verified`` (non-anchoring ones still surface ``unknown`` -- they never self-certify).
     Never a verdict: ``auto_accept_blocked`` stays True; it changes no recommendation/conclusion.
     """
     items = []
     for d in invariants:
+        verified = None
+        if verify:
+            verified = estimate_invariant_strength(
+                d, addressed=addressed, oracle_strength=oracle_strength,
+                assertion_names=assertion_names,
+            )
         items.append({
             "id": d.id,
             "statement": d.statement,
@@ -101,11 +195,11 @@ def invariant_review_view(invariants: List[InvariantDescriptor]) -> dict:
             "target_method": d.target_method,
             "target_lines": d.target_lines,
             "observable": d.observable,
-            "verified": None,                    # S1 does not verify (docs/48 S2/S3)
+            "verified": verified,                # None (S1) or structural estimate (S2)
         })
     return {
         "invariants": items,
         "count": len(items),
         "auto_accept_blocked": True,             # declaring an invariant never accepts a candidate
-        "note": "declared intent; S1 carries, does not verify (docs/48)",
+        "note": "declared intent; verification is structural + advisory (docs/48 S1/S2)",
     }

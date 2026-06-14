@@ -126,8 +126,14 @@ def _review_summary_with_rubric(
             risk_level=case.risk_level,
         )
     if has_invariants:
-        # docs/48 S1: declared intent only -- carried + surfaced, never verified here.
-        enriched["invariant_review"] = invariant_review_view(list(case.invariants))
+        # docs/48 S2: structural verification -- ``asserted`` reuses the already-computed
+        # oracle_strength (docs/46); advisory only, never changes the recommendation/conclusion.
+        osr = (review_summary or {}).get("oracle_strength_estimate") or {}
+        enriched["invariant_review"] = invariant_review_view(
+            list(case.invariants),
+            verify=True,
+            oracle_strength=osr.get("oracle_strength"),
+        )
     return enriched
 
 

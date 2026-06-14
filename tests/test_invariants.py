@@ -4,7 +4,9 @@ it verifies nothing and changes no verdict. Offline; no model, no PIT.
 from app.benchmark.invariants import (
     ANCHORING_SOURCES,
     INVARIANT_KINDS,
+    INVARIANT_STRENGTHS,
     InvariantDescriptor,
+    estimate_invariant_strength,
     invariant_review_view,
     is_anchoring,
     is_known_kind,
@@ -134,3 +136,93 @@ def test_invariants_carry_to_ledger_as_dicts():
     assert res.conclusion == "NEED_HUMAN_REVIEW"
     bare = BenchCaseResult(name="c", repo_url="u", target_class="C")
     assert record_from_bench_case(bare, prov).invariants == []
+
+
+# --- S2: structural verification (estimate_invariant_strength) -------------------
+
+def _anchor(kind="boundary"):
+    return InvariantDescriptor(statement="x", kind=kind, source="manifest")
+
+
+def test_strength_non_anchoring_is_never_blessed():
+    # model-declared (non-anchoring) -> unknown regardless of inputs (anti-self-certification)
+    d = InvariantDescriptor(statement="x", source="model")
+    r = estimate_invariant_strength(d, addressed=True, oracle_strength="structural_ok")
+    assert r["invariant_strength"] == "unknown" and r["anchoring"] is False
+    assert "non_anchoring_model_declared" in r["reasons"]
+
+
+def test_strength_unaddressed():
+    r = estimate_invariant_strength(_anchor(), addressed=False, oracle_strength="structural_ok")
+    assert r["invariant_strength"] == "unaddressed"
+
+
+def test_strength_addressed_unasserted():
+    r = estimate_invariant_strength(_anchor(), addressed=True, oracle_strength="none")
+    assert r["invariant_strength"] == "addressed_unasserted" and r["asserted"] is False
+
+
+def test_strength_asserted_unpinned_is_the_s2_ceiling():
+    r = estimate_invariant_strength(_anchor(), addressed=True, oracle_strength="structural_ok")
+    assert r["invariant_strength"] == "asserted_unpinned" and r["asserted"] is True
+    assert "pinned_needs_mutation" in r["reasons"]
+
+
+def test_strength_unknown_when_coverage_unavailable():
+    # coverage off (addressed=None) -> unknown, but the asserted fact is still surfaced
+    r = estimate_invariant_strength(_anchor(), addressed=None, oracle_strength="structural_ok")
+    assert r["invariant_strength"] == "unknown" and r["asserted"] is True
+    assert "coverage_unavailable" in r["reasons"]
+
+
+def test_strength_unknown_when_assertion_strength_unknown():
+    r = estimate_invariant_strength(_anchor(), addressed=True, oracle_strength=None)
+    assert r["invariant_strength"] == "unknown" and r["asserted"] is None
+    assert "assertion_strength_unknown" in r["reasons"]
+
+
+def test_strength_exception_kind_uses_assertThrows_when_names_available():
+    exc = InvariantDescriptor(statement="expired -> throws", kind="exception", source="manifest")
+    yes = estimate_invariant_strength(exc, addressed=True, assertion_names=["assertThrows"])
+    assert yes["asserted"] is True and yes["invariant_strength"] == "asserted_unpinned"
+    no = estimate_invariant_strength(exc, addressed=True, assertion_names=["assertEquals"])
+    assert no["asserted"] is False and no["invariant_strength"] == "addressed_unasserted"
+
+
+def test_pinned_is_never_emitted_in_s2():
+    # exhaustively: no S2 input combination yields "pinned" (that requires mutation, S3)
+    for addr in (True, False, None):
+        for os_ in ("none", "weak", "mixed", "structural_ok", "unknown", None):
+            r = estimate_invariant_strength(_anchor(), addressed=addr, oracle_strength=os_)
+            assert r["invariant_strength"] in INVARIANT_STRENGTHS
+            assert r["invariant_strength"] != "pinned"
+
+
+# --- S2 view + wire-in (advisory; verdict never changes) ------------------------
+
+def test_view_verify_true_computes_per_invariant_strength():
+    view = invariant_review_view(
+        [_anchor(), InvariantDescriptor(statement="m", source="model")],
+        verify=True, oracle_strength="structural_ok", addressed=True,
+    )
+    a, m = view["invariants"]
+    assert a["verified"]["invariant_strength"] == "asserted_unpinned"   # anchoring
+    assert m["verified"]["invariant_strength"] == "unknown"             # model cannot self-certify
+    assert view["auto_accept_blocked"] is True                          # still never accepts
+
+
+def test_view_verify_false_is_unchanged_s1_behavior():
+    view = invariant_review_view([_anchor()])                            # verify defaults False
+    assert view["invariants"][0]["verified"] is None
+
+
+def test_review_summary_s2_uses_oracle_strength():
+    from app.benchmark.models import BenchCase
+    from app.benchmark.runner import _review_summary_with_rubric
+
+    case = BenchCase(repo_url="u", target_class="C", invariants=[_anchor()])
+    rs = {"oracle_strength_estimate": {"oracle_strength": "structural_ok"}}
+    item = _review_summary_with_rubric(rs, case)["invariant_review"]["invariants"][0]
+    assert item["verified"]["asserted"] is True                         # reused oracle_strength
+    # coverage off in the benchmark -> addressed unknown -> strength unknown, asserted still shown
+    assert item["verified"]["invariant_strength"] == "unknown"
