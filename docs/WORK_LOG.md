@@ -6,12 +6,14 @@
 > judge/audit platform** — *"judge, don't generate."* Every new signal is **advisory**;
 > nothing auto-accepts.
 
-## 0. Project audit (2026-06-13) — evidence-based, all PASS
+## 0. Project audit (2026-06-13; re-verified 2026-06-14) — evidence-based, all PASS
 
-- **State:** branch `main` @ `c800a08`, **synced with `origin/main`**, working tree clean,
-  only `main` exists (all feature branches merged + deleted). Repo healthy.
-- **Tests:** full suite **266 passed / 4 skipped** (the 4 are the `TESTAGENT_E2E`-gated
-  e2e tests). `EXIT=0`.
+- **State:** branch `main` @ `595ce20` (the WORK_LOG commit), **synced with `origin/main`**,
+  0 unpushed, working tree clean, only `main` exists (all feature branches merged + deleted).
+  Repo healthy. (Original audit was taken at `c800a08`, the commit before this log.)
+- **Tests:** full suite **265 passed / 4 skipped** (269 `<testcase>` nodes, 0 fail / 0 error;
+  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (The 2026-06-13 log said
+  266 — a one-count miscount; HEAD is unchanged since, so it was never a regression.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -59,7 +61,7 @@ merges (newest first): `c800a08` run_pit sidecar → `e299553` JUnit5-aware buil
 
 Use the venv python — bare `python` is the Windows Store stub (exit 49, no output):
 `& "E:\AI-Test-Platform\.venv\Scripts\python.exe" …`
-- `… -m pytest -p no:warnings -q` → **266 passed, 4 skipped**.
+- `… -m pytest -p no:warnings -q` → **265 passed, 4 skipped** (269 `<testcase>`, EXIT=0).
 - `… scripts/audit_bench.py` → reproduces `docs/42` §A (historical heuristic: real n=67,
   compile 61% / pass 25% / green-FAIL 0/17; 0 authoritative run_kind).
 - Toolchain present: Maven **3.9.9**, JDK **17**, mvn.cmd at
