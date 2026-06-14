@@ -8,12 +8,12 @@
 
 ## 0. Project audit (2026-06-13; re-verified 2026-06-14) — evidence-based, all PASS
 
-- **State:** branch `main` @ `2179a39`, **13 commits ahead of `origin/main`** (push is
-  human-only), working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14:
-  audit + real-repo mutation run + invariant-verification S1+S2+S3.)
-- **Tests:** full suite **300 passed / 4 skipped** (304 `<testcase>` nodes, 0 fail / 0 error;
+- **State:** branch `main` @ HEAD, **16 commits ahead of `origin/main`** (push is human-only),
+  working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit +
+  real-repo mutation run + invariant-verification S1+S2+S3 + live wire-in.)
+- **Tests:** full suite **304 passed / 4 skipped** (308 `<testcase>` nodes, 0 fail / 0 error;
   the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (265 → 267 mvn-fix → 279
-  invariant S1 → 290 S2 → 300 invariant S3 `2179a39`.)
+  invariant S1 → 290 S2 → 300 S3 → 304 S3 live wire-in.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -99,10 +99,13 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
     `asserted_unpinned` + `scoped_mutants_survive` = gap OR equivalent, never condemned).
     **Validated on commons-cli `OptionValidator.validate()`** (gated PIT): scoped 0.8 (8/10) →
     honest `asserted_unpinned`. Non-anchoring never pinned even with a perfect score.
-  - **Remaining #1 wire-in (deferred, needs approval):** runner runs gated PIT with
-    `include_mutations` + passes per-invariant `mutations` so the LIVE benchmark reaches `pinned`.
-- **Deferred — do NOT start without explicit approval:** #1 live-benchmark wire-in, other roadmap
-  items (#2–#6), P3 / `submit_candidate`, Defects4J, multi-model experiments.
+  - **Live wire-in** (`_maybe_mutation` + `_attach_invariant_mutations` in runner): gated PIT runs
+    once, rows re-scope the invariant view so the LIVE benchmark reaches `pinned` automatically.
+    Mutation evidence implies reachability, so `pinned` works even with coverage off. Unit-tested;
+    a full end-to-end live run with *real generation* needs API/cost (not run). **#1 complete.**
+- **Deferred — do NOT start without explicit approval:** other roadmap items (#2 context
+  retrieval, #3 survived-mutant classification, #4 mock library, #5 multi-round repair, #6 ledger
+  RAG), P3 / `submit_candidate`, Defects4J, multi-model experiments.
 
 ## 5. Forbidden / red-lines (unchanged)
 
