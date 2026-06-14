@@ -12,6 +12,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from app.benchmark.business_tags import normalize_tag
+from app.benchmark.invariants import InvariantDescriptor
 
 # --- Failure taxonomy (Phase 2.5) ------------------------------------------
 # One bucket per (repo, target) case. None == clean PASS. These are FACTS about
@@ -66,6 +67,9 @@ class BenchCase(BaseModel):
     business_pattern: Optional[str] = None
     expected_invariant: Optional[str] = None
     risk_level: Optional[str] = None
+    # docs/48 S1: structured invariant descriptors (manifest-declared, advisory). Declared
+    # intent, NOT verified value; carried read-only and never change judging.
+    invariants: List[InvariantDescriptor] = Field(default_factory=list)
 
     def label(self) -> str:
         return self.name or f"{self.target_class}#{self.target_method or '*'}"
@@ -109,6 +113,8 @@ class BenchCaseResult(BaseModel):
     business_pattern: Optional[str] = None
     expected_invariant: Optional[str] = None
     risk_level: Optional[str] = None
+    # docs/48 S1: structured invariant descriptors carried read-only from the case (advisory).
+    invariants: List[InvariantDescriptor] = Field(default_factory=list)
     # docs/46 S2: advisory structural oracle-strength estimate, carried read-only from review.
     oracle_strength: Optional[str] = None
     # docs/46 S3: advisory PIT mutation score (only when mutation is enabled; else None).
