@@ -76,8 +76,17 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
   the fake-pass guard proven. Found+fixed a Windows defect (`run_pit` couldn't launch bare
   `mvn`=`mvn.cmd` → resolved via `shutil.which`). `samples/calc` & live benchmark untouched;
   `mutation_enabled` back to `False`.
-- **Optional follow-ups:** a gated run on a *larger, real* repo (not the toy `samples/calc`);
-  surface `mutation_score` in report/group-by (bucketed). Both advisory; never auto-accept.
+- **DONE 2026-06-14 — first real-repo run** (docs/46 §16): commons-cli `OptionValidator` +
+  its real Apache JUnit5 test → **0.8947** (19/17/1/1, grep-verified); survivors classified =
+  1 coverage gap (`validate(null)` untested) + 1 *equivalent mutant* (`>1` vs `>=1`). Proves
+  the path scales to a real multi-class Maven repo, and that **survivors need explanation, not
+  just counting**.
+- **Optional follow-ups:** classify/explain survived mutants in the report; surface
+  `mutation_score` (bucketed) in report/group-by. Both advisory; never auto-accept.
+- **Roadmap (owner, 2026-06-14) — six AI problems to solve later, NOT started:** see
+  `docs/00_foundation/47_SIX_AI_PROBLEMS_ROADMAP.md`. Each needs explicit approval + a design
+  pass first; several already have foundations (assertion-quality ↔ oracle/mutation;
+  badcase-memory ↔ ledger; business-contract ↔ business-invariant tags).
 - **Deferred — do NOT start without explicit approval:** P3 / `submit_candidate`, Defects4J,
   multi-model experiments.
 

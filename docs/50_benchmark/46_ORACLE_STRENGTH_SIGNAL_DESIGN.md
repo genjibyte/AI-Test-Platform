@@ -226,6 +226,29 @@ this time through the **merged** `run_pit` (JUnit5-aware sidecar pom + `mvn -f`)
   regression tests added (`test_run_pit_resolves_mvn_launcher`,
   `test_run_pit_falls_back_when_mvn_unresolved`); full suite **267 passed / 4 skipped**.
 
+## 16. First real-repo run — commons-cli OptionValidator (2026-06-14)
+
+Ran the gated mutation on a real Apache library (throwaway copy of the benchmark mirror for
+`commons-cli`, JUnit 5; copied to gitignored `var/pit_run/commons-cli`, `.git` removed, the
+historical benchmark workspace untouched; `TESTAGENT_MUTATION_ENABLED=1` only for the run).
+Scoped to one class + its real (human, Apache) test:
+`targetClasses=org.apache.commons.cli.OptionValidator`,
+`targetTests=org.apache.commons.cli.OptionValidatorTest`. 13 s, **default `mvn`** (post-fix path).
+
+- **Result:** total=19, killed=17, survived=1, no_coverage=1, **mutation_score=0.8947** —
+  verified by an independent grep count of PIT's raw `mutations.xml` (19/17/1/1), matching the
+  parser exactly. A production-grade suite scores high but **not 100 %**.
+- **The two non-killed mutants differ in KIND (this is why survivors need explanation):**
+  - `validate` L125 `return null` → **NO_COVERAGE** (EmptyObjectReturnVals): `OptionValidatorTest`
+    never calls `validate(null)` — a genuine **coverage gap** in this test class.
+  - `validate` L136 `if (option.length() > 1)` → **SURVIVED** (ConditionalsBoundary `>`→`>=`):
+    for a single-char option the inner `for (i = 1; i < chars.length; …)` guard makes `>1` and
+    `>=1` behaviourally identical — an **equivalent mutant**, unkillable, NOT a test weakness.
+- **Implication:** a survived mutant is **not** automatically a bad test; a future report must
+  *classify* survivors (real gap vs equivalent vs trivial), not just count them. Mutation stays
+  advisory; `conclusion=NEED_HUMAN_REVIEW`. Confirms the merged `run_pit`/sidecar path scales
+  from the toy `samples/calc` to a real multi-class Maven repo unchanged.
+
 ---
 
 > This design records the signal it adds; it grants no new scope and changes no judging
