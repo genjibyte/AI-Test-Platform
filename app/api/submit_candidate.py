@@ -80,10 +80,11 @@ def post_submit_candidate(job_id: str, req: SubmitCandidateRequest) -> ApiRespon
             status_code=409,
             detail=f"job must be judged (DONE) before submit_candidate; got {job.status.value}",
         )
+    method = (req.target_method or "").strip() or None  # whitespace-only -> None
     job = run_external_candidate(
         job, repo,
         target_class=req.target_class.strip(),
-        target_method=(req.target_method or None) and req.target_method.strip(),
+        target_method=method,
         test_source=req.test_source,
         producer_id=req.producer_id.strip(),
         producer_meta=req.producer_meta,

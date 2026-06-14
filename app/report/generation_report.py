@@ -138,6 +138,12 @@ def assemble_generation_report(generation: dict) -> dict:
         "test_class": result.get("test_class_name"),
         "test_file": write.get("file_path"),
         "model": result.get("model"),
+        # provenance (docs/43 run_kind, docs/53 producer). For a generator run,
+        # producer_id is None and run_kind is real/fake/dryrun/smoke; for a
+        # submit_candidate run, producer_id names the caller and run_kind="external".
+        # Surfaced for the reviewer; NEVER a warrant (trusted stays False).
+        "producer_id": result.get("producer_id") or generation.get("producer_id"),
+        "run_kind": generation.get("run_kind"),
         "scenarios": result.get("scenarios", []),
         "mocks": result.get("mocks", []),
         # v2 grounding metadata — what the model declared it grounded on / skipped /
