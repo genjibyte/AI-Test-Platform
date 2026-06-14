@@ -8,12 +8,12 @@
 
 ## 0. Project audit (2026-06-13; re-verified 2026-06-14) — evidence-based, all PASS
 
-- **State:** branch `main` @ `3ce3eb0`, **10 commits ahead of `origin/main`** (push is
+- **State:** branch `main` @ `2179a39`, **13 commits ahead of `origin/main`** (push is
   human-only), working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14:
-  audit + real-repo mutation run + invariant-verification S1+S2.)
-- **Tests:** full suite **290 passed / 4 skipped** (294 `<testcase>` nodes, 0 fail / 0 error;
+  audit + real-repo mutation run + invariant-verification S1+S2+S3.)
+- **Tests:** full suite **300 passed / 4 skipped** (304 `<testcase>` nodes, 0 fail / 0 error;
   the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (265 → 267 mvn-fix → 279
-  invariant S1 → 290 invariant S2 `3ce3eb0`.)
+  invariant S1 → 290 S2 → 300 invariant S3 `2179a39`.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -86,19 +86,23 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
 - **Roadmap (owner, 2026-06-14) — six AI problems:** see
   `docs/00_foundation/47_SIX_AI_PROBLEMS_ROADMAP.md` (judge-side #1/#3/#6 on-thesis;
   producer-side #2/#4/#5 secondary). Each remaining item needs explicit approval + a design pass.
-- **DONE 2026-06-14 — #1 design + S1 + S2** (design `docs/48`): "invariant verification"
+- **DONE 2026-06-14 — #1 design + S1 + S2 + S3** (design `docs/48`): "invariant verification"
   reframed as *does the candidate TEST pin the DECLARED invariant?* (coverage + assertion +
   line-scoped mutation), never "is the code correct".
   - **S1** (`6f69a3f`): `InvariantDescriptor` + carry case→result→ledger + advisory
     `review_summary["invariant_review"]`; anti-self-certification (model-declared = non-anchoring).
   - **S2** (`3ce3eb0`): `estimate_invariant_strength` → `invariant_strength`
     {unaddressed/addressed_unasserted/asserted_unpinned/pinned/unknown}; `asserted` reuses
-    `oracle_strength`; ceiling `asserted_unpinned` (pinned is S3); honest "unknown" when
-    coverage off. All advisory; verdict never changes.
-  - **S3 (gated semantic / line-scoped mutation) is design-only — needs approval** (also needs a
-    back-compat `parse_pit_report` per-mutation extension).
-- **Deferred — do NOT start without explicit approval:** #1 S3, other roadmap items
-  (#2–#6), P3 / `submit_candidate`, Defects4J, multi-model experiments.
+    `oracle_strength`; honest "unknown" when coverage off. Advisory; verdict never changes.
+  - **S3** (`2179a39`): `parse_pit_report(include_mutations=)` + `parse_line_spec` +
+    `scoped_mutation_score` → `pinned` ONLY when all invariant-scoped mutants are killed (else
+    `asserted_unpinned` + `scoped_mutants_survive` = gap OR equivalent, never condemned).
+    **Validated on commons-cli `OptionValidator.validate()`** (gated PIT): scoped 0.8 (8/10) →
+    honest `asserted_unpinned`. Non-anchoring never pinned even with a perfect score.
+  - **Remaining #1 wire-in (deferred, needs approval):** runner runs gated PIT with
+    `include_mutations` + passes per-invariant `mutations` so the LIVE benchmark reaches `pinned`.
+- **Deferred — do NOT start without explicit approval:** #1 live-benchmark wire-in, other roadmap
+  items (#2–#6), P3 / `submit_candidate`, Defects4J, multi-model experiments.
 
 ## 5. Forbidden / red-lines (unchanged)
 
