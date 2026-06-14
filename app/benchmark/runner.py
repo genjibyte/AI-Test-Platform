@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from app.benchmark.business_tags import business_review_rubric
+from app.benchmark.invariants import invariant_review_view
 from app.benchmark.models import (
     COVERAGE_AVAILABLE,
     COVERAGE_UNAVAILABLE,
@@ -101,24 +102,32 @@ def _case_tags(case: BenchCase) -> dict:
         "business_pattern": case.business_pattern,
         "expected_invariant": case.expected_invariant,
         "risk_level": case.risk_level,
+        # docs/48 S1: carry structured invariant descriptors (declared intent, unverified).
+        "invariants": list(case.invariants),
     }
 
 
 def _review_summary_with_rubric(
     review_summary: Optional[dict], case: BenchCase
 ) -> Optional[dict]:
-    """docs/45 S3: attach the ADVISORY business-review rubric to the review summary when
-    the case carries business tags. Additive + advisory only -- it never changes the
-    recommendation, conclusion, or accept (auto_accept stays blocked)."""
-    if not (case.business_domain or case.business_pattern or case.expected_invariant):
+    """docs/45 S3 + docs/48 S1: attach the ADVISORY business-review rubric and/or the declared
+    invariant view to the review summary when the case carries either. Additive + advisory only
+    -- it never changes the recommendation, conclusion, or accept (auto_accept stays blocked)."""
+    has_tags = bool(case.business_domain or case.business_pattern or case.expected_invariant)
+    has_invariants = bool(case.invariants)
+    if not (has_tags or has_invariants):
         return review_summary
     enriched = dict(review_summary or {})
-    enriched["business_rubric"] = business_review_rubric(
-        business_domain=case.business_domain,
-        business_pattern=case.business_pattern,
-        expected_invariant=case.expected_invariant,
-        risk_level=case.risk_level,
-    )
+    if has_tags:
+        enriched["business_rubric"] = business_review_rubric(
+            business_domain=case.business_domain,
+            business_pattern=case.business_pattern,
+            expected_invariant=case.expected_invariant,
+            risk_level=case.risk_level,
+        )
+    if has_invariants:
+        # docs/48 S1: declared intent only -- carried + surfaced, never verified here.
+        enriched["invariant_review"] = invariant_review_view(list(case.invariants))
     return enriched
 
 

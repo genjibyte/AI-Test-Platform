@@ -1,6 +1,7 @@
 # 48 — Business-invariant *verification* (design, 2026-06-14)
 
-> **Status: DESIGN ONLY. Not approved for code.** Sequel to `45` (invariant *tagging* —
+> **Status: S1 implemented 2026-06-14 (descriptor + carry, no verification); S2/S3 DESIGN ONLY,
+> not approved for code.** Sequel to `45` (invariant *tagging* —
 > declared intent) and `46` (oracle-strength / mutation). Roadmap item **#1** of `docs/00_foundation/47`.
 > Every signal here is **advisory**: it feeds `review_summary` only, never
 > `recommend_with_reasons` / `conclusion`; `auto_accept` stays blocked; `conclusion` stays
@@ -98,10 +99,14 @@ decides whether the declared invariant was the *right* property.
   stay for the reviewer (the computed block is parallel + clearly machine-advisory).
 
 ## 6. Slices (independently testable; each needs its own go)
-- **S1 — descriptor + carry (offline, no compute):** an invariant descriptor schema
-  (`id, statement, kind, target{class,method?,lines?}, observable, source`) declarable in the
-  manifest case and carried through `BenchCaseResult` / ledger; surfaced (untrusted) in the
-  rubric. No verification yet. Mirrors `45` S1.
+- **S1 — descriptor + carry (offline, no compute) — DONE 2026-06-14:** `InvariantDescriptor`
+  (`id, statement, kind, target{class,method?,lines?}, observable, source`) +
+  `parse_invariants` / `is_anchoring` / `invariant_review_view` in
+  `app/benchmark/invariants.py`; declarable on `BenchCase`, carried through `BenchCaseResult`
+  (`_case_tags`) and ledger `JudgedRecord` (`ingest`), surfaced **untrusted/unverified** as
+  `review_summary["invariant_review"]` (`verified=None`, `auto_accept_blocked=True`). The
+  anti-self-certification rule (§2) is enforced: model-declared invariants are non-anchoring.
+  No verification computed. (`tests/test_invariants.py`.)
 - **S2 — structural verification (deterministic):** compute `addressed` (coverage) + `asserted`
   (quality gate) → `invariant_strength` without mutation. Offline-testable with fixtures.
 - **S3 — semantic verification (gated):** line-scoped mutation (`pinned`), behind

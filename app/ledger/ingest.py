@@ -34,6 +34,7 @@ def record_from_bench_case(
         business_pattern=result.business_pattern,
         expected_invariant=result.expected_invariant,
         risk_level=result.risk_level,
+        invariants=[i.model_dump() for i in result.invariants],  # docs/48 S1 (advisory)
         oracle_strength=result.oracle_strength,
         mutation_score=result.mutation_score,
         gen_outcome=result.gen_outcome,

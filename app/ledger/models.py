@@ -65,6 +65,8 @@ class JudgedRecord(BaseModel):
     business_pattern: Optional[str] = None
     expected_invariant: Optional[str] = None
     risk_level: Optional[str] = None
+    # docs/48 S1: declared invariant descriptors (advisory; declared intent, NOT verified).
+    invariants: list[dict] = Field(default_factory=list)
     oracle_strength: Optional[str] = None    # docs/46 S2: advisory structural estimate (read-only)
     mutation_score: Optional[float] = None   # docs/46 S3: advisory PIT mutation score (read-only)
 
