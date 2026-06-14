@@ -10,9 +10,9 @@
 
 - **State:** branch `main` @ HEAD (pushing this batch — owner authorized), working tree clean,
   only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit + real-repo mutation run +
-  #1 invariant-verification complete + #3 survived-mutant classify + #6 retrieval S1+S2.)
-- **Tests:** full suite **325 passed / 4 skipped** (329 `<testcase>` nodes, 0 fail / 0 error;
-  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 323 #6 S1 → 325 #6 S2.)
+  #1 invariant-verification complete + #3 survived-mutant classify + #6 retrieval S1+S2+S3.)
+- **Tests:** full suite **329 passed / 4 skipped** (333 `<testcase>` nodes, 0 fail / 0 error;
+  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 325 #6 S2 → 329 #6 S3.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -117,9 +117,11 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
   - **S2**: `JudgedRecord` gains DECLARED `root_cause`/`fix_note` (advisory, never fabricated);
     `find_similar` results carry the derived `signature` (`badcase_signature`) + the declared
     root-cause/fix → actionable precedent ("why" + "how"). Verdict unchanged.
-  - **S3 (optional, gated):** semantic/embedding retrieval with an explainable fallback — needs approval.
-- **Deferred — do NOT start without explicit approval:** #6 S3; #2 context retrieval, #4 mock
-  library, #5 multi-round repair; P3 / `submit_candidate`, Defects4J, multi-model experiments.
+  - **S3**: `find_similar(..., query_text=)` adds a **no-dependency** token-overlap (Jaccard,
+    stdlib) over declared free-text (`reason: text_overlap`); explainable, never replaces structural
+    signals. **Embedding retrieval stays DEFERRED** (new dep or API/cost → needs explicit approval).
+- **Deferred — do NOT start without explicit approval:** #6 embedding retrieval (dep/API); #2 context
+  retrieval, #4 mock library, #5 multi-round repair; P3 / `submit_candidate`, Defects4J, multi-model.
 
 ## 5. Forbidden / red-lines (unchanged)
 
