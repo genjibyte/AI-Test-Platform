@@ -8,6 +8,7 @@ runner is injectable so the whole path is unit-tested offline, with PIT never in
 """
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Callable, Union
@@ -39,6 +40,12 @@ def run_pit(
     for offline tests (so PIT is never actually invoked under unit tests). Returns
     ``available=False`` on timeout, launch error, or a missing report."""
     repo_dir = Path(repo_dir)
+    # Windows: bare ``mvn`` is ``mvn.cmd``; subprocess (no shell) cannot launch it and raises
+    # FileNotFoundError -> available=False, so the signal would never appear on Windows.
+    # Resolve to the real launcher (shutil.which honours PATHEXT) so the DEFAULT path works
+    # cross-platform. Falls back to the original string when Maven is not on PATH, preserving
+    # the safe degrade-to-unavailable behaviour. (docs/46 §14 finding, 2026-06-14.)
+    mvn = shutil.which(mvn) or mvn
     pom = repo_dir / "pom.xml"
     try:
         if pom.exists():

@@ -195,6 +195,37 @@ stayed `False`).
   plugin/pom configuration — a follow-up. Until then mutation gracefully reports
   `available=False` on JUnit 5 targets (advisory; never blocks judging).
 
+## 15. Gated run through the merged path — negative control + Windows fix (2026-06-14)
+
+Re-ran on throwaway copies of `samples/calc` (gitignored `var/pit_run/*`; tracked
+`samples/calc` and its pom untouched; `TESTAGENT_MUTATION_ENABLED=1` set only for the run),
+this time through the **merged** `run_pit` (JUnit5-aware sidecar pom + `mvn -f`), and added a
+**negative control** to prove the signal resists fake / green-but-empty tests.
+
+- **Merged-path validation:** `run_pit` wrote the sidecar `pom-pit.xml` (original pom +
+  `pitest-maven 1.15.0` + `pitest-junit5-plugin 1.2.1`; original untouched), ran PIT, and
+  `parse_pit_report` returned `total=5, killed=4, survived=1, mutation_score=0.8` — verified
+  **line-by-line against PIT's raw `mutations.xml`** (independent hand count = 5/4/1, not the
+  parser's word). The surviving mutant is the **`max` `>`→`>=` ConditionalsBoundary**:
+  `CalcTest.max()` only tests `max(7,3)`, never the boundary `max(x,x)`, so 0.8 is a *real,
+  explainable* test-strength gap. `killingTest` entries carry `[engine:junit-jupiter]`,
+  confirming the junit5 plugin actually drove the run.
+- **Negative control (fake-pass guard — the load-bearing result for §2):** a second copy with
+  the **same code, same coverage, GREEN and passing**, but `CalcTest` gutted to **zero
+  assertions** (executes `add`/`max`, asserts nothing) → `mvn test` = 2 run / 0 fail (green),
+  `NO_COVERAGE=0` (the code *is* executed), yet **`mutation_score=0.0` (5/5 SURVIVED)**.
+  Coverage and green status cannot tell the real test (0.8) from the empty one (0.0);
+  **mutation can.** This is exactly the "green but empty" / AI-fake-pass trap the platform
+  exists to catch — and even the 0.8 stays **advisory** (`conclusion=NEED_HUMAN_REVIEW`,
+  nothing auto-accepts).
+- **Defect found + fixed (`app/mutation/run.py`):** `run_pit` defaulted `mvn="mvn"`; on Windows
+  bare `mvn` is `mvn.cmd` and `subprocess` (no shell) raises `FileNotFoundError`, so the signal
+  silently degraded to `available=False` on **every** Windows run. Fixed by resolving the
+  launcher with `shutil.which(mvn) or mvn` (honours `PATHEXT`; falls back to the original string
+  → safe degrade when Maven is absent). The default-path run then yields 0.8. Two offline
+  regression tests added (`test_run_pit_resolves_mvn_launcher`,
+  `test_run_pit_falls_back_when_mvn_unresolved`); full suite **267 passed / 4 skipped**.
+
 ---
 
 > This design records the signal it adds; it grants no new scope and changes no judging

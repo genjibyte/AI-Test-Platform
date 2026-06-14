@@ -115,6 +115,51 @@ def test_run_pit_writes_junit5_sidecar_and_uses_dash_f(tmp_path):
     assert "pitest-junit5-plugin" in sidecar.read_text(encoding="utf-8")
 
 
+def test_run_pit_resolves_mvn_launcher(tmp_path, monkeypatch):
+    # Windows fix (docs/46 §14): bare "mvn" is mvn.cmd; subprocess (no shell) can't launch it,
+    # so run_pit resolves it via shutil.which before invoking -- the DEFAULT path must work.
+    import app.mutation.run as runmod
+    monkeypatch.setattr(runmod.shutil, "which", lambda name: r"C:\maven\bin\mvn.CMD")
+    (tmp_path / "pom.xml").write_text(
+        "<project><build><plugins></plugins></build></project>", encoding="utf-8")
+    seen = {}
+
+    def fake_runner(cmd, **kw):
+        seen["cmd"] = cmd
+        rpt = tmp_path / "target" / "pit-reports"
+        rpt.mkdir(parents=True, exist_ok=True)
+        (rpt / "mutations.xml").write_text(_REPORT, encoding="utf-8")
+
+        class _P:
+            returncode = 0
+
+        return _P()
+
+    run_pit(tmp_path, "com.x.Calc", "com.x.CalcTest", runner=fake_runner)  # default mvn="mvn"
+    assert seen["cmd"][0] == r"C:\maven\bin\mvn.CMD"     # resolved launcher, not bare "mvn"
+
+
+def test_run_pit_falls_back_when_mvn_unresolved(tmp_path, monkeypatch):
+    # Maven not on PATH -> which returns None -> keep the original string so the launch fails
+    # and degrades to available=False (the safe behaviour is preserved, never a fake pass).
+    import app.mutation.run as runmod
+    monkeypatch.setattr(runmod.shutil, "which", lambda name: None)
+    (tmp_path / "pom.xml").write_text(
+        "<project><build><plugins></plugins></build></project>", encoding="utf-8")
+    seen = {}
+
+    def fake_runner(cmd, **kw):
+        seen["cmd"] = cmd
+
+        class _P:
+            returncode = 0
+
+        return _P()
+
+    run_pit(tmp_path, "com.x.Calc", "com.x.CalcTest", runner=fake_runner)
+    assert seen["cmd"][0] == "mvn"                       # unchanged fallback
+
+
 # --- gated benchmark wire-in (docs/46 S3 #1) -------------------------------------
 
 def test_maybe_mutation_score_gated_off_then_enabled(tmp_path, monkeypatch):
