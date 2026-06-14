@@ -11,8 +11,8 @@
 - **State:** branch `main` @ HEAD, **2 commits ahead of `origin/main`** (push is human-only),
   working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit + real-repo
   mutation run + #1 invariant-verification + #3 survivor classify + #6 retrieval + #4 mock-smell S1.)
-- **Tests:** full suite **348 passed / 4 skipped** (352 `<testcase>` nodes, 0 fail / 0 error;
-  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 339 #4 mock-smell S1 → 348 #5 review digest.)
+- **Tests:** full suite **381 passed / 4 skipped** (385 `<testcase>` nodes, 0 fail / 0 error;
+  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 348 #5 review digest → 381 docs/53 S1 submit_candidate.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
@@ -132,6 +132,18 @@ Use the venv python — bare `python` is the Windows Store stub (exit 49, no out
   `generation_report` (per-candidate signals) and again in `runner._attach_digest` (after benchmark-
   layer signals). Computes nothing new; changes no recommendation/conclusion; `auto_accept_blocked`
   stays True. 9 tests. **Completes the value-judgment signal layer.**
+- **DONE 2026-06-15 — submit_candidate S1 (judge any producer)** (design `docs/53`): closes the
+  *"judge candidates from ANY producer"* gap — Claude/Codex/DeepSeek/human submissions now flow
+  through the same judge stack. `POST /jobs/{id}/submit_candidate` →
+  `app/pipeline/submit_pipeline.run_external_candidate` reuses target/context/preflight/write/
+  execute/compare and feeds the same `assemble_generation_report` (no new judging logic).
+  **Hard invariants forced at the boundary AND pipeline:** `run_kind="external"` (caller cannot
+  override; generator path cannot claim it); `trusted=False`; `conclusion=NEED_HUMAN_REVIEW`;
+  `producer_id` required + identifier-safe + not `"fake-1"` (impersonation guard, docs/43);
+  `test_source` size-capped (256 KB); no LLM call; no production-code edits. New `JobStatus`:
+  `SUBMIT_EXECUTE/SUBMIT_DONE/SUBMIT_FAILED`; on-disk file name `CalcSubmittedTest.java` distinct
+  from the generator's `CalcAiGeneratedTest.java` so the two producer paths never collide. 33
+  new tests; generator path unaffected.
 - **Deferred — do NOT start without explicit approval:** #6 embedding retrieval (dep/API); #4 mock
   pattern library (producer-side); #2 context retrieval, #5 multi-round repair; P3 /
   `submit_candidate`, Defects4J, multi-model.

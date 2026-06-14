@@ -65,6 +65,7 @@
 - [50 Badcase Retrieval Design (#6)](/docs/50_benchmark/50_BADCASE_RETRIEVAL_DESIGN.md)
 - [51 Mock / External-Dependency Smell Design (#4 judge-side)](/docs/50_benchmark/51_MOCK_SMELL_DESIGN.md)
 - [52 Review Digest Design (#5 consolidation capstone)](/docs/50_benchmark/52_REVIEW_DIGEST_DESIGN.md)
+- [53 submit_candidate Design (judge any producer)](/docs/50_benchmark/53_SUBMIT_CANDIDATE_DESIGN.md)
 
 ## 60 Context V3
 
