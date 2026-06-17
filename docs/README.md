@@ -71,24 +71,16 @@
 - [52 Review Digest Design (#5 consolidation capstone)](/docs/50_benchmark/52_REVIEW_DIGEST_DESIGN.md)
 - [53 submit_candidate Design (judge any producer)](/docs/50_benchmark/53_SUBMIT_CANDIDATE_DESIGN.md)
 
-## 60 Context V3
+## 60 Context V3 (generation-side, maintenance mode)
 
-- [25 Context V3 Pro 3-Case Review](/docs/60_context_v3/25_CONTEXT_V3_PRO_3CASE_REVIEW.md)
-- [26 Context V3 Pro 10-Case Review](/docs/60_context_v3/26_CONTEXT_V3_PRO_10CASE_REVIEW.md)
-- [27 Context V3.1 Prompt Hardening](/docs/60_context_v3/27_CONTEXT_V3_1_PROMPT_HARDENING.md)
-- [28 Context V3.1 Pro 10-Case Review](/docs/60_context_v3/28_CONTEXT_V3_1_PRO_10CASE_REVIEW.md)
-- [29 Context V3.2 Hardening](/docs/60_context_v3/29_CONTEXT_V3_2_HARDENING.md)
-- [30 Context V3.2 4-Case Review](/docs/60_context_v3/30_CONTEXT_V3_2_4CASE_REVIEW.md)
-- [31 Context V3.2.1 BooleanUtils Review](/docs/60_context_v3/31_CONTEXT_V3_2_1_BOOLEANUTILS_REVIEW.md)
-- [35 Context V3.2.2 BooleanUtils Review](/docs/60_context_v3/35_CONTEXT_V3_2_2_BOOLEANUTILS_REVIEW.md)
-- [37 Context V3.2.3 Pro 10-Case Review](/docs/60_context_v3/37_CONTEXT_V3_2_3_PRO_10CASE_REVIEW.md)
+- [Context v3 → v3.2.3 Evolution Digest](/docs/60_context_v3/CONTEXT_V3_EVOLUTION_DIGEST.md)
+  — consolidates the 9 per-run logs (25–37); originals in git history.
 
 ## 70 Preflight
 
-- [32 Generated Test Preflight Gate](/docs/70_preflight/32_GENERATED_TEST_PREFLIGHT_GATE.md)
-- [33 Preflight Offline Replay Audit](/docs/70_preflight/33_PREFLIGHT_OFFLINE_REPLAY_AUDIT.md)
-- [34 BooleanUtils Preflight Live Review](/docs/70_preflight/34_BOOLEANUTILS_PREFLIGHT_LIVE_REVIEW.md)
-- [36 Preflight Overload Ambiguity Design](/docs/70_preflight/36_PREFLIGHT_OVERLOAD_AMBIGUITY_DESIGN.md)
+- [Preflight Evolution Digest](/docs/70_preflight/PREFLIGHT_EVOLUTION_DIGEST.md)
+  — consolidates the 4 preflight docs (32/33/34/36); originals in git history. The gate
+  is live code (`app/quality/generated_test_preflight.py`).
 
 ## Knowledge (agent memory)
 
