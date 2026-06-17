@@ -143,3 +143,76 @@ Candidate
 3. **沉淀层**（badcase / 失败归因 / 跨作者比较）是否作为下一个**功能**投入方向？（设计已起草：`docs/50_benchmark/41_PRECIPITATION_LAYER_DESIGN.md`，仍先设计后实现，待你批准 P1 切片。）
 
 > 一句话：方向没错，错在**重心**。把"判卷/管理/比较/沉淀任意来源测试"重新摆到正中央，生成器退回到"链路中的一个 producer"；而这条路**主要靠解耦与重述，不靠堆功能**。
+
+---
+
+## 10. V2 拓宽（2026-06-17，owner 指令 + 外部知识包 ingested）
+
+> 触发：owner 重申——本项目**不只是"AI 单测生成器"，而是面向"测试生成类 Agent"的执行型评测平台**。
+> 外部生态调研已落入 `docs/knowledge/EXTERNAL_ECOSYSTEM_KNOWLEDGE_PACK.md`。本节把 V1（上文，
+> 2026-06-08）沿**两个轴**拓宽，并新增第四支柱 **Asset Gate**。约束性表述同时写入 `CLAUDE.md`
+> 的 **Design north-star**，使每个后续设计都遵循。**本节仍是设计/约束，不实现代码；每个未来级别/阶段 owner-gated。**
+
+### 10.1 两个拓宽轴（内核不变，只扩输入面）
+1. **Producer 轴**：候选来源从 V1 的"人 / 本平台生成器 / 外部 agent"具体化为**任意测试生成 agent/工具**——
+   Claude Code / Copilot / Codex、Coze / Dify workflow、EvoSuite / Randoop / Schemathesis / EvoMaster 等
+   传统或 LLM 工具。它们一律是 **producer**，经 `submit_candidate`（docs/53）走同一判卷内核；**provenance
+   advisory、永不作为采纳依据**（`run_kind="external"`，"external 永不进 real headline"已被测试钉死）。
+2. **测试级别轴**：候选从"单测"扩到"**接口/API 测试代码与用例**"。**判卷内核不变**；新增的只是 candidate
+   **kind** + 执行器（API harness）+ 资产类型（schema / fixture / mock）。UI / 性能 / 安全**仍不做**。
+
+### 10.2 四支柱（统一抽象；前三已落地，第四是下一步）
+| 支柱 | 含义 | 现状 |
+|---|---|---|
+| **Candidate** | 来源无关的候选提交入口 | **已落地** `app/api/submit_candidate.py` + `app/pipeline/submit_pipeline.py`（docs/53 S1） |
+| **Provenance** | 谁产出的；advisory，绝不是 warrant | **已落地** `producer_id` + `run_kind="external"`（docs/53 S2） |
+| **Badcase** | 失败沉淀为可检索的结构化经验 | **已落地** `app/ledger/` + `app/ledger/retrieval.py`（docs/50） |
+| **Asset Gate** | 判断**资产是否足以判卷/可信**，并推荐测试**级别** | **未建——下一个 on-thesis 步骤** |
+
+支撑信号（已落地，喂 `review_summary`，均 advisory）：quality gate、结构化 oracle-strength（docs/46）、
+gated PIT mutation + 存活变异分类（docs/46/49）、mock/外部依赖 smell（docs/51）、不变量验证（docs/48）、
+review digest 收口（docs/52）。
+
+### 10.3 新支柱：Asset Sufficiency Gate（抽象，先设计后实现）
+**为什么是 judge-side**：少资产场景下，测试不可信往往不是因为"代码缺失"，而是因为**业务 oracle / 测试数据 /
+mock / schema 缺失**。Asset Gate 在判卷链路里回答两个问题：**(1) 资产够不够？(2) 这个目标到底该判到哪一级测试？**
+它不改判卷结论，只产出 advisory 视图。
+
+```text
+AssetSufficiencyReport (advisory) = {
+  code_context | existing_tests | business_oracle | test_data | api_schema |
+  db_schema | external_dependency_mock : sufficient | partial | missing,
+  test_level_recommendation : unit | api | integration | manual_oracle_first,
+  missing_assets : [...], risk_notes : [...]
+}
+```
+**v1 用规则即可，不引 RAG/依赖**（对齐知识包 Slice D）：只有 `assertNotNull`/`assertTrue(true)` → 弱断言；
+断言完全复制当前实现输出且无外部依据 → `oracle_from_code_only`；方法依赖 repository/client/mq/time/random →
+`likely_needs_fixture_or_mock`；Controller/Service 状态流转复杂 → 建议 `api`/`integration`。
+**放置**：作为 `review_summary["asset_sufficiency"]` 一等信号，并喂入 review digest（docs/52）。**红线**：advisory，
+不改 `recommendation`/`conclusion`，不碰 quality gate；模型自报的资产**非锚定**（沿用 docs/48 anti-self-certification）。
+
+### 10.4 从单测到接口测试（gated 未来；每步 design+approval）
+同一内核 `Candidate → 隔离执行 → 确定性信号 → review → badcase` 直接复用；接口测试只是新增：
+**API Candidate kind**（JUnit-API / YAML/JSON 用例）、**API harness executor**、**asset/env provider**
+（Testcontainers / WireMock）。producer 可为 Schemathesis / Newman / EvoMaster（baseline）或任意 agent。
+**顺序**：先 Asset Gate + Test-Level Router（判卷面，本级即用），再在批准后落 API harness MVP（知识包 Slice F / P4）。
+
+### 10.5 与 Charter §8.8 的范围张力（诚实化解）
+Charter §8.8"不做接口自动化"**仍然成立**：我们**不做 API 自动化框架**。被允许的唯一 API 方向是**用同一判卷内核
+评测 API 测试候选**，且仅在某个 gated 阶段获批后。UI 自动化、手工用例生成、复杂 RAG/知识图谱、企业权限/多租户
+**继续不做**。已对 Charter §1/§8.8 做**小幅 sharpen**（保留原意 + broaden 为"gated 未来级别"），同 2026-06-08 的处理方式。
+
+### 10.6 前沿对标（2026，印证方向）
+- **TestExplora**（Microsoft）：repo 级"主动发现 bug"的测试生成，以**文档意图为 oracle**，SOTA fail-to-pass 仅 ~16%
+  → "生成易、判定难，oracle 是瓶颈"，正是本项目押注的判卷面。
+- **Rethinking the Value of Agent-Generated Tests**：agent 生成的测试价值需被重新评估 → 印证"判卷而非信任 producer"。
+- **Understanding LLM-Driven Test Oracle Generation**：oracle 生成是当前最难点 → 支撑 Asset Gate 的"业务 oracle 充分性"判定。
+- **API 侧**：Schemathesis 偏单请求 mutation、缺依赖推理；EvoMaster 为最佳工具之一（白盒+黑盒）；LLM 从 OpenAPI
+  直接生成 API 测试仍 nascent → 接口测试候选**同样**需要判卷 + schema 资产充分性，而非直接信任。
+- Sources：TestExplora https://arxiv.org/abs/2602.10471 ；Rethinking Agent-Generated Tests https://arxiv.org/abs/2602.07900 ；
+  LLM Test Oracle Generation https://arxiv.org/abs/2601.05542 ；REST API test strategies (log coverage) https://arxiv.org/abs/2604.07073 。
+
+### 10.7 红线（V2 不变）
+advisory only；永不自动采纳；`conclusion` 恒 `NEED_HUMAN_REVIEW`、`trusted=False`；不改生产/pom/既有测试；
+mutation 默认 gated off；无新依赖须 stop-and-ask；历史数据只读；每个新级别/阶段 **owner-gated + 先设计后实现**。

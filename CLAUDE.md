@@ -4,14 +4,41 @@
 > file, trust the repo and fix this file.
 
 ## Thesis (what this project is)
-A **Java/Maven AI unit-test _candidate evaluation & audit_ platform.** Candidate tests
-may come from the built-in generator, Claude, Codex, DeepSeek, or a human. The product
-is the **judge → quality gate → review recommendation → badcase ledger → reproducible
-report** layer. **Generation is just one producer.**
-See `docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md` and the charter
+An **execution-based _candidate evaluation_ platform for test-generating agents.** It
+judges whether a candidate test has engineering value; it does **not** "generate tests."
+Candidates may come from the built-in generator, Claude Code, Copilot, Codex, DeepSeek,
+Coze/Dify, EvoSuite/Randoop/Schemathesis, or a human — **generation is just one producer.**
+The product is the **judge → quality gate → review recommendation → badcase ledger →
+reproducible report** layer. The current kernel is **Java/Maven JUnit unit tests**;
+interface/API-test candidates are a **gated future level** (same judge kernel, new candidate
+kind), not a new product.
+See `docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md` (§10 = the V2 widening),
+`docs/knowledge/EXTERNAL_ECOSYSTEM_KNOWLEDGE_PACK.md`, and the charter
 `docs/00_foundation/00_PROJECT_CHARTER.md`.
-Out of scope: UI automation, API automation, manual test-case generation, generic
-RAG / multi-agent platform, enterprise task management.
+Out of scope (unless owner-approved): UI automation, manual test-case authoring, generic
+RAG / knowledge-graph / multi-agent platform, enterprise task management, and **becoming an
+API-automation framework** — judging API-test *candidates* with the same kernel is the only
+sanctioned API direction, and only once a gated phase is approved.
+
+## Design north-star (every new design must pass this)
+1. **Build order — don't skip ahead:** (1) a minimal trustworthy **unit-test judge kernel**
+   *(done)*; (2) the producer-agnostic abstraction below, spanning AI unit tests → interface/
+   API test code & cases; (3) *only then* extend execution to interface/API testing.
+2. **Four pillars.** Every feature must state which pillar it strengthens, for *candidates of
+   any origin* (not "make our own generator greener"):
+   - **Candidate** — author-agnostic submission entry (`submit_candidate`, docs/53). *Live.*
+   - **Provenance** — who produced it; advisory, never a warrant (`producer_id` + `run_kind=
+     "external"`, docs/53 S2). *Live.*
+   - **Badcase** — structured, retrievable failure precipitation (`app/ledger/` + retrieval,
+     docs/50). *Live.*
+   - **Asset Gate** — judge whether the *assets* (code context / business-oracle source /
+     fixtures / mock / schema) suffice, and recommend the test **level** (unit / api /
+     integration / manual-oracle-first). Judge-side, advisory. **Not built — the next on-thesis step.**
+3. **Single anti-drift filter:** does this strengthen *judging / managing / comparing /
+   precipitating* candidates of any origin? If it only raises our own generator's compile/pass
+   rate — and is not an oracle-safety / red-line fix — **downgrade it.**
+4. **Invariants hold across all of the above:** advisory only; never auto-accept; `conclusion`
+   stays `NEED_HUMAN_REVIEW`; `trusted=False`; every new level/phase is owner-gated + design-first.
 
 ## Boundary — the bar every agent is held to (anti-hallucination)
 The project's claim is **NOT "I can generate tests"** — it is **"I can judge whether
@@ -27,7 +54,7 @@ tests:
 - If you cannot show judging evidence, say so — do not fill the gap with a confident-
   sounding but unverified claim.
 
-## Current state (2026-06-13)
+## Current state (2026-06-17)
 - Done: judge + minimal generation pipeline; quality gate + review policy (advisory,
   never auto-accept); preflight + oracle-safe compile-repair (gated off); ledger
   P1/P2 (`app/ledger/`); `run_kind` **minimal slice** (producer-set provenance + the
@@ -39,11 +66,15 @@ tests:
   **structural** estimate rolled up from the quality gate (S1+S2, docs/46), and a
   **dormant gated** PIT **mutation** subsystem (`app/mutation/`, `mutation_enabled=False`,
   docs/46 S3 — the real semantic signal; never runs PIT unless explicitly enabled).
-- **Foundation-hardening pause lifted (owner-approved); the value-judgment signal layer
-  landed (2026-06-13).** Still **not** built — do not start without explicit approval:
-  P3 / `submit_candidate`, Defects4J, multi-model experiments. Mutation stays **gated off**
-  (`mutation_enabled=False`); the JUnit5-aware PIT sidecar (`build_pit_pom`) is validated
-  but **unmerged** on `feat/mutation-junit5`. Every new signal stays advisory; never auto-accept.
+- **Value-judgment signal layer landed (2026-06-13);** then judge-side problems
+  #1/#3/#4/#5/#6 (docs/48–52) and the **producer-agnostic `submit_candidate` entry
+  (docs/53 S1+S2)** landed (2026-06-15) — the **Candidate + Provenance + Badcase** pillars
+  are live (see Design north-star). Mutation stays **gated off** (`mutation_enabled=False`);
+  the JUnit5-aware PIT sidecar (`build_pit_pom`, `app/mutation/pit.py`) **is merged on `main`**
+  (commit `c800a08`) and validated. Still **not** built — do not start without explicit
+  approval: the **Asset Gate / Test-Level Router** (the next on-thesis step), the interface/
+  API-test level, Defects4J, multi-model experiments. Every new signal stays advisory; never
+  auto-accept.
 - Branch `main`; commits are often stacked **locally and unpushed**.
 - Data caveat: **new** benchmark runs carry the authoritative `run_kind` field;
   **historical** `var/benchmark/*/bench.db` rows have no field, so their fake/real split

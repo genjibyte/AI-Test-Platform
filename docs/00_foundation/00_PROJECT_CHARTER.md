@@ -15,6 +15,8 @@
 构建一个能验证单测（无论由人、外部 agent 还是本平台生成器编写）是否工程可用的判卷闭环。
 
 > 重定位说明（2026-06-08，见 `docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md`）：核心价值是**管理 / 判卷 / 审计比较 / 沉淀**任意来源的单测结果；"生成"是判卷链路中的一个 **producer**，非主卖点。下文"AI 生成"相关措辞按此口径理解（已小幅 sharpen §2 / §3.6 / §6 / §11，保留原意）。
+>
+> V2 拓宽（2026-06-17，owner 指令，见 `40_CORE_THESIS_REPOSITIONING.md` §10 + `CLAUDE.md` Design north-star）：项目是**面向"测试生成类 Agent"的执行型评测平台**——producer 面扩为任意测试生成 agent/工具，测试级别从单测**递进**到接口/API 测试候选；统一抽象为四支柱 **Candidate / Provenance / Badcase / Asset Gate**。**判卷内核不变**；接口测试是 gated 未来级别，非新产品。下文范围按此理解（§1 / §8 已小幅 sharpen，保留原意）。
 
 ---
 
@@ -200,6 +202,8 @@ AI 单测生成判卷场。
 19. 不做生产代码自动修改。
 
 这些能力可以进入 Roadmap，但不得进入 MVP。
+
+> V2 sharpen（2026-06-17，owner 指令，见 `40_CORE_THESIS_REPOSITIONING.md` §10）：上列"不做"**保留原意**——本项目**不做接口自动化框架、不做 UI 自动化、不做手工黑盒用例生成、不做复杂 RAG/知识图谱/企业权限**。唯一被 broaden 的是第 8 条"不做接口自动化"：**接口/API 测试作为一个 gated 未来"测试级别"**，用**同一判卷内核**评测 API 测试**候选**（新增 candidate kind + 执行器 + 资产类型），仅在获批阶段推进——**判卷 ≠ 自动化框架**，二者不冲突。第 16 条 mutation 现以 **gated/opt-in** 形式存在（默认关，`app/mutation/`，见 `docs/50_benchmark/46`）。判卷面新增的 **Asset Gate**（资产充分性 + 测试级别推荐）为 advisory，不改结论。
 
 ---
 
