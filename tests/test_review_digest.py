@@ -33,6 +33,14 @@ def test_mutation_and_invariant_flags_with_non_anchoring_skipped():
     assert sum(1 for f in d["flags"] if f["signal"] == "invariant") == 1   # non-anchoring skipped
 
 
+def test_mutation_unclassified_survivor_is_low_flag():
+    # a survivor the classifier couldn't bucket (unrecognized mutator) must still reach the
+    # digest -- survivors.py marks it "human review"; report_md surfaces it; the digest must too.
+    d = build_review_digest({"mutation_survivors": {"counts": {"survived_unclassified": 2}}})
+    assert any(f["signal"] == "mutation" and f["severity"] == "low" for f in d["flags"])
+    assert "unclassified" in d["flags"][0]["message"]
+
+
 def test_quality_blockers_are_high():
     d = build_review_digest({"quality": {"blockers": ["no_assertions"]}})
     assert d["flags"][0]["signal"] == "quality_gate" and d["flags"][0]["severity"] == "high"

@@ -59,6 +59,9 @@ def build_review_digest(review_summary: dict) -> dict:
     if sc.get("survived_maybe_equivalent"):
         _flag(flags, "mutation", "low",
               f"{sc['survived_maybe_equivalent']} maybe-equivalent survivor(s): review (not auto-bad)")
+    if sc.get("survived_unclassified"):
+        _flag(flags, "mutation", "low",
+              f"{sc['survived_unclassified']} unclassified survivor(s): unrecognized mutator -- review")
 
     # invariant verification (docs/48) -- only anchoring invariants carry a real estimate
     for item in (rs.get("invariant_review") or {}).get("invariants") or []:
