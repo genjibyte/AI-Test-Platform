@@ -21,7 +21,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from app.benchmark.business_tags import normalize_tag
-from app.mutation.pit import parse_line_spec, scoped_mutation_score
+from app.mutation.pit import parse_line_spec
 from app.mutation.survivors import classify_survivors
 
 # docs/48 §1 -- the invariant kinds we target (extensible; "other"/"unknown" always allowed).
