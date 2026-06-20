@@ -11,8 +11,9 @@
 - **State:** branch `main` @ HEAD, **2 commits ahead of `origin/main`** (push is human-only),
   working tree clean, only `main` exists. Repo healthy. (Re-verified 2026-06-14: audit + real-repo
   mutation run + #1 invariant-verification + #3 survivor classify + #6 retrieval + #4 mock-smell S1.)
-- **Tests:** full suite **389 passed / 4 skipped** (393 `<testcase>` nodes, 0 fail / 0 error;
-  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 381 docs/53 S1 submit_candidate → 389 docs/53 S2 provenance.)
+- **Tests:** full suite **395 passed / 4 skipped** (399 `<testcase>` nodes, 0 fail / 0 error;
+  the 4 skips are the `TESTAGENT_E2E`-gated e2e tests). `EXIT=0`. (… → 389 docs/53 S2 provenance →
+  390 audit bug-fix → 395 manifest.v2 value-judgment enrichment.)
 - **Core invariants INTACT:** `trusted` is hardwired `False` (`app/llm/schema.py`,
   deterministic — model can't set it); `accept_rate=None` (`aggregate`); `auto_accept_blocked=True`;
   `conclusion` stays `NEED_HUMAN_REVIEW`. The four signals below are **read-only/advisory**
