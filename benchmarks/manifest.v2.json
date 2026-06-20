@@ -1,0 +1,253 @@
+{
+  "_comment": "Benchmark manifest v2 (docs/23, docs/45, docs/48). SAME 10 pins as manifest.v1.json (identical repo+commit+target -> identical code-under-test, so v1's reproducibility/baseline comparison is untouched and v1 stays the frozen pin), ENRICHED with the value-judgment dimension: business-invariant tags (docs/45 S1) + anchoring invariant DESCRIPTORS (docs/48, source=manifest). These are DECLARED INTENT, never verified value: advisory, carried read-only, change no verdict (conclusion stays NEED_HUMAN_REVIEW). Invariants are method-scoped (no target_lines: exact line numbers can't be pinned offline; method scope is enough for docs/48 _scope + docs/49 survivors). Statements are grounded in the documented behavior in docs/60_context_v3/CONTEXT_V3_EVOLUTION_DIGEST.md. Run like v1 (jacoco.skip; coverage advisory). source=manifest makes each invariant anchoring (may drive real verification); a model-declared invariant would stay non-anchoring (docs/48 S2).",
+  "version": 2,
+  "cases": [
+    {
+      "name": "commons-cli Option",
+      "repo_url": "https://github.com/apache/commons-cli.git",
+      "commit": "ae44dcdffd28d6a1a32dc4e0801b715adcef162e",
+      "ref": "commons-cli @ ae44dcd (frozen: v2-pro-quality-final)",
+      "target_class": "org.apache.commons.cli.Option",
+      "business_domain": "dev_productivity",
+      "business_pattern": "state_transition",
+      "risk_level": "medium",
+      "expected_invariant": "addValue always throws UnsupportedOperationException; getValues() returns null (not an empty array) when the option has no values",
+      "invariants": [
+        {
+          "id": "option-addvalue-throws",
+          "statement": "Option.addValue(String) always throws UnsupportedOperationException; values are populated by the parser, never set directly",
+          "kind": "exception",
+          "target_class": "org.apache.commons.cli.Option",
+          "target_method": "addValue",
+          "observable": "exception:UnsupportedOperationException",
+          "source": "manifest"
+        },
+        {
+          "id": "option-getvalues-null",
+          "statement": "getValues() returns null (not an empty array) when the option has no values -- a documented Javadoc/impl conflict; the test must pin actual behavior, not the doc",
+          "kind": "boundary",
+          "target_class": "org.apache.commons.cli.Option",
+          "target_method": "getValues",
+          "observable": "return",
+          "source": "manifest"
+        }
+      ]
+    },
+    {
+      "name": "commons-cli Options",
+      "repo_url": "https://github.com/apache/commons-cli.git",
+      "commit": "ae44dcdffd28d6a1a32dc4e0801b715adcef162e",
+      "ref": "commons-cli @ ae44dcd",
+      "target_class": "org.apache.commons.cli.Options",
+      "business_domain": "dev_productivity",
+      "business_pattern": "eligibility",
+      "risk_level": "medium",
+      "expected_invariant": "adding a required option is reflected in getRequiredOptions()",
+      "invariants": [
+        {
+          "id": "options-required-tracked",
+          "statement": "addOption registers the option; an option added as required appears in getRequiredOptions()",
+          "kind": "state_transition",
+          "target_class": "org.apache.commons.cli.Options",
+          "target_method": "addOption",
+          "observable": "state",
+          "source": "manifest"
+        }
+      ]
+    },
+    {
+      "name": "commons-cli CommandLine",
+      "repo_url": "https://github.com/apache/commons-cli.git",
+      "commit": "ae44dcdffd28d6a1a32dc4e0801b715adcef162e",
+      "ref": "commons-cli @ ae44dcd",
+      "target_class": "org.apache.commons.cli.CommandLine",
+      "business_domain": "dev_productivity",
+      "business_pattern": "state_transition",
+      "risk_level": "low",
+      "expected_invariant": "hasOption/getOptionValue reflect the parsed-option state",
+      "invariants": [
+        {
+          "id": "commandline-hasoption-reflects-state",
+          "statement": "hasOption(opt) is true iff that option was parsed into the CommandLine; getOptionValue returns the parsed value or null",
+          "kind": "state_transition",
+          "target_class": "org.apache.commons.cli.CommandLine",
+          "target_method": "hasOption",
+          "observable": "return",
+          "source": "manifest"
+        }
+      ]
+    },
+    {
+      "name": "commons-csv CSVRecord",
+      "repo_url": "https://github.com/apache/commons-csv.git",
+      "commit": "8192d9d196a554d67d7d65b0a131001b9d1eb412",
+      "ref": "commons-csv @ 8192d9d (frozen: v2-pro-quality-final)",
+      "target_class": "org.apache.commons.csv.CSVRecord",
+      "business_domain": "data_platform",
+      "business_pattern": "other",
+      "risk_level": "medium",
+      "expected_invariant": "get(String) throws IllegalArgumentException on an unmapped header; get(int) throws on an out-of-range index",
+      "invariants": [
+        {
+          "id": "csvrecord-get-name-throws",
+          "statement": "get(String) throws IllegalArgumentException when the name is not mapped to a header (or the mapping is inconsistent)",
+          "kind": "exception",
+          "target_class": "org.apache.commons.csv.CSVRecord",
+          "target_method": "get",
+          "observable": "exception:IllegalArgumentException",
+          "source": "manifest"
+        },
+        {
+          "id": "csvrecord-get-index-throws",
+          "statement": "get(int) throws ArrayIndexOutOfBoundsException for an index outside the record's range",
+          "kind": "exception",
+          "target_class": "org.apache.commons.csv.CSVRecord",
+          "target_method": "get",
+          "observable": "exception:ArrayIndexOutOfBoundsException",
+          "source": "manifest"
+        }
+      ]
+    },
+    {
+      "name": "commons-csv CSVFormat",
+      "repo_url": "https://github.com/apache/commons-csv.git",
+      "commit": "8192d9d196a554d67d7d65b0a131001b9d1eb412",
+      "ref": "commons-csv @ 8192d9d",
+      "target_class": "org.apache.commons.csv.CSVFormat",
+      "business_domain": "data_platform",
+      "business_pattern": "state_transition",
+      "risk_level": "medium",
+      "expected_invariant": "with* methods are immutable -- they return a new CSVFormat with only the changed setting and leave the original unchanged",
+      "invariants": [
+        {
+          "id": "csvformat-with-immutable",
+          "statement": "withDelimiter (and other with*/builder methods) returns a NEW CSVFormat carrying only the changed setting; the original instance is unchanged (immutability)",
+          "kind": "state_transition",
+          "target_class": "org.apache.commons.csv.CSVFormat",
+          "target_method": "withDelimiter",
+          "observable": "return",
+          "source": "manifest"
+        }
+      ]
+    },
+    {
+      "name": "commons-text WordUtils",
+      "repo_url": "https://github.com/apache/commons-text.git",
+      "commit": "e910b53a90308dbd70d54b4f69843805b53fc0fa",
+      "ref": "commons-text @ e910b53 (frozen: v2-pro-quality-final)",
+      "target_class": "org.apache.commons.text.WordUtils",
+      "business_domain": "other",
+      "business_pattern": "other",
+      "risk_level": "low",
+      "expected_invariant": "capitalize(null) returns null; otherwise the first letter of each whitespace-delimited word is upper-cased",
+      "invariants": [
+        {
+          "id": "wordutils-capitalize-null-and-words",
+          "statement": "capitalize(null) returns null; for non-null input it upper-cases the first letter of each whitespace-delimited word and leaves the rest unchanged",
+          "kind": "boundary",
+          "target_class": "org.apache.commons.text.WordUtils",
+          "target_method": "capitalize",
+          "observable": "return",
+          "source": "manifest"
+        }
+      ]
+    },
+    {
+      "name": "commons-text StringEscapeUtils",
+      "repo_url": "https://github.com/apache/commons-text.git",
+      "commit": "e910b53a90308dbd70d54b4f69843805b53fc0fa",
+      "ref": "commons-text @ e910b53",
+      "target_class": "org.apache.commons.text.StringEscapeUtils",
+      "business_domain": "security_privacy",
+      "business_pattern": "other",
+      "risk_level": "medium",
+      "expected_invariant": "escape maps special characters to entities and unescape is its inverse (round-trip)",
+      "invariants": [
+        {
+          "id": "escapeutils-xml-entities",
+          "statement": "escapeXml10 maps <, >, &, \", ' to their XML entities; unescapeXml is the inverse for those entities (round-trip). Exact entity maps must not be guessed beyond evidence",
+          "kind": "boundary",
+          "target_class": "org.apache.commons.text.StringEscapeUtils",
+          "target_method": "escapeXml10",
+          "observable": "return",
+          "source": "manifest"
+        }
+      ]
+    },
+    {
+      "name": "commons-lang3 NumberUtils",
+      "repo_url": "https://github.com/apache/commons-lang.git",
+      "commit": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "ref": "rel/commons-lang-3.20.0",
+      "target_class": "org.apache.commons.lang3.math.NumberUtils",
+      "business_domain": "reliability",
+      "business_pattern": "fallback",
+      "risk_level": "medium",
+      "expected_invariant": "toInt/toDouble/toLong return the supplied default for null or unparseable input and never throw",
+      "invariants": [
+        {
+          "id": "numberutils-default-on-bad-input",
+          "statement": "toInt(String, default) (and toDouble/toLong) returns the supplied default for null or unparseable input and never throws",
+          "kind": "boundary",
+          "target_class": "org.apache.commons.lang3.math.NumberUtils",
+          "target_method": "toInt",
+          "observable": "return",
+          "source": "manifest"
+        }
+      ]
+    },
+    {
+      "name": "commons-lang3 Validate",
+      "repo_url": "https://github.com/apache/commons-lang.git",
+      "commit": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "ref": "rel/commons-lang-3.20.0",
+      "target_class": "org.apache.commons.lang3.Validate",
+      "business_domain": "reliability",
+      "business_pattern": "eligibility",
+      "risk_level": "medium",
+      "expected_invariant": "notNull throws NullPointerException on null; isTrue throws IllegalArgumentException on a false expression; both pass silently otherwise",
+      "invariants": [
+        {
+          "id": "validate-notnull-throws-npe",
+          "statement": "notNull throws NullPointerException when the argument is null and returns the argument unchanged otherwise",
+          "kind": "exception",
+          "target_class": "org.apache.commons.lang3.Validate",
+          "target_method": "notNull",
+          "observable": "exception:NullPointerException",
+          "source": "manifest"
+        },
+        {
+          "id": "validate-istrue-throws-iae",
+          "statement": "isTrue throws IllegalArgumentException when the expression is false and is a no-op when true",
+          "kind": "exception",
+          "target_class": "org.apache.commons.lang3.Validate",
+          "target_method": "isTrue",
+          "observable": "exception:IllegalArgumentException",
+          "source": "manifest"
+        }
+      ]
+    },
+    {
+      "name": "commons-lang3 BooleanUtils",
+      "repo_url": "https://github.com/apache/commons-lang.git",
+      "commit": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "ref": "rel/commons-lang-3.20.0",
+      "target_class": "org.apache.commons.lang3.BooleanUtils",
+      "business_domain": "dev_productivity",
+      "business_pattern": "fallback",
+      "risk_level": "low",
+      "expected_invariant": "toBoolean(String) maps 'true'/'yes'/'on' (case-insensitive) to true and null/anything else to false",
+      "invariants": [
+        {
+          "id": "booleanutils-toboolean-mapping",
+          "statement": "toBoolean(String) maps 'true'/'yes'/'on' (case-insensitive) to true and null or any other string to false",
+          "kind": "boundary",
+          "target_class": "org.apache.commons.lang3.BooleanUtils",
+          "target_method": "toBoolean",
+          "observable": "return",
+          "source": "manifest"
+        }
+      ]
+    }
+  ]
+}

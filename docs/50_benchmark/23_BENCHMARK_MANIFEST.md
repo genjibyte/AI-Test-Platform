@@ -1,9 +1,11 @@
-# Phase 2.6 — Frozen Benchmark Manifest (v1)
+# Phase 2.6 — Frozen Benchmark Manifest (v1) + value-judgment enrichment (v2)
 
-> Date: 2026-06-07. Nature: **measurement instrument**. This is the benchmark we
-> hold fixed so context/model changes can be compared apples-to-apples.
+> Date: 2026-06-07 (v1); enriched 2026-06-20 (v2). Nature: **measurement instrument**.
+> This is the benchmark we hold fixed so context/model changes can be compared apples-to-apples.
 > Upstream: `docs/14` (Phase 2.5 benchmark), `docs/21` (pro quality run), `docs/22` (review policy).
 > Boundary (user roadmap step 2): build the manifest, **freeze the 3 cases, expand to 8–12**. No model run here.
+> **v2 (§5):** same 10 pins, ENRICHED with business-invariant tags (docs/45) + anchoring
+> invariant descriptors (docs/48). See `benchmarks/manifest.v2.json`.
 
 ---
 
@@ -142,3 +144,40 @@ for Step 2 and is exactly why Step 4 must use a real model only after explicit
 confirmation.
 
 <!-- DRYRUN_RESULT -->
+
+---
+
+## 5. v2 — value-judgment enrichment (2026-06-20)
+
+`benchmarks/manifest.v2.json` is **v1's exact 10 pins** (identical `repo_url`+`commit`+
+`target_class` → identical code-under-test) plus the **value-judgment dimension** that v1
+left empty:
+
+- **Business-invariant tags (docs/45 S1):** `business_domain` / `business_pattern` /
+  `risk_level` / `expected_invariant` on every case (controlled vocab, advisory).
+- **Anchoring invariant descriptors (docs/48):** 1–2 `InvariantDescriptor`s per case with
+  `source="manifest"` (→ anchoring, may drive real verification), `kind`
+  (exception/boundary/state_transition), `target_method`, `statement`, `observable`.
+  **Method-scoped, no `target_lines`** — exact line numbers can't be pinned offline, and
+  method scope is enough for the `docs/48 _scope` reachability check and `docs/49` survivor
+  classification.
+
+**Why a new file, not an edit to v1:** v1 stays the frozen reproducibility pin (its
+`v2-pro-quality-final` baseline comparison is untouched). v2 only adds **advisory** metadata
+— it changes no verdict (`conclusion` stays `NEED_HUMAN_REVIEW`, `auto_accept` blocked). The
+statements are **grounded** in the documented behavior captured in
+`docs/60_context_v3/CONTEXT_V3_EVOLUTION_DIGEST.md` (e.g. `Option.addValue` always throws;
+`Option.getValues()` returns `null` not `[]`; `CSVRecord.get` throws on bad key/index;
+`Validate.notNull`→NPE / `isTrue`→IAE).
+
+**What v2 activates** that v1 left dormant for the benchmark: the docs/45 business rubric, the
+docs/48 invariant-verification view (`asserted`/`addressed`/`pinned`), docs/49 scoped survivor
+classification, and the digest's invariant flags — all advisory. Running v2 with gated PIT
+(`mutation_enabled`) lets an anchoring invariant reach `pinned` when its method-scoped mutants
+are all killed. Validated offline by `tests/test_benchmark_manifest_v2.py` (loads; v2 pins ==
+v1 pins; every case has known tags + anchoring, method-scoped invariants; the verifier never
+accepts).
+
+**Next enrichment (breadth, deferred):** adding NEW (repo, commit, target) cases needs commit
+SHAs verified against the real repos — not inventable offline — so it stays a separate,
+network-gated step. v2 enriches **depth** (the verifiable, on-thesis move) now.

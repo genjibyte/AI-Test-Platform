@@ -59,7 +59,7 @@
 
 ## 50 Benchmark
 
-- [23 Benchmark Manifest](/docs/50_benchmark/23_BENCHMARK_MANIFEST.md)
+- [23 Benchmark Manifest (v1 frozen + v2 value-judgment enrichment)](/docs/50_benchmark/23_BENCHMARK_MANIFEST.md)
 - [41 Precipitation Layer Design](/docs/50_benchmark/41_PRECIPITATION_LAYER_DESIGN.md)
 - [43 run_kind Design](/docs/50_benchmark/43_RUN_KIND_DESIGN.md)
 - [45 Business-Invariant Tagging Design](/docs/50_benchmark/45_BUSINESS_INVARIANT_TAGGING_DESIGN.md)
