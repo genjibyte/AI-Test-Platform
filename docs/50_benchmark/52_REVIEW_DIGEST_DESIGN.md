@@ -1,14 +1,15 @@
 # 52 — Review digest (design, 2026-06-14)
 
-> **Status: implemented 2026-06-14.** The **consolidation / capstone** of the advisory judging
+> **Status: implemented 2026-06-14; Asset Gate S1/S2 added 2026-07-04.** The **consolidation / capstone** of the advisory judging
 > signals (`46` oracle+mutation, `48` invariant, `49` survivors, `51` mock smells, the quality
-> gate). Advisory: it READS signals already on `review_summary` and emits a prioritized checklist;
+> gate, `55` asset sufficiency). Advisory: it READS signals already on `review_summary` and emits a prioritized checklist;
 > it computes nothing new, never feeds `recommend_with_reasons`/`conclusion`, `auto_accept` stays
 > blocked, `conclusion` stays `NEED_HUMAN_REVIEW`. A flag is a place to look, not a rejection.
 
 ## 0. Why
 The judge-side value layer now emits many separate signals on `review_summary`
-(`oracle_strength_estimate`, `mutation_survivors`, `invariant_review`, `mock_smells`, `quality`).
+(`oracle_strength_estimate`, `mutation_survivors`, `invariant_review`, `mock_smells`,
+`asset_sufficiency`, `quality`).
 A human reviewer should not have to assemble them. The **digest** rolls them into one ordered
 "what to look at" view — the unified **judgment surface**. It is the product (*the judgment*) made
 usable, not a new detector.
@@ -34,6 +35,9 @@ Pure; never raises; reads only the keys present (signals are attached at differe
 | `mock_smells` | `mock_of_target` | high |
 | `mock_smells` | `real_dependency` | medium |
 | `mock_smells` | `stub_returns_null` / `loose_matchers` | low |
+| `asset_sufficiency` | `business_oracle=missing` / `manual_oracle_first` | high |
+| `asset_sufficiency` | `external_dependency_mock=missing` / `test_data=missing` | medium |
+| `asset_sufficiency` | partial assets (except report-local `existing_tests` placeholder) | low |
 | `mutation_survivors` | `survived_weak_oracle` / `not_covered` | medium |
 | `mutation_survivors` | `survived_maybe_equivalent` | low |
 | `invariant_review` (anchoring only) | `unaddressed` / `addressed_unasserted` | medium |

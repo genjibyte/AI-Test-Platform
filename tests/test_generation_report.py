@@ -226,6 +226,17 @@ def test_clean_pass_is_strong_with_reasons_and_invariant():
     # docs/46 S1: the advisory structural oracle-strength estimate surfaces here
     assert rs["oracle_strength_estimate"]["oracle_strength"] == "structural_ok"
     assert rs["oracle_strength_estimate"]["semantic_strength"] == "human_review"
+    # docs/55 S1/S2: asset sufficiency is advisory and does not alter the clean-pass triage.
+    assert rs["asset_sufficiency"]["business_oracle"] == "sufficient"
+    assert rs["asset_sufficiency"]["test_level_recommendation"] == "unit"
+    # docs/55 S4A: report-only router surfaces current support without changing verdicts.
+    assert rs["test_level_router"]["recommended_level"] == "unit"
+    assert rs["test_level_router"]["current_kernel_support"] == "supported"
+    assert rs["test_level_router"]["owner_gate_required"] is False
+    assert rs["test_level_router"]["report_only"] is True
+    assert rs["test_level_router"]["advisory"] is True
+    assert r["conclusion"] == CONCLUSION
+    assert r["trusted"] is False
 
 
 def test_machine_repaired_pass_downgrades_from_strong():
@@ -252,3 +263,38 @@ def test_no_risk_sentinel_stays_strong():
     bundle["result"]["risk_flags"] = ["none"]
     r = assemble_generation_report(bundle)
     assert r["review_recommendation"] == "STRONG_REVIEW_CANDIDATE"
+
+
+def test_asset_sufficiency_surfaces_for_weak_candidate_without_verdict_change():
+    r = assemble_generation_report(_bundle())
+    rs = r["review_summary"]
+    assert rs["asset_sufficiency"]["business_oracle"] == "missing"
+    assert rs["asset_sufficiency"]["test_level_recommendation"] == "manual_oracle_first"
+    assert rs["test_level_router"]["recommended_level"] == "manual_oracle_first"
+    assert rs["test_level_router"]["current_kernel_support"] == "manual_review_required"
+    assert rs["test_level_router"]["owner_gate_required"] is True
+    assert any(f["signal"] == "asset_sufficiency" for f in rs["digest"]["flags"])
+    assert not any(f["signal"] == "test_level_router" for f in rs["digest"]["flags"])
+    assert r["conclusion"] == CONCLUSION
+
+
+def test_test_level_router_treats_provenance_as_context_only():
+    bundle = _grounded_pass_bundle(run_kind="external")
+    bundle["result"]["producer_id"] = "external-codex"
+
+    r = assemble_generation_report(bundle)
+    router = r["review_summary"]["test_level_router"]
+
+    assert router["recommended_level"] == "unit"
+    assert router["current_kernel_support"] == "supported"
+    assert router["owner_gate_required"] is False
+    assert "provenance_is_context_not_proof" in router["reason_codes"]
+    assert router["evidence"][1] == {
+        "source": "provenance",
+        "run_kind": "external",
+        "producer_id_present": True,
+    }
+    assert "external-codex" not in str(router)
+    assert r["review_recommendation"] == "STRONG_REVIEW_CANDIDATE"
+    assert r["conclusion"] == CONCLUSION
+    assert r["trusted"] is False

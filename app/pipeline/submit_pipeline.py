@@ -32,6 +32,7 @@ from app.generate.test_writer import TestWriteError, write_generated_test
 from app.llm.run_kind import resolve_run_kind_for_submit
 from app.llm.schema import TestGenerationResult
 from app.models.job import Job, JobStatus
+from app.quality.asset_sufficiency import asset_facts_from_snapshot
 from app.quality.generated_test_preflight import evaluate_generated_test_preflight
 from app.runtime.workspace import Workspace
 from app.storage.job_repo import JobRepo
@@ -179,6 +180,8 @@ def run_external_candidate(
         snapshot = build_snapshot(repo_dir, target_class, target_method)
     except ContextError as exc:
         return _submit_fail(repo, job, bundle, f"context collection failed: {exc}")
+    # docs/55 S2: persist tiny asset facts from the bounded context; never the full snapshot.
+    bundle["asset_facts"] = asset_facts_from_snapshot(snapshot)
 
     # baseline coverage BEFORE the submitted test runs.
     baseline_overall = parse_jacoco(repo_dir)

@@ -69,6 +69,10 @@ class JudgedRecord(BaseModel):
     invariants: list[dict] = Field(default_factory=list)
     oracle_strength: Optional[str] = None    # docs/46 S2: advisory structural estimate (read-only)
     mutation_score: Optional[float] = None   # docs/46 S3: advisory PIT mutation score (read-only)
+    # docs/55 S3B: compact Asset Gate carry (advisory, projected from BenchCaseResult).
+    asset_test_level_recommendation: Optional[str] = None
+    asset_missing_count: int = 0
+    asset_partial_count: int = 0
     # docs/50 S2: actionable precedent -- DECLARED by a human/external author (advisory, NEVER
     # platform-fabricated; default None). Retrieval surfaces these next to the derived signature.
     root_cause: Optional[str] = None

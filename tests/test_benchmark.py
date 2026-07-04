@@ -14,6 +14,7 @@ from app.benchmark.models import (
     BenchCaseResult,
     BenchReport,
     aggregate,
+    asset_gate_breakdown,
     classify_failure,
     load_spec,
 )
@@ -150,6 +151,60 @@ def test_aggregate_run_kind_real_excludes_non_real():
     assert real["gen_test_pass_rate"] == 0.5
 
 
+def test_asset_gate_breakdown_composes_with_run_kind_without_headline_change():
+    cases = [
+        _pass("real_unit", run_kind="real", asset_test_level_recommendation="unit"),
+        _pass(
+            "real_manual",
+            run_kind="real",
+            asset_test_level_recommendation="manual_oracle_first",
+            asset_missing_count=2,
+            asset_partial_count=1,
+        ),
+        _pass(
+            "fake_api",
+            run_kind="fake",
+            asset_test_level_recommendation="api",
+            asset_missing_count=1,
+        ),
+        _pass("real_unknown", run_kind="real"),
+    ]
+    before_keys = set(aggregate(cases).keys())
+
+    raw = asset_gate_breakdown(cases)
+    real = asset_gate_breakdown(cases, run_kind="real")
+
+    assert raw == {
+        "run_kind_filter": None,
+        "total": 4,
+        "by_test_level": {
+            "unit": 1,
+            "manual_oracle_first": 1,
+            "api": 1,
+            "unknown": 1,
+        },
+        "missing_asset_cases": 2,
+        "partial_asset_cases": 1,
+        "missing_assets_total": 3,
+        "partial_assets_total": 1,
+    }
+    assert real == {
+        "run_kind_filter": "real",
+        "total": 3,
+        "by_test_level": {
+            "unit": 1,
+            "manual_oracle_first": 1,
+            "unknown": 1,
+        },
+        "missing_asset_cases": 1,
+        "partial_asset_cases": 1,
+        "missing_assets_total": 2,
+        "partial_assets_total": 1,
+    }
+    assert set(aggregate(cases).keys()) == before_keys
+    assert "asset_gate_breakdown" not in aggregate(cases)
+
+
 def test_render_markdown_has_facts():
     report = BenchReport(
         provider="fake", model="fake-1", generated_at="2026-06-06",
@@ -166,6 +221,44 @@ def test_render_markdown_has_facts():
     # docs/43 S2: both the raw and the real-only headline aggregate sections render
     assert "RAW (all run_kinds)" in md
     assert "HEADLINE (real only" in md
+    assert "fake/dryrun/smoke/external/unknown excluded" in md
+
+
+def test_render_markdown_includes_asset_gate_breakdown_without_headline_drift():
+    cases = [
+        _pass(
+            "real_manual",
+            run_kind="real",
+            asset_test_level_recommendation="manual_oracle_first",
+            asset_missing_count=2,
+            asset_partial_count=1,
+        ),
+        _pass("real_unit", run_kind="real", asset_test_level_recommendation="unit"),
+        _pass(
+            "fake_api",
+            run_kind="fake",
+            asset_test_level_recommendation="api",
+            asset_missing_count=1,
+        ),
+        _pass("historical_unknown", run_kind=None),
+    ]
+    before_keys = set(aggregate(cases).keys())
+
+    md = render_markdown(BenchReport(cases=cases, aggregate=aggregate(cases)))
+
+    assert "## Asset Gate - RAW (all run_kinds)" in md
+    assert "## Asset Gate - HEADLINE (real only)" in md
+    raw = md.split("## Asset Gate - RAW (all run_kinds)", 1)[1].split("##", 1)[0]
+    headline = md.split("## Asset Gate - HEADLINE (real only)", 1)[1].split("##", 1)[0]
+    assert "- total: 4  (run_kind_filter: None)" in raw
+    assert "api" in raw
+    assert "missing_asset_cases: 2  missing_assets_total: 3" in raw
+    assert "- total: 2  (run_kind_filter: real)" in headline
+    assert "manual_oracle_first" in headline and "unit" in headline
+    assert "api" not in headline
+    assert "missing_asset_cases: 1  missing_assets_total: 2" in headline
+    assert set(aggregate(cases).keys()) == before_keys
+    assert "asset_gate_breakdown" not in aggregate(cases)
 
 
 def test_completed_result_carries_review_summary_failures():
@@ -216,6 +309,55 @@ def test_completed_result_carries_review_summary_failures():
     assert failure["test_name"] == "fails"
     assert failure["expected"] == "true"
     assert failure["actual"] == "false"
+
+
+def test_completed_result_carries_compact_asset_gate_fields_without_aggregate_change():
+    before_keys = set(aggregate([_pass("baseline")]).keys())
+    job = Job(git_url="file:///repo", status=JobStatus.GEN_DONE,
+              build_outcome="SUCCESS")
+    job.test_result = {"has_reports": True, "failed": 0, "errors": 0}
+    job.coverage = {}
+    job.generation = {
+        "target": {"target_class": "com.example.Calc", "target_method": "add"},
+        "result": {
+            "test_class_name": "CalcAiGeneratedTest",
+            "test_source": (
+                "package com.example;\n"
+                "import org.junit.jupiter.api.Test;\n"
+                "class CalcAiGeneratedTest {\n"
+                "  @Test void empty() { Client client = null; client.toString(); }\n"
+                "}\n"
+            ),
+            "trusted": False,
+        },
+        "write": {"created": True, "content": "", "production_code_touched": False},
+        "execution": {
+            "gen_outcome": "PASS",
+            "build_outcome": "SUCCESS",
+            "gen_total": 1,
+            "gen_passed": 1,
+            "gen_failed": 0,
+            "gen_errors": 0,
+            "gen_skipped": 0,
+        },
+    }
+
+    result = _completed_result(
+        BenchCase(repo_url="file:///repo", target_class="com.example.Calc", target_method="add"),
+        job,
+        time.monotonic(),
+    )
+
+    assert result.asset_test_level_recommendation == "manual_oracle_first"
+    assert result.asset_missing_count == 1  # business_oracle
+    assert result.asset_partial_count == 2  # external_dependency_mock + test_data
+    assert any(
+        i["asset"] == "existing_tests"
+        and i["reason"] == "report-local S1 does not persist neighbor-test asset facts"
+        for i in result.review_summary["asset_sufficiency"]["risk_notes"]
+    )
+    assert result.conclusion == "NEED_HUMAN_REVIEW"
+    assert set(aggregate([result]).keys()) == before_keys
 
 
 def test_run_benchmark_reports_llm_config_failure(tmp_path, monkeypatch):

@@ -37,6 +37,9 @@ def record_from_bench_case(
         invariants=[i.model_dump() for i in result.invariants],  # docs/48 S1 (advisory)
         oracle_strength=result.oracle_strength,
         mutation_score=result.mutation_score,
+        asset_test_level_recommendation=result.asset_test_level_recommendation,
+        asset_missing_count=result.asset_missing_count,
+        asset_partial_count=result.asset_partial_count,
         gen_outcome=result.gen_outcome,
         compiled=result.compiled,
         executed=result.executed,

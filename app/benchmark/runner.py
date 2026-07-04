@@ -140,6 +140,32 @@ def _review_summary_with_rubric(
     return enriched
 
 
+_S1_EXISTING_TESTS_PLACEHOLDER = "report-local S1 does not persist neighbor-test asset facts"
+
+
+def _asset_gate_carry(review_summary: Optional[dict]) -> dict:
+    """docs/55 S3A: compact projection of Asset Gate report facts for benchmark rows.
+
+    The benchmark runner does not compute Asset Gate logic; it only carries the report signal.
+    """
+    asset = (review_summary or {}).get("asset_sufficiency") or {}
+    risk_notes = asset.get("risk_notes") or []
+    partial_count = sum(
+        1
+        for item in risk_notes
+        if item.get("status") == "partial"
+        and not (
+            item.get("asset") == "existing_tests"
+            and item.get("reason") == _S1_EXISTING_TESTS_PLACEHOLDER
+        )
+    )
+    return {
+        "asset_test_level_recommendation": asset.get("test_level_recommendation"),
+        "asset_missing_count": len(asset.get("missing_assets") or []),
+        "asset_partial_count": partial_count,
+    }
+
+
 def _case_failure(
     case: BenchCase,
     t0: float,
@@ -206,6 +232,7 @@ def _completed_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
     before_ok = bool((cd.get("overall_before") or {}).get("has_report"))
     cov_available = after_ok and before_ok
     cov_status = COVERAGE_AVAILABLE if cov_available else COVERAGE_UNAVAILABLE
+    review_summary = _review_summary_with_rubric(rep.get("review_summary"), case)
 
     return BenchCaseResult(
         **_case_tags(case),
@@ -243,7 +270,8 @@ def _completed_result(case: BenchCase, job: Job, t0: float) -> BenchCaseResult:
         quality_blockers=len(quality.get("blocking_issues") or []),
         quality_warnings=len(quality.get("warnings") or []),
         review_recommendation=rep.get("review_recommendation"),
-        review_summary=_review_summary_with_rubric(rep.get("review_summary"), case),
+        review_summary=review_summary,
+        **_asset_gate_carry(review_summary),
         oracle_strength=((rep.get("review_summary") or {}).get("oracle_strength_estimate") or {}).get("oracle_strength"),
         runtime_ms=int((time.monotonic() - t0) * 1000),
         error=(job.generation or {}).get("error"),

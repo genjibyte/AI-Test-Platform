@@ -17,6 +17,45 @@ def test_mock_of_target_is_high():
     assert any(f["severity"] == "high" and f["signal"] == "mock_smells" for f in d["flags"])
 
 
+def test_asset_missing_business_oracle_is_high():
+    d = build_review_digest({
+        "asset_sufficiency": {
+            "business_oracle": "missing",
+            "test_level_recommendation": "manual_oracle_first",
+        }
+    })
+    assert any(
+        f["signal"] == "asset_sufficiency" and f["severity"] == "high"
+        for f in d["flags"]
+    )
+    assert d["headline"].startswith("needs careful review")
+
+
+def test_asset_external_dependency_mock_missing_is_medium():
+    d = build_review_digest({
+        "asset_sufficiency": {
+            "business_oracle": "sufficient",
+            "external_dependency_mock": "missing",
+            "test_level_recommendation": "unit",
+        }
+    })
+    assert any(
+        f["signal"] == "asset_sufficiency" and f["severity"] == "medium"
+        for f in d["flags"]
+    )
+
+
+def test_asset_partial_existing_tests_placeholder_does_not_make_noise():
+    d = build_review_digest({
+        "asset_sufficiency": {
+            "existing_tests": "partial",
+            "business_oracle": "sufficient",
+            "test_level_recommendation": "unit",
+        }
+    })
+    assert not any(f["signal"] == "asset_sufficiency" for f in d["flags"])
+
+
 def test_mutation_and_invariant_flags_with_non_anchoring_skipped():
     rs = {
         "mutation_survivors": {"counts": {"survived_weak_oracle": 2, "survived_maybe_equivalent": 1}},
@@ -50,6 +89,24 @@ def test_no_signals_is_clean_but_still_human_review():
     d = build_review_digest({})
     assert d["flag_count"] == 0 and "no advisory flags" in d["headline"]
     assert d["auto_accept_blocked"] is True and d["conclusion"] == "NEED_HUMAN_REVIEW"
+
+
+def test_test_level_router_is_report_only_and_not_a_digest_signal():
+    d = build_review_digest({
+        "test_level_router": {
+            "recommended_level": "api",
+            "current_kernel_support": "future_gated",
+            "owner_gate_required": True,
+            "report_only": True,
+            "advisory": True,
+        }
+    })
+
+    assert d["flag_count"] == 0
+    assert not any(f["signal"] == "test_level_router" for f in d["flags"])
+    assert d["auto_accept_blocked"] is True
+    assert d["conclusion"] == "NEED_HUMAN_REVIEW"
+    assert d["advisory"] is True
 
 
 def test_flags_sorted_high_before_low():

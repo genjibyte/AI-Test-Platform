@@ -186,6 +186,17 @@ def test_preflight_rejects_before_write_and_maven(repo, tmp_path, monkeypatch):
     assert out.generation["execution"]["gen_outcome"] == "COMPILE_FAILURE"
     assert out.generation["execution"]["build_outcome"] == "PREFLIGHT_REJECT"
     assert out.generation["preflight"]["status"] == "FAIL"
+    assert out.generation["asset_facts"] == {
+        "neighbor_test_found": False,
+        "neighbor_test_methods": 0,
+        "dependency_artifacts": [],
+        "build_java_source": None,
+        "target_has_method_source": False,
+        "target_method_specified": False,
+        "target_fields": 0,
+        "target_constructors": 0,
+        "target_methods": 2,
+    }
 
     report = assemble_generation_report(out.generation)
     assert report["compiled"] is False

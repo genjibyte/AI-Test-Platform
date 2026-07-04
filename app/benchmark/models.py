@@ -127,6 +127,10 @@ class BenchCaseResult(BaseModel):
     quality_warnings: int = 0
     review_recommendation: Optional[str] = None  # Phase 4 advisory triage (docs/22)
     review_summary: Optional[dict] = None         # actionable reviewer facts (docs/22)
+    # docs/55 S3A: compact Asset Gate carry, projected from review_summary only.
+    asset_test_level_recommendation: Optional[str] = None
+    asset_missing_count: int = 0
+    asset_partial_count: int = 0
     runtime_ms: int = 0
     error: Optional[str] = None
 
@@ -282,6 +286,26 @@ def oracle_strength_breakdown(cases: List[BenchCaseResult], *, run_kind: Optiona
         "run_kind_filter": run_kind,
         "total": len(cases),
         "by_oracle_strength": dict(by_strength.most_common()),
+    }
+
+
+def asset_gate_breakdown(cases: List[BenchCaseResult], *, run_kind: Optional[str] = None) -> dict:
+    """docs/55 S3C: descriptive group-by of compact Asset Gate carry fields.
+
+    Composes with ``run_kind`` like the other descriptive views. Pure description only -- no
+    judging, no aggregate headline changes, no accept/score.
+    """
+    if run_kind is not None:
+        cases = [c for c in cases if c.run_kind == run_kind]
+    by_level = Counter((c.asset_test_level_recommendation or "unknown") for c in cases)
+    return {
+        "run_kind_filter": run_kind,
+        "total": len(cases),
+        "by_test_level": dict(by_level.most_common()),
+        "missing_asset_cases": sum(1 for c in cases if c.asset_missing_count > 0),
+        "partial_asset_cases": sum(1 for c in cases if c.asset_partial_count > 0),
+        "missing_assets_total": sum(c.asset_missing_count for c in cases),
+        "partial_assets_total": sum(c.asset_partial_count for c in cases),
     }
 
 

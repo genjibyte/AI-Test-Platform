@@ -20,6 +20,9 @@ from fastapi.testclient import TestClient
 
 from app.api.submit_candidate import _MAX_TEST_SOURCE_BYTES, _PRODUCER_ID_RE
 from app.config import Settings
+from app.models.context_snapshot import ContextSnapshot, Target
+from app.models.coverage import Coverage
+from app.models.java_source import JavaClassStructure, JavaMethod, JavaParam
 from app.llm.run_kind import (
     EXTERNAL_KIND,
     RUN_KINDS,
@@ -35,6 +38,7 @@ from app.pipeline.submit_pipeline import (
     run_external_candidate,
 )
 from app.report.generation_report import CONCLUSION, assemble_generation_report
+from app.runtime.workspace import Workspace
 from app.storage.db import get_connection, init_db
 from app.storage.job_repo import JobRepo
 
@@ -142,6 +146,97 @@ def test_submit_fails_when_workspace_missing(repo):
     assert out.generation["producer_id"] == "claude-4-7"
 
 
+def test_submit_pipeline_persists_asset_facts_before_preflight_reject(repo, tmp_path, monkeypatch):
+    settings = Settings(workspace_root=tmp_path / "ws", data_dir=tmp_path / "data")
+    monkeypatch.setattr("app.runtime.workspace.get_settings", lambda: settings)
+
+    job = Job(git_url="https://example.com/x.git", status=JobStatus.DONE)
+    repo.create(job)
+    ws = Workspace(job.id).create()
+    ws.repo_dir.mkdir(parents=True, exist_ok=True)
+
+    structure = JavaClassStructure(
+        package="org.apache.commons.lang3",
+        class_name="BooleanUtils",
+        methods=[
+            JavaMethod(
+                return_type="Boolean",
+                name="toBooleanObject",
+                params=[JavaParam(type="int", name="value")],
+                signature="public static Boolean toBooleanObject",
+                source="",
+            ),
+            JavaMethod(
+                return_type="Boolean",
+                name="toBooleanObject",
+                params=[
+                    JavaParam(type="int", name="value"),
+                    JavaParam(type="int", name="trueValue"),
+                    JavaParam(type="int", name="falseValue"),
+                    JavaParam(type="int", name="nullValue"),
+                ],
+                signature="public static Boolean toBooleanObject",
+                source="",
+            ),
+        ],
+    )
+    snapshot = ContextSnapshot(
+        target_class="org.apache.commons.lang3.BooleanUtils",
+        class_structure=structure,
+    )
+    target = Target(
+        target_class="org.apache.commons.lang3.BooleanUtils",
+        file_path="src/main/java/org/apache/commons/lang3/BooleanUtils.java",
+        exists=True,
+    )
+    test_source = (
+        "package org.apache.commons.lang3;\n"
+        "class BooleanUtilsSubmittedTest {\n"
+        "  void t() { BooleanUtils.toBooleanObject(1, 1, 0); }\n"
+        "}\n"
+    )
+
+    monkeypatch.setattr(
+        "app.pipeline.submit_pipeline.resolve_target",
+        lambda *_args, **_kwargs: (target, structure),
+    )
+    monkeypatch.setattr(
+        "app.pipeline.submit_pipeline.build_snapshot",
+        lambda *_args, **_kwargs: snapshot,
+    )
+    monkeypatch.setattr(
+        "app.pipeline.submit_pipeline.parse_jacoco",
+        lambda *_args, **_kwargs: Coverage(),
+    )
+    monkeypatch.setattr(
+        "app.pipeline.submit_pipeline.parse_jacoco_class",
+        lambda *_args, **_kwargs: Coverage(),
+    )
+
+    out = run_external_candidate(
+        job,
+        repo,
+        "org.apache.commons.lang3.BooleanUtils",
+        None,
+        test_source,
+        producer_id="human:reviewer",
+    )
+
+    assert out.status == JobStatus.SUBMIT_DONE
+    assert out.generation["execution"]["build_outcome"] == "PREFLIGHT_REJECT"
+    assert out.generation["asset_facts"] == {
+        "neighbor_test_found": False,
+        "neighbor_test_methods": 0,
+        "dependency_artifacts": [],
+        "build_java_source": None,
+        "target_has_method_source": False,
+        "target_method_specified": False,
+        "target_fields": 0,
+        "target_constructors": 0,
+        "target_methods": 2,
+    }
+
+
 # ---------- platform-controlled result identity --------------------------------
 
 def test_result_identity_is_platform_controlled():
@@ -204,6 +299,9 @@ def test_assemble_generation_report_on_submit_bundle_holds_invariants():
     dg = report["review_summary"]["digest"]
     assert dg["auto_accept_blocked"] is True
     assert dg["conclusion"] == "NEED_HUMAN_REVIEW"
+    # Asset Gate is producer-agnostic: submitted candidates get the same advisory block.
+    assert "asset_sufficiency" in report["review_summary"]
+    assert report["review_summary"]["asset_sufficiency"]["advisory"] is True
 
 
 # ---------- API validation -----------------------------------------------------

@@ -40,6 +40,7 @@ from app.llm.fake_client import FakeLLMClient
 from app.llm.run_kind import resolve_run_kind
 from app.llm.schema import LLMOutputError
 from app.models.job import Job, JobStatus
+from app.quality.asset_sufficiency import asset_facts_from_snapshot
 from app.quality.generated_test_preflight import evaluate_generated_test_preflight
 from app.repair.compile_repair import repair_compile_failure, repair_is_safe
 from app.runtime.workspace import Workspace
@@ -134,6 +135,8 @@ def run_generation(
         snapshot = build_snapshot(repo_dir, target_class, target_method)
     except ContextError as exc:
         return _gen_fail(repo, job, bundle, f"context collection failed: {exc}")
+    # docs/55 S2: persist tiny asset facts from the bounded context; never the full snapshot.
+    bundle["asset_facts"] = asset_facts_from_snapshot(snapshot)
 
     # Capture the baseline coverage BEFORE the generated test runs — at this
     # point the workspace still holds the Phase 1 jacoco.xml.

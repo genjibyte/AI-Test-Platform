@@ -4,6 +4,7 @@ import uuid
 from app.benchmark.models import BenchCaseResult, BenchReport
 from app.ledger.analytics import (
     aggregate_badcases,
+    asset_gate_summary,
     author_profile,
     badcase_signature,
     compare_authors_on_target,
@@ -45,6 +46,35 @@ def test_record_from_bench_case_projects_facts_and_fingerprint():
     assert rec.conclusion == "NEED_HUMAN_REVIEW"
     assert rec.provenance.author_type == "platform_generator"
     assert rec.test_fingerprint == fingerprint_source(src)
+
+
+def test_record_from_bench_case_carries_asset_gate_fields_without_changing_signature(tmp_path):
+    prov = Provenance(author_type="platform_generator", author_id="deepseek-x")
+    src = "class T { void t(){ assertEquals(1, f()); } }"
+    rec = record_from_bench_case(
+        _case(
+            "asset",
+            asset_test_level_recommendation="manual_oracle_first",
+            asset_missing_count=2,
+            asset_partial_count=1,
+            failure_type="TEST_FAILURE",
+        ),
+        prov,
+        test_source=src,
+    )
+
+    assert rec.asset_test_level_recommendation == "manual_oracle_first"
+    assert rec.asset_missing_count == 2
+    assert rec.asset_partial_count == 1
+    assert badcase_signature(rec) == "TEST_FAILURE@com.x.C#m"
+
+    store = LedgerStore(tmp_path / "ledger.db")
+    store.append(rec)
+    assert store.by_author("deepseek-x")[0].record_id == rec.record_id
+    assert store.by_target("com.x.C", "m")[0].record_id == rec.record_id
+    assert store.by_fingerprint(fingerprint_source(src))[0].record_id == rec.record_id
+    got = store.all()[0]
+    assert got.model_dump() == rec.model_dump()
 
 
 def test_store_append_query_and_roundtrip(tmp_path):
@@ -210,3 +240,58 @@ def test_analytics_run_kind_filter_real_only():
     assert ledger_summary(records)["run_kind_filter"] is None
     summ = ledger_summary(records, run_kind="real")
     assert summ["run_kind_filter"] == "real" and summ["records"] == 1
+
+
+def test_asset_gate_summary_composes_with_run_kind_and_preserves_signatures():
+    records = [
+        _rec(
+            failure_type="TEST_FAILURE",
+            run_kind="real",
+            recommendation="NEEDS_REVISION",
+        ).model_copy(update={
+            "asset_test_level_recommendation": "manual_oracle_first",
+            "asset_missing_count": 2,
+            "asset_partial_count": 1,
+        }),
+        _rec(run_kind="real").model_copy(update={
+            "asset_test_level_recommendation": "unit",
+        }),
+        _rec(run_kind="fake").model_copy(update={
+            "asset_test_level_recommendation": "api",
+            "asset_missing_count": 1,
+        }),
+        _rec(run_kind="real"),
+    ]
+
+    raw = asset_gate_summary(records)
+    real = asset_gate_summary(records, run_kind="real")
+
+    assert raw == {
+        "run_kind_filter": None,
+        "records": 4,
+        "by_test_level": {
+            "manual_oracle_first": 1,
+            "unit": 1,
+            "api": 1,
+            "unknown": 1,
+        },
+        "missing_asset_records": 2,
+        "partial_asset_records": 1,
+        "missing_assets_total": 3,
+        "partial_assets_total": 1,
+    }
+    assert real == {
+        "run_kind_filter": "real",
+        "records": 3,
+        "by_test_level": {
+            "manual_oracle_first": 1,
+            "unit": 1,
+            "unknown": 1,
+        },
+        "missing_asset_records": 1,
+        "partial_asset_records": 1,
+        "missing_assets_total": 2,
+        "partial_assets_total": 1,
+    }
+    assert badcase_signature(records[0]) == "TEST_FAILURE@com.x.C#m"
+    assert len(aggregate_badcases(records, run_kind="real")) == 1

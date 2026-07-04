@@ -4,6 +4,7 @@ from __future__ import annotations
 from app.benchmark.models import (
     BenchReport,
     aggregate,
+    asset_gate_breakdown,
     business_breakdown,
     oracle_strength_breakdown,
 )
@@ -76,6 +77,22 @@ def _oracle_lines(bd: dict, title: str) -> list:
     ]
 
 
+def _asset_gate_lines(bd: dict, title: str) -> list:
+    """Descriptive Asset Gate group-by (docs/55 S3D). Advisory counts only."""
+    return [
+        f"## {title}",
+        "",
+        f"- total: {bd.get('total')}  (run_kind_filter: {bd.get('run_kind_filter')})",
+        f"- by_test_level: {bd.get('by_test_level')}",
+        f"- missing_asset_cases: {bd.get('missing_asset_cases')}  "
+        f"missing_assets_total: {bd.get('missing_assets_total')}",
+        f"- partial_asset_cases: {bd.get('partial_asset_cases')}  "
+        f"partial_assets_total: {bd.get('partial_assets_total')}",
+        "  (advisory; Asset Gate does not change aggregate headlines or review conclusion)",
+        "",
+    ]
+
+
 def _survivor_lines(report: BenchReport) -> list:
     """Aggregate survived-mutant classification across cases (docs/49 S2). Advisory: explains
     survivors (coverage gap vs weak oracle vs maybe-equivalent); never a verdict. Rendered only
@@ -116,7 +133,7 @@ def render_markdown(report: BenchReport) -> str:
     lines += _aggregate_lines(report.aggregate, "Aggregate — RAW (all run_kinds)")
     lines += _aggregate_lines(
         aggregate(report.cases, run_kind="real"),
-        "Aggregate — HEADLINE (real only; fake/dryrun/smoke/unknown excluded)",
+        "Aggregate — HEADLINE (real only; fake/dryrun/smoke/external/unknown excluded)",
     )
     lines += _business_lines(
         business_breakdown(report.cases), "Business tags — RAW (all run_kinds)"
@@ -130,6 +147,13 @@ def render_markdown(report: BenchReport) -> str:
     lines += _oracle_lines(
         oracle_strength_breakdown(report.cases, run_kind="real"),
         "Oracle strength — HEADLINE (real only)",
+    )
+    lines += _asset_gate_lines(
+        asset_gate_breakdown(report.cases), "Asset Gate - RAW (all run_kinds)"
+    )
+    lines += _asset_gate_lines(
+        asset_gate_breakdown(report.cases, run_kind="real"),
+        "Asset Gate - HEADLINE (real only)",
     )
     lines += _survivor_lines(report)
     lines += [

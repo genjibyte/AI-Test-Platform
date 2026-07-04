@@ -20,8 +20,10 @@ from __future__ import annotations
 
 from typing import Optional
 
+from app.quality.asset_sufficiency import estimate_asset_sufficiency
 from app.quality.mock_smells import detect_mock_smells
 from app.quality.oracle_strength import estimate_oracle_strength
+from app.quality.test_level_router import route_test_level
 from app.quality.test_quality_gate import evaluate_test_quality
 from app.review.review_digest import build_review_digest
 from app.review.review_policy import build_review_summary, recommend_with_reasons
@@ -122,10 +124,33 @@ def assemble_generation_report(generation: dict) -> dict:
     )
     # docs/46 S1: advisory STRUCTURAL oracle-strength estimate, rolled up from the quality
     # gate. Advisory only -- it does NOT change the recommendation/conclusion set above.
-    review_summary["oracle_strength_estimate"] = estimate_oracle_strength(quality_dict)
+    oracle_strength = estimate_oracle_strength(quality_dict)
+    review_summary["oracle_strength_estimate"] = oracle_strength
     # docs/51 #4 S1: advisory mock / external-dependency smells (judge-side). Surfaced for review
     # only -- it does NOT change the recommendation/conclusion and does NOT touch the quality gate.
-    review_summary["mock_smells"] = detect_mock_smells(test_source, target_class=target_class)
+    mock_smells = detect_mock_smells(test_source, target_class=target_class)
+    review_summary["mock_smells"] = mock_smells
+    # docs/55 S1: advisory Asset Sufficiency Gate. It uses only report-local facts and is
+    # surfaced for review; it does NOT change recommendation/conclusion/trusted.
+    review_summary["asset_sufficiency"] = estimate_asset_sufficiency(
+        test_source=test_source,
+        target_class=target_class,
+        target_method=target.get("target_method") or result.get("target_method"),
+        quality_gate=quality_dict,
+        oracle_strength=oracle_strength,
+        mock_smells=mock_smells,
+        grounding=grounding,
+        preflight=preflight,
+        coverage_delta=coverage,
+        asset_facts=generation.get("asset_facts"),
+    )
+    # docs/55 S4A: report-only Test-Level Router. It maps Asset Gate's advisory level to
+    # current kernel support, launches no executor, and does not affect digest severity.
+    review_summary["test_level_router"] = route_test_level(
+        asset_sufficiency=review_summary["asset_sufficiency"],
+        run_kind=generation.get("run_kind"),
+        producer_id=result.get("producer_id") or generation.get("producer_id"),
+    )
     # docs/52: advisory review digest -- a prioritized roll-up of the signals above for the
     # reviewer. Built last; reads only what's present; changes no recommendation/conclusion.
     review_summary["digest"] = build_review_digest(review_summary)

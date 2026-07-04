@@ -201,3 +201,22 @@ def oracle_strength_summary(records: List[JudgedRecord], *, run_kind: Optional[s
         "records": len(records),
         "by_oracle_strength": dict(by_strength.most_common()),
     }
+
+
+def asset_gate_summary(records: List[JudgedRecord], *, run_kind: Optional[str] = None) -> dict:
+    """docs/55 S3C: descriptive group-by of compact Asset Gate carry fields.
+
+    Composes with ``run_kind`` and reads already-stored ledger facts only. It does not affect
+    badcase signatures, retrieval, or author/target analytics.
+    """
+    records = _filter_kind(records, run_kind)
+    by_level = Counter((r.asset_test_level_recommendation or "unknown") for r in records)
+    return {
+        "run_kind_filter": run_kind,
+        "records": len(records),
+        "by_test_level": dict(by_level.most_common()),
+        "missing_asset_records": sum(1 for r in records if r.asset_missing_count > 0),
+        "partial_asset_records": sum(1 for r in records if r.asset_partial_count > 0),
+        "missing_assets_total": sum(r.asset_missing_count for r in records),
+        "partial_assets_total": sum(r.asset_partial_count for r in records),
+    }

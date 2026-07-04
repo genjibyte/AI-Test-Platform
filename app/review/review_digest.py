@@ -1,9 +1,9 @@
 """Review digest (docs/52) -- an ADVISORY roll-up of the per-candidate review signals into one
 prioritized human-review checklist. It READS signals already on ``review_summary``
-(oracle-strength, mutation survivors, invariant verification, mock smells, the quality gate) and
-emits ordered flags + a headline. It computes NOTHING new and changes NO verdict: it never feeds
-``recommend_with_reasons``/``conclusion``; ``auto_accept_blocked`` stays True; ``conclusion`` stays
-``NEED_HUMAN_REVIEW``. A flag is a place to look, not a rejection.
+(oracle-strength, mutation survivors, invariant verification, mock smells, asset sufficiency,
+the quality gate) and emits ordered flags + a headline. It computes NOTHING new and changes NO
+verdict: it never feeds ``recommend_with_reasons``/``conclusion``; ``auto_accept_blocked`` stays
+True; ``conclusion`` stays ``NEED_HUMAN_REVIEW``. A flag is a place to look, not a rejection.
 """
 from __future__ import annotations
 
@@ -47,6 +47,34 @@ def build_review_digest(review_summary: dict) -> dict:
         _flag(flags, "mock_smells", "low", "stubs return null (may mask null handling)")
     if mc.get("loose_matchers"):
         _flag(flags, "mock_smells", "low", "loose argument matchers (may not pin the real call)")
+
+    # asset sufficiency (docs/55)
+    assets = rs.get("asset_sufficiency") or {}
+    if assets.get("business_oracle") == "missing":
+        _flag(flags, "asset_sufficiency", "high", "business oracle asset is missing")
+    if assets.get("test_level_recommendation") == "manual_oracle_first":
+        _flag(flags, "asset_sufficiency", "high", "manual-oracle-first review recommended")
+    if assets.get("external_dependency_mock") == "missing":
+        _flag(flags, "asset_sufficiency", "medium", "external dependency mock asset is missing")
+    if assets.get("test_data") == "missing":
+        _flag(flags, "asset_sufficiency", "medium", "test data asset is missing")
+    if assets.get("api_schema") == "missing" and assets.get("test_level_recommendation") == "api":
+        _flag(flags, "asset_sufficiency", "medium", "API schema asset is missing")
+    # Low-noise partial flag: do not emit for the S1 report-local ``existing_tests`` placeholder.
+    partial_assets = [
+        name for name in (
+            "code_context", "business_oracle", "test_data", "api_schema",
+            "db_schema", "external_dependency_mock",
+        )
+        if assets.get(name) == "partial"
+    ]
+    if partial_assets and not any(f["signal"] == "asset_sufficiency" for f in flags):
+        _flag(
+            flags,
+            "asset_sufficiency",
+            "low",
+            f"partial asset evidence: {', '.join(partial_assets)}",
+        )
 
     # survived mutants (docs/49)
     sc = (rs.get("mutation_survivors") or {}).get("counts") or {}
