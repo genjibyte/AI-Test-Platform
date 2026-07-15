@@ -9,21 +9,36 @@ judges whether a candidate test has engineering value; it does **not** "generate
 Candidates may come from the built-in generator, Codex, Copilot, Codex, DeepSeek,
 Coze/Dify, EvoSuite/Randoop/Schemathesis, or a human — **generation is just one producer.**
 The product is the **judge → quality gate → review recommendation → badcase ledger →
-reproducible report** layer. The current kernel is **Java/Maven JUnit unit tests**;
-interface/API-test candidates are a **gated future level** (same judge kernel, new candidate
-kind), not a new product.
+reproducible report** layer. The current kernel is **Java/Maven JUnit unit tests**, but the
+mainline should make early room for **interface/API-test candidate evaluation** using the same
+judge kernel. API/interface is a near-term candidate-evaluation direction, not a separate product.
+
+Mainline framing:
+- **Entry:** interface/API test candidates and automated test-generation outputs. Generation is an
+  input source, not the platform identity.
+- **Goals:** improve integration-test quality, final code quality, and architecture-quality
+  feedback through executable evidence.
+- **Platform form:** execute, judge, attribute, and precipitate badcases. Do not become the test
+  generator, API automation framework, task platform, or auto-adoption system.
+
 See `docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md` (§10 = the V2 widening),
 `docs/knowledge/EXTERNAL_ECOSYSTEM_KNOWLEDGE_PACK.md`, and the charter
 `docs/00_foundation/00_PROJECT_CHARTER.md`.
 Out of scope (unless owner-approved): UI automation, manual test-case authoring, generic
 RAG / knowledge-graph / multi-agent platform, enterprise task management, and **becoming an
-API-automation framework** — judging API-test *candidates* with the same kernel is the only
-sanctioned API direction, and only once a gated phase is approved.
+API-automation framework**. The sanctioned API direction is **API/interface candidate
+evaluation**: design candidate kinds, evidence contracts, report fields, and small smoke paths;
+start executors only after an owner-gated design is approved.
 
 ## Design north-star (every new design must pass this)
-1. **Build order — don't skip ahead:** (1) a minimal trustworthy **unit-test judge kernel**
-   *(done)*; (2) the producer-agnostic abstraction below, spanning AI unit tests → interface/
-   API test code & cases; (3) *only then* extend execution to interface/API testing.
+1. **Build order — don't overfit to unit-only work:** (1) a minimal trustworthy **unit-test judge
+   kernel** *(done)*; (2) the producer-agnostic abstraction below, spanning AI unit tests →
+   interface/API test code & cases *(mainline direction)*; (3) then minimal owner-gated API
+   evaluation smoke paths as the design matures. Do not let producer/generator polish crowd out
+   S6 API/interface candidate design.
+   Early API/interface design should start from the Entry/Goals/Form framing above:
+   candidate inputs first, integration/code/architecture quality goals second, execution/judgment/
+   attribution/badcase precipitation as the platform form.
 2. **Four pillars.** Every feature must state which pillar it strengthens, for *candidates of
    any origin* (not "make our own generator greener"):
    - **Candidate** — author-agnostic submission entry (`submit_candidate`, docs/53). *Live.*
@@ -33,12 +48,16 @@ sanctioned API direction, and only once a gated phase is approved.
      docs/50). *Live.*
    - **Asset Gate** — judge whether the *assets* (code context / business-oracle source /
      fixtures / mock / schema) suffice, and recommend the test **level** (unit / api /
-     integration / manual-oracle-first). Judge-side, advisory. **Not built — the next on-thesis step.**
+     integration / manual-oracle-first). Judge-side, advisory. **S1-S4A live:** compact report,
+     benchmark/ledger carry, descriptive breakdowns, and a report-only Test-Level Router. No
+     executor/API harness.
 3. **Single anti-drift filter:** does this strengthen *judging / managing / comparing /
    precipitating* candidates of any origin? If it only raises our own generator's compile/pass
    rate — and is not an oracle-safety / red-line fix — **downgrade it.**
 4. **Invariants hold across all of the above:** advisory only; never auto-accept; `conclusion`
    stays `NEED_HUMAN_REVIEW`; `trusted=False`; every new level/phase is owner-gated + design-first.
+   "Design-first" means API/interface candidate evaluation should be considered early, not hidden
+   behind endless unit-test generator tuning.
 
 ## Boundary — the bar every agent is held to (anti-hallucination)
 The project's claim is **NOT "I can generate tests"** — it is **"I can judge whether
@@ -54,27 +73,24 @@ tests:
 - If you cannot show judging evidence, say so — do not fill the gap with a confident-
   sounding but unverified claim.
 
-## Current state (2026-06-17)
-- Done: judge + minimal generation pipeline; quality gate + review policy (advisory,
-  never auto-accept); preflight + oracle-safe compile-repair (gated off); ledger
-  P1/P2 (`app/ledger/`); `run_kind` **minimal slice** (producer-set provenance + the
-  "fake can never be real" guard, docs/43) plus its **S2 filter-only follow-up — done**
-  (`aggregate()` + ledger analytics default headline views to `run_kind=="real"`;
-  fake/dryrun/smoke + historical unknown excluded; back-compat; docs/43 §12).
-  **Value-judgment signal layer (advisory; none feed the recommendation/`conclusion`),
-  owner-approved 2026-06-13:** business-invariant tags (S1–S3, docs/45), oracle-strength
-  **structural** estimate rolled up from the quality gate (S1+S2, docs/46), and a
-  **dormant gated** PIT **mutation** subsystem (`app/mutation/`, `mutation_enabled=False`,
-  docs/46 S3 — the real semantic signal; never runs PIT unless explicitly enabled).
-- **Value-judgment signal layer landed (2026-06-13);** then judge-side problems
-  #1/#3/#4/#5/#6 (docs/48–52) and the **producer-agnostic `submit_candidate` entry
-  (docs/53 S1+S2)** landed (2026-06-15) — the **Candidate + Provenance + Badcase** pillars
-  are live (see Design north-star). Mutation stays **gated off** (`mutation_enabled=False`);
-  the JUnit5-aware PIT sidecar (`build_pit_pom`, `app/mutation/pit.py`) **is merged on `main`**
-  (commit `c800a08`) and validated. Still **not** built — do not start without explicit
-  approval: the **Asset Gate / Test-Level Router** (the next on-thesis step), the interface/
-  API-test level, Defects4J, multi-model experiments. Every new signal stays advisory; never
-  auto-accept.
+## Current state (2026-07-04)
+- Done: judge + minimal generation pipeline; `submit_candidate`; quality gate + review policy
+  (advisory, never auto-accept); preflight + oracle-safe compile-repair (gated off); ledger
+  P1/P2 + retrieval; `run_kind` hygiene (`real` headline excludes fake/dryrun/smoke/external/
+  historical unknown); business-invariant tags; oracle-strength structural estimate; dormant
+  gated PIT mutation subsystem; invariant review; survived-mutant classification; mock smell;
+  review digest.
+- Asset Gate S1-S4A is live: `review_summary["asset_sufficiency"]`, tiny `asset_facts` from
+  `ContextSnapshot`, digest flags, compact benchmark/ledger carry fields, descriptive breakdowns,
+  benchmark markdown, and report-only `review_summary["test_level_router"]`. All are advisory.
+  The router launches no executor and creates no API/integration candidate kind.
+- Still **not** built — do not start without explicit approval: API/interface executor,
+  implemented new candidate kinds, Defects4J ingestion, multi-model experiments, LLM Judge scoring,
+  complex RAG, large MCP/web backend, auto-adoption, auto-merge, or auto-warehouse entry.
+- Current direction: avoid treating API/interface evaluation as indefinitely deferred. After a
+  bounded S4A router audit, prefer S6 API/interface candidate boundary design over more unit-test
+  generator, prompt, or compile/pass-rate work unless a concrete evidence/red-line fix is being
+  handled.
 - Branch `main`; commits are often stacked **locally and unpushed**.
 - Data caveat: **new** benchmark runs carry the authoritative `run_kind` field;
   **historical** `var/benchmark/*/bench.db` rows have no field, so their fake/real split
@@ -83,18 +99,55 @@ tests:
   `docs/50_benchmark/43_RUN_KIND_DESIGN.md`).
 
 ## Read first
-1. `docs/00_foundation/00_PROJECT_CHARTER.md` — top constraint
-2. `docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md` — thesis
-3. `docs/00_foundation/42_AI_TEST_FAILURE_EMPIRICAL_AUDIT.md` — real data + §A reproducibility
-4. `docs/knowledge/` — agent memory (start at `README.md`): external agent/testgen lessons, benchmark strategy, business-invariant test value. All three converge: **`run_kind` is the critical next step**.
-5. `docs/README.md` — doc index
+Use a small read set so design work stays on the mainline and does not hallucinate from old
+notes.
+
+Always read the thin layer:
+1. `docs/WORK_LOG.md` — current snapshot, next step, and routed read rules
+2. `docs/README.md` — active doc index, archive policy, and three-layer read mechanism
+3. `docs/00_foundation/54_CORE_FREEZE_AND_BOUNDARY_REFERENCE.md` — current boundary
+4. `docs/knowledge/README.md` — knowledge gate for design work
+5. `docs/knowledge/EXTERNAL_ASSET_MAPPING_MATRIX.md` — required intake-shape mapping for external assets
+
+Then follow the three-layer read mechanism in `docs/README.md`:
+- Layer 1, thin required read: current state, boundary, knowledge gate, and asset mapping.
+- Layer 2, task-routed read: only docs needed by the current design need.
+- Layer 3, deep/evidence read: historical docs, large knowledge packs, external repo README audits,
+  and code/tests only when Layer 2 proves they are needed.
+
+Task-routed examples:
+- API/interface candidate design: `docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md` §10 and
+  `docs/60_api_candidate/00_API_CANDIDATE_JUDGE_BOUNDARY.md`.
+- API compact report/evidence or S6C/S7 smoke-path work:
+  `docs/60_api_candidate/03_API_COMPACT_REPORT_CONTRACT.md` and
+  `docs/60_api_candidate/04_S7_SMOKE_PATH_SELECTION.md`. For `junit_api_candidate` report-only
+  wiring, also read `docs/60_api_candidate/05_S7A_JUNIT_API_REPORT_ONLY_WIRING_DESIGN.md`. For
+  submit API exposure of `candidate_kind` or compact `api_evidence`, also read
+  `docs/60_api_candidate/06_S7B_SUBMIT_API_REPORT_ONLY_EXTENSION_DESIGN.md`.
+- Asset Gate / Test-Level Router: `docs/50_benchmark/55_ASSET_GATE_NEXT_STEP_AUDIT.md`.
+- Metrics, benchmark claims, landing validation, or historical data:
+  `docs/00_foundation/42_AI_TEST_FAILURE_EMPIRICAL_AUDIT.md`,
+  `docs/50_benchmark/43_RUN_KIND_DESIGN.md`, and
+  `docs/50_benchmark/56_REAL_WORLD_VALIDATION_LINE.md`.
+- Human-review labels, RCA, usable-test rate, diagnosis time, or misjudgment metrics:
+  `docs/50_benchmark/56_REAL_WORLD_VALIDATION_LINE.md` and
+  `docs/50_benchmark/57_HUMAN_REVIEW_RCA_LABEL_CONTRACT.md`.
+- External repositories/assets: first map each asset with
+  `docs/knowledge/EXTERNAL_ASSET_MAPPING_MATRIX.md`, then do a focused README audit when the
+  matrix says `readme_audit`, `dataset_slice`, `executor_adapter`, or `sut_target`. Do not make all
+  knowledge packs part of the default read set.
+
+External asset rule: never write only "useful". State the intake shape (`knowledge_note`,
+`readme_audit`, `manifest_seed`, `dataset_slice`, `producer_adapter`, `executor_adapter`,
+`sut_target`, `isolation_support`, `provenance_support`, `discovery_index`, `support_only`, or
+`reject_mainline`) and the project artifact it affects.
 
 ## Toolchain (this machine)
 - Python: **use the venv** → `& "E:\AI-Test-Platform\.venv\Scripts\python.exe"`.
   Bare `python` is the Windows Store stub (exits 49, no output).
 - Verify command:
-  `& "E:\AI-Test-Platform\.venv\Scripts\python.exe" -m pytest` → expect
-  `225 passed, 4 skipped` (the count grows as tests are added).
+  `& "E:\AI-Test-Platform\.venv\Scripts\python.exe" -m pytest` → recent evidence:
+  `427 passed, 4 skipped, 1 warning` (the count grows as tests are added).
 
 ## Safe actions
 - Read/inspect anything; run offline `pytest`; run read-only scripts

@@ -18,6 +18,7 @@ Bundle shape (all optional; missing pieces degrade gracefully)::
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Optional
 
 from app.quality.asset_sufficiency import estimate_asset_sufficiency
@@ -25,10 +26,16 @@ from app.quality.mock_smells import detect_mock_smells
 from app.quality.oracle_strength import estimate_oracle_strength
 from app.quality.test_level_router import route_test_level
 from app.quality.test_quality_gate import evaluate_test_quality
+from app.report.api_evidence import (
+    ApiEvidenceValidationError,
+    JUNIT_API_CANDIDATE,
+    validate_api_evidence_block,
+)
 from app.review.review_digest import build_review_digest
 from app.review.review_policy import build_review_summary, recommend_with_reasons
 
 CONCLUSION = "NEED_HUMAN_REVIEW"  # invariant for all of Phase 2
+JUNIT_UNIT_CANDIDATE = "junit_unit_candidate"
 
 # GenTestOutcome values that imply the generated test compiled / executed.
 _COMPILED = {"PASS", "TEST_FAILURE", "NO_TESTS"}
@@ -63,6 +70,54 @@ def _coverage_view(delta: Optional[dict]) -> Optional[dict]:
         "target_before": delta.get("target_before"),
         "target_after": delta.get("target_after"),
     }
+
+
+def _attach_api_evidence_if_present(review_summary: dict, generation: dict) -> None:
+    """Attach compact API evidence for the S7A report-only path.
+
+    This is deliberately narrow: it validates a supplied block or creates an empty
+    one for ``junit_api_candidate``. It never infers traffic, starts an executor, or
+    changes verdicts. Ordinary unit bundles remain unchanged.
+    """
+    candidate_kind = generation.get("candidate_kind")
+    api_evidence = generation.get("api_evidence")
+
+    if candidate_kind is None and api_evidence is None:
+        return
+    if candidate_kind == JUNIT_UNIT_CANDIDATE and api_evidence is None:
+        return
+    if candidate_kind not in (None, JUNIT_UNIT_CANDIDATE, JUNIT_API_CANDIDATE):
+        raise ApiEvidenceValidationError(
+            "S7A report-only wiring supports only junit_unit_candidate "
+            "or junit_api_candidate"
+        )
+    if candidate_kind == JUNIT_UNIT_CANDIDATE and api_evidence is not None:
+        raise ApiEvidenceValidationError(
+            "api_evidence requires candidate_kind=junit_api_candidate"
+        )
+
+    block = {}
+    if api_evidence is not None:
+        if not isinstance(api_evidence, Mapping):
+            raise ApiEvidenceValidationError("api_evidence block must be a mapping")
+        block = dict(api_evidence)
+
+    if candidate_kind is not None:
+        block_candidate_kind = block.get("candidate_kind")
+        if block_candidate_kind not in (None, candidate_kind):
+            raise ApiEvidenceValidationError(
+                "api_evidence.candidate_kind must match generation.candidate_kind"
+            )
+        block["candidate_kind"] = candidate_kind
+    elif "candidate_kind" not in block:
+        block["candidate_kind"] = JUNIT_API_CANDIDATE
+
+    normalized = validate_api_evidence_block(block)
+    if normalized["candidate_kind"] != JUNIT_API_CANDIDATE:
+        raise ApiEvidenceValidationError(
+            "S7A report-only wiring accepts only junit_api_candidate api_evidence"
+        )
+    review_summary["api_evidence"] = normalized
 
 
 def assemble_generation_report(generation: dict) -> dict:
@@ -151,6 +206,10 @@ def assemble_generation_report(generation: dict) -> dict:
         run_kind=generation.get("run_kind"),
         producer_id=result.get("producer_id") or generation.get("producer_id"),
     )
+    # docs/60_api_candidate/05 S7A: report-only API evidence for the first
+    # junit_api_candidate path. This validates compact supplied facts, never starts
+    # an executor, and does not feed digest/recommendation/conclusion/trusted.
+    _attach_api_evidence_if_present(review_summary, generation)
     # docs/52: advisory review digest -- a prioritized roll-up of the signals above for the
     # reviewer. Built last; reads only what's present; changes no recommendation/conclusion.
     review_summary["digest"] = build_review_digest(review_summary)

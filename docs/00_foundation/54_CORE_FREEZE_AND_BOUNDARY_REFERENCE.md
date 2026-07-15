@@ -119,8 +119,10 @@ The stable abstraction is the V2 four-pillar model:
 | Badcase | Structured memory of judged failures and precedents. | Live. Retrieval is advisory and evidence-bound. |
 | Asset Gate | Whether available assets are sufficient, and which test level is appropriate. | S1-S3D advisory signal and compact carry live; S4A Test-Level Router is report-only live. No executor/API harness. |
 
-The next design frontier is not another generator improvement. It is auditing the report-only
-router and designing any later execution-level expansion separately, owner-gated and report-first.
+The next design frontier is not another generator improvement. It is a bounded closeout audit of
+the report-only router plus early API/interface Candidate boundary design. This is a near-term
+mainline direction: move the judge beyond unit-test-only candidates without jumping into an API
+automation framework.
 
 ## 6. Asset Gate Is The Next Core Design
 
@@ -163,9 +165,10 @@ the full snapshot. The router is report-only and owner-gated; this is still not 
 This is the clean bridge from the current Java/Maven unit-test kernel to future API candidate
 evaluation without becoming an API automation framework.
 
-## 7. Future API Direction Boundary
+## 7. Near-Term API Evaluation Boundary
 
-API/interface testing is allowed only as a gated future candidate level.
+API/interface testing is a near-term candidate-evaluation direction. It should be designed early
+as part of the mainline, while execution remains owner-gated and design-first.
 
 Allowed framing:
 
@@ -187,12 +190,14 @@ Auto-generate and auto-adopt API suites.
 Build full data factory / environment orchestration before Asset Gate.
 ```
 
-Required order:
+Preferred order:
 
 1. Stabilize the current unit-test judge kernel and evidence surface.
-2. Design and approve Asset Gate / Test-Level Router.
-3. Only then design an API candidate kind and minimal API executor.
-4. Keep every new level owner-gated, advisory, and report-first.
+2. Close out a bounded audit that Asset Gate / report-only Test-Level Router remains advisory.
+3. Design the API/interface Candidate boundary early as a mainline direction: candidate kind,
+   input shape, evidence contract, report fields, and asset requirements.
+4. Only after that design, choose a minimal API smoke path and executor adapter.
+5. Keep every new level owner-gated, advisory, and report-first.
 
 ## 8. Decision Filter For Every New Requirement
 
@@ -268,13 +273,76 @@ Risky metrics when used as headlines:
 Default headline views must remain honest about `run_kind`. Historical data with missing
 `run_kind` remains read-only and labeled as heuristic/unknown.
 
+### 10.1 Real-World Landing Validation Line
+
+Future benchmark/report/review designs should use
+`docs/50_benchmark/56_REAL_WORLD_VALIDATION_LINE.md` as the metric contract for proving real
+project value.
+
+Core validation metrics:
+
+| Metric | What it proves | Evidence requirement |
+|---|---|---|
+| First Compile Pass Rate | Candidate can compile on first judged execution. | Maven/Surefire first-run evidence; repair cannot count as first pass. |
+| First Test Pass Rate | Candidate executes and its own tests pass. | First-run `gen_outcome == PASS`; green is not value proof. |
+| Usable Test Rate | Human ultimately keeps the test. | Human disposition labels; never inferred from recommendation. |
+| Weak Assertion Detection Rate | Platform catches fake-green / weak-oracle tests. | Quality/mutation signals plus labeled weak-test set for recall/precision. |
+| Defect Discovery Rate | Candidate exposes real or seeded defects. | Pinned real-bug or seeded-defect verifier; `TEST_FAILURE` alone is not enough. |
+| Human Edit Count | Effort from candidate to usable test. | Human review/edit annotations. |
+| Human Handling Time | Human review and repair cost. | Review timestamps, not job runtime. |
+| Diagnosis Time | Time from failure to root-cause understanding. | Failure surfaced timestamp plus human/verifier RCA timestamp. |
+| Misjudgment Rate | Whether platform guidance misleads humans. | Human/golden labels compared with platform signals. |
+
+Rule: separate automated judge evidence from human/golden validation. Automated compile/pass and
+weak-structure signals may be reported earlier with `run_kind` hygiene; usable-test rate, defect
+discovery, human effort, diagnosis time, and misjudgment rate must not be headlined until their
+labels/verifiers exist.
+
+V1 status, 2026-07-12: the automated evidence line is implemented as
+`app/benchmark/validation_line.py` and rendered in benchmark markdown as RAW plus HEADLINE(real)
+sections. It changes no `aggregate(...)` keys, schemas, ledger fields, recommendations,
+conclusions, trust, or digest severity.
+
+S5C status, 2026-07-15: human review and RCA label language is drafted in
+`docs/50_benchmark/57_HUMAN_REVIEW_RCA_LABEL_CONTRACT.md`, and the V1 pure validator is live in
+`app/review/human_labels.py`. It validates disposition, root-cause, fix-note, timestamp,
+manual-edit, and misjudgment labels and projects compact metric facts; it does not implement
+storage, indexes, backfill, auto-RCA, LLM judging, or any verdict change.
+
+S6C status, 2026-07-15: the minimal S7 API/interface smoke path is selected in
+`docs/60_api_candidate/04_S7_SMOKE_PATH_SELECTION.md`: start with `junit_api_candidate` on the
+existing Maven/Surefire boundary. The V1 `api_evidence` validator is live in
+`app/report/api_evidence.py`; it validates compact report-only API facts and redaction rules, but
+does not wire runtime reports, add candidate kinds, start executors, install tools, change
+benchmark/ledger schemas, or change verdict semantics.
+
+S7A status, 2026-07-15: report-only wiring for `junit_api_candidate` is live in
+`app/report/generation_report.py` and specified in
+`docs/60_api_candidate/05_S7A_JUNIT_API_REPORT_ONLY_WIRING_DESIGN.md`. A generation bundle may now
+attach validated `review_summary["api_evidence"]` when it explicitly carries
+`candidate_kind="junit_api_candidate"` or `api_evidence`; ordinary unit bundles remain unchanged.
+This still does not implement a submit API change, executor, dependency, benchmark/ledger schema
+change, digest severity change, or verdict change.
+
+S7B status, 2026-07-16: submit API exposure of `candidate_kind` and compact `api_evidence` is
+designed in `docs/60_api_candidate/06_S7B_SUBMIT_API_REPORT_ONLY_EXTENSION_DESIGN.md`. The design
+keeps existing submit callers stable, accepts API evidence only for explicit
+`junit_api_candidate`, requires public-boundary redaction/authority validation, and still does not
+implement an endpoint change, executor, dependency, benchmark/ledger schema change, digest severity
+change, or verdict change.
+
 ## 11. Skill/SOP Reference Boundary
 
-The external knowledge note recommends Skill-style SOPs. In this repo, the right interpretation is:
+The external knowledge notes recommend Skill-style SOPs and Agent/Harness evaluation templates.
+In this repo, the right interpretation is:
 
 - Skill is a reusable evaluation procedure, not a new product surface.
 - A useful Skill encodes steps, red lines, evidence, and human fallback.
 - Skill docs should not smuggle in UI automation, complex RAG, or provider-platform scope.
+- Skill docs should help use the judge correctly: trigger, inputs, workflow, evidence, red lines,
+  output, and fallback.
+- Prompt-written evaluator logic may help design a harness, but it must not replace deterministic
+  judge invariants or become a runtime authority.
 
 Candidate Skill candidates, if created later:
 
@@ -285,8 +353,12 @@ Candidate Skill candidates, if created later:
 | `badcase-memory` | Retrieve real ledger precedents as advisory context. |
 | `test-quality-review` | Guide human review of oracle, invariant, mock, flaky, and maintainability risks. |
 | `eval-report` | Produce an audit-grade report with `NEED_HUMAN_REVIEW`. |
+| `ci-pr-handoff` | Prepare local verification evidence and PR handoff without pushing or merging. |
 
 These should describe how to use the judge. They should not become a new generator roadmap.
+
+For the detailed external lesson mapping, see
+`docs/knowledge/AGENT_HARNESS_EVALUATION_KB.md`. Its lessons are knowledge, not automatic tasks.
 
 ## 12. Current Core Map
 
@@ -338,8 +410,22 @@ Any future design that claims to be on-thesis should explicitly state:
 6. Whether it needs new dependencies, model calls, network access, or cost approval.
 7. Which existing report or digest field will surface the signal.
 8. Which tests prove that no auto-accept or headline metric drift occurred.
+9. If it mentions an external asset, the asset's intake shape from
+   `docs/knowledge/EXTERNAL_ASSET_MAPPING_MATRIX.md`, the project artifact it affects, and the red
+   lines that prevent copying, vendoring, or premature execution.
 
 If a design cannot answer these, it is probably not ready to implement.
+
+Recommended external asset block:
+
+```text
+External Asset Mapping:
+- asset:
+- intake shape:
+- project artifact:
+- expected evidence:
+- red lines:
+```
 
 ## 14. Final Boundary
 
@@ -351,5 +437,6 @@ It should not become:
 
 > A prompt playground, provider hub, RAG platform, automation suite, or auto-merge bot.
 
-The strongest next move is to audit and harden Asset Gate/report evidence, not another round of
-generation tuning.
+The strongest next move is to close out the S4A router audit and start S6 API/interface Candidate
+boundary design as the preferred mainline direction, not another round of generation tuning or
+broad external-tool ingestion.

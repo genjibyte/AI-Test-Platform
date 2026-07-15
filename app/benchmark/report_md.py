@@ -8,6 +8,7 @@ from app.benchmark.models import (
     business_breakdown,
     oracle_strength_breakdown,
 )
+from app.benchmark.validation_line import validation_line_summary
 
 
 def _pct(v) -> str:
@@ -93,6 +94,30 @@ def _asset_gate_lines(bd: dict, title: str) -> list:
     ]
 
 
+def _validation_lines(summary: dict, title: str) -> list:
+    """Real-world validation-line V1 summary (docs/56). Automated evidence only."""
+    return [
+        f"## {title}",
+        "",
+        f"- total_cases: {summary.get('total_cases')}  "
+        f"generation_attempted: {summary.get('generation_attempted')}  "
+        f"first_run_evidence_cases: {summary.get('first_run_evidence_cases')}  "
+        f"(run_kind_filter: {summary.get('run_kind_filter')})",
+        f"- first_compile_pass_rate: {_pct(summary.get('first_compile_pass_rate'))}  "
+        f"first_compile_pass_count: {summary.get('first_compile_pass_count')}",
+        f"- first_test_pass_rate: {_pct(summary.get('first_test_pass_rate'))}  "
+        f"first_test_pass_count: {summary.get('first_test_pass_count')}",
+        f"- structural_weak_signal_rate: {_pct(summary.get('structural_weak_signal_rate'))}  "
+        f"structural_weak_signal_cases: {summary.get('structural_weak_signal_cases')}/"
+        f"{summary.get('structural_weak_signal_evaluated_cases')}",
+        f"- preflight_reject_cases: {summary.get('preflight_reject_cases')}  "
+        "first_run_ambiguous_due_to_repair: "
+        f"{summary.get('first_run_ambiguous_due_to_repair')}",
+        "  (V1 automated evidence only; human/golden metrics remain unavailable)",
+        "",
+    ]
+
+
 def _survivor_lines(report: BenchReport) -> list:
     """Aggregate survived-mutant classification across cases (docs/49 S2). Advisory: explains
     survivors (coverage gap vs weak oracle vs maybe-equivalent); never a verdict. Rendered only
@@ -154,6 +179,14 @@ def render_markdown(report: BenchReport) -> str:
     lines += _asset_gate_lines(
         asset_gate_breakdown(report.cases, run_kind="real"),
         "Asset Gate - HEADLINE (real only)",
+    )
+    lines += _validation_lines(
+        validation_line_summary(report.cases),
+        "Real-world validation line - RAW (all run_kinds)",
+    )
+    lines += _validation_lines(
+        validation_line_summary(report.cases, run_kind="real"),
+        "Real-world validation line - HEADLINE (real only)",
     )
     lines += _survivor_lines(report)
     lines += [

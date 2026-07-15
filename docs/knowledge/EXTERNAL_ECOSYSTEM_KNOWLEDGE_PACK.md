@@ -1,10 +1,11 @@
 <!-- INGESTED 2026-06-17 into docs/knowledge/. This is an EXTERNAL research pack
 (reference / roadmap), not proof of implementation. Read the reconciliation note
 below before treating any "建议新增/Slice" as undone work — several pillars already
-exist. The binding strategic reading lives in the constraint files every agent reads:
-CLAUDE.md ("Design north-star") + docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md (§10 V2). -->
+exist. The binding strategic reading lives in AGENTS.md plus the active docs:
+docs/WORK_LOG.md, docs/README.md, docs/00_foundation/54_CORE_FREEZE_AND_BOUNDARY_REFERENCE.md,
+and docs/50_benchmark/55_ASSET_GATE_NEXT_STEP_AUDIT.md. -->
 
-> **Reconciliation with current state (2026-06-17) — read first.** This pack predates
+> **Reconciliation with current state (2026-07-06) — read first.** This pack predates
 > some work it lists as "to do". Already built on `main` (do NOT re-build):
 > - **Candidate / Submission entry (pack Slice A / §2.1)** → `submit_candidate` is live:
 >   `app/api/submit_candidate.py` + `app/pipeline/submit_pipeline.py` (docs/53 S1). Any
@@ -22,12 +23,14 @@ CLAUDE.md ("Design north-star") + docs/00_foundation/40_CORE_THESIS_REPOSITIONIN
 > - **Other judge signals already live:** quality gate (`app/quality/test_quality_gate.py`),
 >   structural oracle-strength (docs/46), mock/external-dependency smells (docs/51),
 >   invariant verification (docs/48), review digest (docs/52).
+> - **Asset Gate + Test-Level Router (pack Slice D / §2.2)** → Asset Gate S1-S4A is live:
+>   `review_summary["asset_sufficiency"]`, tiny `asset_facts`, digest flags, compact benchmark/
+>   ledger carry, descriptive breakdowns, benchmark markdown, and report-only
+>   `review_summary["test_level_router"]`. Do not rebuild it; audit/harden it.
 >
-> **Genuinely new / not built** (the on-thesis next steps this pack motivates):
-> **Asset Sufficiency Gate (pack §2.2 / Slice D)** and **Test-Level Router**; then the
-> **gated** extension to interface/API testing (pack §5, P4+). All remain design-first,
-> advisory, owner-gated — the standing rule is in CLAUDE.md ("Design north-star") and
-> docs/00_foundation/40 §10.
+> **Still not built:** interface/API candidate execution, new candidate kinds,
+> Defects4J, multi-model experiments, LLM Judge scoring, complex RAG, large MCP/web backend,
+> and any auto-adoption flow. All remain design-first, advisory, owner-gated, and report-first.
 >
 > ---
 

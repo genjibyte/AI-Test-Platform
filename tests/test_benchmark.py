@@ -261,6 +261,51 @@ def test_render_markdown_includes_asset_gate_breakdown_without_headline_drift():
     assert "asset_gate_breakdown" not in aggregate(cases)
 
 
+def test_render_markdown_includes_validation_line_without_aggregate_drift():
+    cases = [
+        _pass("real_ok", run_kind="real"),
+        _pass(
+            "real_weak",
+            run_kind="real",
+            gen_outcome="COMPILE_FAILURE",
+            compiled=False,
+            executed=False,
+            passed=False,
+            failure_type="COMPILE_FAILURE",
+            quality_gate_status="FAIL",
+            quality_blockers=1,
+            review_summary={
+                "quality": {
+                    "status": "FAIL",
+                    "blockers": ["no_assertions"],
+                    "warnings": [],
+                },
+            },
+        ),
+        _pass("fake_ok", run_kind="fake"),
+    ]
+    before_keys = set(aggregate(cases).keys())
+
+    md = render_markdown(BenchReport(cases=cases, aggregate=aggregate(cases)))
+
+    assert "## Real-world validation line - RAW (all run_kinds)" in md
+    assert "## Real-world validation line - HEADLINE (real only)" in md
+    raw = md.split(
+        "## Real-world validation line - RAW (all run_kinds)", 1
+    )[1].split("##", 1)[0]
+    headline = md.split(
+        "## Real-world validation line - HEADLINE (real only)", 1
+    )[1].split("##", 1)[0]
+    assert "first_run_evidence_cases: 3  (run_kind_filter: None)" in raw
+    assert "first_compile_pass_rate: 67%" in raw
+    assert "first_run_evidence_cases: 2  (run_kind_filter: real)" in headline
+    assert "first_compile_pass_rate: 50%" in headline
+    assert "structural_weak_signal_cases: 1/2" in headline
+    assert "human/golden metrics remain unavailable" in headline
+    assert set(aggregate(cases).keys()) == before_keys
+    assert "first_compile_pass_rate" not in aggregate(cases)
+
+
 def test_completed_result_carries_review_summary_failures():
     fqcn = "com.example.CAiGeneratedTest"
     job = Job(git_url="file:///repo", status=JobStatus.GEN_DONE,

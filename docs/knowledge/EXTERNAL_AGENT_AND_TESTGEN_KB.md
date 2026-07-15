@@ -2,14 +2,15 @@
 
 > **Recorded 2026-06-11** into the repo as durable agent memory (`docs/knowledge/`).
 > This is an **external-lessons** knowledge base. Per §9, it is **NOT proof any feature
-> is implemented**. Many paths it references are **PLANNED, not yet present** — e.g.
-> `AGENTS.md`, `docs/TASKS.md`, `docs/HANDOFF.md`, `docs/RUN_POLICY.md`,
-> `docs/QUALITY_GATE.md`, `docs/ARTIFACT_SPEC.md`, `docs/FAILURE_LEDGER.md`,
-> `artifacts/runs/`, `app/mutation/`, `app/reporting/`, `app/context_builder/`,
-> `skills/`. **Current equivalents that DO exist:** quality gate = `app/quality/` +
-> `docs/30_phase2_5_quality/19_MINIMAL_TEST_QUALITY_GATE.md`; reporting = `app/report/`;
-> ledger = `app/ledger/`; benchmark audit = `scripts/audit_bench.py`; agent guide =
-> `CLAUDE.md`. `run_kind` (P1-T3) is **designed but paused / not implemented**.
+> is implemented**. It predates several live capabilities. Current reconciliation
+> (2026-07-06): `AGENTS.md` exists and is the active agent guide; quality gate =
+> `app/quality/`; reporting = `app/report/`; ledger = `app/ledger/`; benchmark audit =
+> `scripts/audit_bench.py`; mutation = `app/mutation/` and remains gated off by default;
+> `run_kind` is live; `submit_candidate` is live; Asset Gate S1-S4A is live, including the
+> report-only Test-Level Router. Historical references to `docs/TASKS.md`,
+> `docs/HANDOFF.md`, `docs/RUN_POLICY.md`, `docs/QUALITY_GATE.md`, `docs/ARTIFACT_SPEC.md`,
+> `docs/FAILURE_LEDGER.md`, `artifacts/runs/`, `app/reporting/`, `app/context_builder/`,
+> or `skills/` are patterns, not current repo facts.
 
 ## Purpose
 This knowledge base records external industrial and research lessons that are directly relevant to this project.

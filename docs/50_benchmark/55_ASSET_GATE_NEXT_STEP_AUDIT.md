@@ -289,10 +289,10 @@ No drift found:
 
 Residual watch item:
 
-- Asset Gate counts are compact report counters, not a formal router decision. The next design
-  must keep the Test-Level Router owner-gated and report-first.
+- Asset Gate counts are compact report counters. S4A's router is report-only; any next design must
+  keep it owner-gated and must not add execution without separate approval.
 
-## 9. S4 Test-Level Router Boundary - Design Only
+## 9. S4 Test-Level Router Boundary - Record
 
 Decision: the Test-Level Router is a report-facing contract over Asset Gate facts. It is not an
 executor, not a candidate-kind expansion, and not an API/integration harness.
@@ -738,3 +738,28 @@ No aggregate headline changes. No badcase signature changes. No model/network ca
 dependencies. No executor/router automation yet. No verdict/recommendation/conclusion/trusted
 changes.
 ```
+
+## 16. Post-S4A Design Queue
+
+After the S4A report-only router audit passes, keep the next designs evidence-governance-first:
+
+```text
+S5B Golden Set governance
+  Clarify benchmark-manifest case roles, stability rules, risk coverage, and admission criteria.
+  No model run, no runner change, no historical DB backfill in the first design slice.
+
+S5C Badcase RCA taxonomy
+  Stabilize human-declared root_cause / fix_note language for grouping and retrieval.
+  Do not auto-fill RCA fields and do not change badcase signatures in the first design slice.
+
+S5D Skill/SOP templates
+  Describe safe judge workflows: trigger, inputs, steps, evidence, red lines, output, fallback.
+  Do not create a broad skill platform or prompt-based evaluator.
+
+S5E LLM Judge calibration
+  Future-gated only. Requires human calibration set, confidence/reason/evidence output, bias
+  controls, and advisory-only report placement.
+```
+
+The design queue comes from `docs/knowledge/AGENT_HARNESS_EVALUATION_KB.md`. Treat it as a queue
+of owner-gated design options, not as approval to implement.
