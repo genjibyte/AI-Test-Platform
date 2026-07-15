@@ -249,3 +249,8 @@ S7B design is sufficient if the next implementer can answer:
 - why the runner remains Maven/Surefire;
 - why digest, benchmark, ledger, conclusion, and trust do not drift;
 - what remains deferred to S7C/S8.
+
+S7C is drafted in `docs/60_api_candidate/07_S7C_JUNIT_API_SMOKE_MANIFEST_DESIGN.md`. It defines
+the minimal `api_smoke_manifest.v1` exam-bag contract for the first `junit_api_candidate` proof
+line: target, asset requirements, execution policy, compact evidence contract, denominator, and
+external-asset intake rules. It still does not approve an executor or endpoint change.

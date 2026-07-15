@@ -50,7 +50,9 @@ implementation planning, also read `docs/60_api_candidate/04_S7_SMOKE_PATH_SELEC
 `junit_api_candidate` report-only wiring, also read
 `docs/60_api_candidate/05_S7A_JUNIT_API_REPORT_ONLY_WIRING_DESIGN.md`. For submit API exposure of
 `candidate_kind` or compact `api_evidence`, also read
-`docs/60_api_candidate/06_S7B_SUBMIT_API_REPORT_ONLY_EXTENSION_DESIGN.md`.
+`docs/60_api_candidate/06_S7B_SUBMIT_API_REPORT_ONLY_EXTENSION_DESIGN.md`. For API smoke manifest,
+exam-bag, first proof denominator, or asset requirements, also read
+`docs/60_api_candidate/07_S7C_JUNIT_API_SMOKE_MANIFEST_DESIGN.md`.
 
 ### Layer 3 - Deep Evidence Read
 

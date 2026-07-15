@@ -186,6 +186,8 @@ S7A   Live V1: report-only `api_evidence` wiring for `junit_api_candidate`
 S7B   Drafted: submit_candidate report-only extension for `candidate_kind` and
       compact `api_evidence`
       (`docs/60_api_candidate/06_S7B_SUBMIT_API_REPORT_ONLY_EXTENSION_DESIGN.md`)
+S7C   Drafted: `junit_api_candidate` smoke manifest / exam-bag contract
+      (`docs/60_api_candidate/07_S7C_JUNIT_API_SMOKE_MANIFEST_DESIGN.md`)
 
 Support tracks, only when needed:
 S5B0  Run P0 external asset README audit from docs/knowledge/EXTERNAL_ASSET_MAPPING_MATRIX.md
@@ -211,6 +213,8 @@ pass rate:
   framework.
 - API/interface candidate evaluation should not be treated as a distant optional topic. It is the
   preferred next design direction once S4A report-only invariants are checked.
+- S7C smoke work should pin a concrete manifest denominator and asset requirements before any
+  executor, dependency, external SUT import, or benchmark/ledger carry.
 - Real-world validation metrics must separate automated evidence from human/golden labels; do not
   headline usable-test rate, defect discovery, diagnosis time, or misjudgment rate before their
   required labels exist.
@@ -248,6 +252,7 @@ Layer 2 routes by need:
 
 ```text
 API/interface -> docs/40 §10 + docs/60_api_candidate/00 + docs/60_api_candidate/01 + docs/60_api_candidate/02
+API smoke     -> docs/60_api_candidate/03 + docs/60_api_candidate/04 + docs/60_api_candidate/05 + docs/60_api_candidate/06 + docs/60_api_candidate/07
 Asset Gate    -> docs/50_benchmark/55
 Metrics       -> docs/42 + docs/50_benchmark/43 + docs/50_benchmark/56
 Human labels  -> docs/50_benchmark/56 + docs/50_benchmark/57

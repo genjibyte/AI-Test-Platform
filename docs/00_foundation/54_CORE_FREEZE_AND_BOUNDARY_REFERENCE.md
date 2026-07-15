@@ -331,6 +331,13 @@ keeps existing submit callers stable, accepts API evidence only for explicit
 implement an endpoint change, executor, dependency, benchmark/ledger schema change, digest severity
 change, or verdict change.
 
+S7C status, 2026-07-16: the first `junit_api_candidate` smoke manifest / exam-bag contract is
+designed in `docs/60_api_candidate/07_S7C_JUNIT_API_SMOKE_MANIFEST_DESIGN.md`. It pins the future
+API smoke denominator, target/assets, execution policy, and compact evidence contract while keeping
+the existing Maven/Surefire judge as the only runner. It still does not implement a manifest
+validator, endpoint change, executor, dependency, service orchestration, external SUT import,
+benchmark/ledger schema change, digest severity change, or verdict change.
+
 ## 11. Skill/SOP Reference Boundary
 
 The external knowledge notes recommend Skill-style SOPs and Agent/Harness evaluation templates.
@@ -437,6 +444,7 @@ It should not become:
 
 > A prompt playground, provider hub, RAG platform, automation suite, or auto-merge bot.
 
-The strongest next move is to close out the S4A router audit and start S6 API/interface Candidate
-boundary design as the preferred mainline direction, not another round of generation tuning or
-broad external-tool ingestion.
+The strongest next move is a bounded S7C implementation slice only if approved: a pure smoke
+manifest validator with no execution and no schema or verdict drift. Otherwise continue tightening
+API/interface candidate evidence around the existing judge kernel, not another round of generation
+tuning or broad external-tool ingestion.

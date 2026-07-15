@@ -123,7 +123,9 @@ Task-routed examples:
   `docs/60_api_candidate/04_S7_SMOKE_PATH_SELECTION.md`. For `junit_api_candidate` report-only
   wiring, also read `docs/60_api_candidate/05_S7A_JUNIT_API_REPORT_ONLY_WIRING_DESIGN.md`. For
   submit API exposure of `candidate_kind` or compact `api_evidence`, also read
-  `docs/60_api_candidate/06_S7B_SUBMIT_API_REPORT_ONLY_EXTENSION_DESIGN.md`.
+  `docs/60_api_candidate/06_S7B_SUBMIT_API_REPORT_ONLY_EXTENSION_DESIGN.md`. For API smoke
+  manifest, first proof denominator, exam-bag, or asset-requirement design, also read
+  `docs/60_api_candidate/07_S7C_JUNIT_API_SMOKE_MANIFEST_DESIGN.md`.
 - Asset Gate / Test-Level Router: `docs/50_benchmark/55_ASSET_GATE_NEXT_STEP_AUDIT.md`.
 - Metrics, benchmark claims, landing validation, or historical data:
   `docs/00_foundation/42_AI_TEST_FAILURE_EMPIRICAL_AUDIT.md`,
