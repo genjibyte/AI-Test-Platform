@@ -1,5 +1,5 @@
 {
-  "_comment": "FROZEN benchmark manifest v1 (Phase 2.6/4). Every case is pinned to an EXACT commit SHA so runs are reproducible and comparable across context/model versions (docs/23). The 3 'frozen' cases (Option, CSVRecord, WordUtils) are pinned to the exact commits used by var/benchmark/v2-pro-quality-final, so that v2 baseline stays a valid comparison point with ZERO re-run. The other 7 broaden coverage of the failure taxonomy that Context v3 targets (api-contract / exception-semantics / pure-function). Run with the docs/21 skip-flags incantation; coverage stays advisory (jacoco.skip). Buckets/frozen-status are documented in docs/23, not enforced here.",
+  "_comment": "FROZEN benchmark manifest v1. Every case is pinned to an EXACT commit SHA so runs are reproducible and comparable across context/model versions (docs/23). The 3 'frozen' cases (Option, CSVRecord, WordUtils) are pinned to the exact commits used by var/benchmark/v2-pro-quality-final, so that v2 baseline stays a valid comparison point with ZERO re-run. The other 7 broaden coverage of the failure taxonomy that Context v3 targets (api-contract / exception-semantics / pure-function). Run with the skip flags documented in docs/23; coverage stays advisory (jacoco.skip). Buckets/frozen-status are documented in docs/23, not enforced here.",
   "version": 1,
   "cases": [
     {

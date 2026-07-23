@@ -28,6 +28,8 @@ Implemented:
 - formal Test-Level Router boundary, report-only
 - S4 audit and S4A report-only implementation design
 - S4A report-only implementation completed; no executor, benchmark carry, or ledger carry
+- S5A closeout audit completed; router remains pure/report-only and does not leak into benchmark,
+  ledger, markdown, digest, executor, signature, or verdict surfaces
 - producer-agnostic behavior for generated and submitted candidates
 
 Files:
@@ -63,6 +65,7 @@ Latest validation:
 62 passed
 123 passed, 1 warning
 427 passed, 4 skipped, 1 warning
+78 passed in 0.42s (S5A closeout audit target tests)
 ```
 
 ## 2. Output Shape
@@ -606,6 +609,41 @@ Implementation status:
 - Still requires a fresh owner-approved design before any executor, candidate-kind,
   benchmark carry, ledger carry, markdown section, or digest flag is added.
 
+## 12.1 S5A Closeout Audit - Done
+
+Audit result, 2026-07-21:
+
+- `app/quality/test_level_router.py` remains one pure helper with only standard-library typing
+  imports. It does not import report, benchmark, ledger, pipeline, repository, Maven, PIT, API,
+  settings, network, model, or environment helpers.
+- `review_summary["test_level_router"]` remains the only router surface in the current report.
+- `build_review_digest(...)` still ignores `test_level_router`; the digest reads underlying Asset
+  Gate findings instead of turning routing into a new severity signal.
+- `BenchCaseResult` and `JudgedRecord` still carry only compact Asset Gate fields, not router
+  fields.
+- `aggregate(...)`, benchmark markdown, `record_from_bench_case(...)`, and `badcase_signature(...)`
+  do not read or render router facts.
+- API/interface-looking targets may be routed to `future_gated`, but this still launches no
+  executor and creates no candidate kind.
+
+No drift found:
+
+- no benchmark carry, ledger carry, or markdown section for router;
+- no digest flag or digest severity change;
+- no aggregate headline metric or run-kind filter change;
+- no SQLite column/index or badcase signature change;
+- no executor, schema discovery, service orchestration, model/network call, or dependency;
+- no recommendation, conclusion, trusted-status, auto-accept, or auto-reject change.
+
+Focused evidence:
+
+```text
+78 passed in 0.42s
+```
+
+S5A closes the S4A audit queue. Any future router expansion still requires a separate
+owner-approved design and no-drift tests.
+
 ## 13. Carry Field Semantics
 
 Fields on `BenchCaseResult` and `JudgedRecord`:
@@ -761,5 +799,5 @@ S5E LLM Judge calibration
   controls, and advisory-only report placement.
 ```
 
-The design queue comes from `docs/knowledge/AGENT_HARNESS_EVALUATION_KB.md`. Treat it as a queue
-of owner-gated design options, not as approval to implement.
+The historical Agent/Harness knowledge queue was pruned on 2026-07-21. Treat any recovered queue
+as archaeology only, not as approval to implement.

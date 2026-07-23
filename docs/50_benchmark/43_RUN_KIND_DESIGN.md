@@ -1,22 +1,17 @@
-# P1-T3 `run_kind` — design
+# P1-T3 `run_kind` — design and live contract
 
-> Date: 2026-06-11. **Design only. NOT implemented.** No code, no model, no benchmark,
-> no data mutation. Foundation-hardening phase; `run_kind` implementation stays paused
-> until explicit approval. This doc locks down *what* to build so the eventual change
-> is small, bounded, and reviewable.
+> Date: 2026-06-11. Status: S1-S3 implemented; S2 run_kind filters are live for benchmark and
+> ledger views. No judging change, no model run, no historical data mutation, and no backfill.
+> Historical rows without `run_kind` remain unknown/heuristic-labeled.
 >
 > Upstream: docs/42 §A (contamination incident), `scripts/audit_bench.py` (current
-> heuristic + LIMITATION), `docs/knowledge/` (all three KBs name `run_kind` the
-> critical next step), audit finding **F-001 (Blocker)**.
+> heuristic + LIMITATION), audit finding **F-001 (Blocker)**.
 
 ## 0. Why
 
-Fake/real separation is currently **heuristic and unenforced**: the only signals are the
-literal `// FAKE CLIENT PLACEHOLDER` string in `test_source` (`app/llm/fake_client.py`)
-or `model == "fake-1"`. There is **no schema field** and **no regression test**, so
-headline metrics can be silently contaminated — which already happened (n=80 raw → 13
-fake → n=67 real, docs/42 §A). Goal: one **authoritative** field so headline/ledger
-metrics default to real, plus a regression test that prevents recurrence.
+Before S1, fake/real separation was heuristic and unenforced. New rows now carry the
+authoritative `run_kind` field, and regression tests prevent a fake client from producing a
+`real` row. Historical `bench.db` rows still lack the field and remain heuristic/unknown.
 
 ## 1. The field
 
@@ -75,7 +70,7 @@ No change to `gen_outcome`, quality gate, review policy, preflight, or repair.
 - Historical `bench.db` rows have no `run_kind` → treat as **unknown**.
 - `audit_bench.py` keeps the heuristic for unknown rows and labels the split heuristic /
   incomplete (as today). New runs carry the authoritative field.
-- **Do not mutate historical raw artifacts** (KB rule). No in-place backfill of `bench.db`.
+- **Do not mutate historical raw artifacts.** No in-place backfill of `bench.db`.
 
 ## 6. Regression test (closes the recurrence gap)
 
@@ -86,13 +81,13 @@ No change to `gen_outcome`, quality gate, review policy, preflight, or repair.
 ## 7. Scope guard — what NOT to do
 
 - No judging-logic change; no new repair/preflight buckets; no P3 / `submit_candidate`.
-- No business-domain tags (`business_domain`/`business_pattern`/`expected_invariant` from
-  `INTERNET_TECH_BUSINESS_KB.md`) — that is a **separate, later** field set.
+- No business-domain tags (`business_domain`/`business_pattern`/`expected_invariant`) — that is a
+  separate field set governed by docs/45.
 - No model run; no historical-data mutation; small diff.
 - The pipeline must not infer `run_kind` from source text; only `audit_bench.py`'s
   historical fallback may, and it must label it.
 
-## 8. Files likely touched (when implemented — NOT now)
+## 8. Implemented Files
 
 - `app/llm/client.py` (or a tiny helper): derive base `run_kind` from a client/settings.
 - `app/benchmark/runner.py` and/or `app/pipeline/generate_pipeline.py`: set
@@ -104,7 +99,7 @@ No change to `gen_outcome`, quality gate, review policy, preflight, or repair.
 - `scripts/audit_bench.py`: prefer schema field; label heuristic fallback.
 - `tests/`: regression tests (§6).
 
-## 9. Acceptance (when implemented)
+## 9. Acceptance - Live
 
 - `pytest` green incl. the new regression tests.
 - `audit_bench.py` on historical data still works (heuristic, labeled); on a new fake run,
@@ -122,7 +117,7 @@ No change to `gen_outcome`, quality gate, review policy, preflight, or repair.
   prefers the field.
 - **S3 — guard + regression test + `--run-kind` flag**.
 
-Each slice is small and paused until approved.
+The slices below are implemented; future changes should stay equally small and evidence-bound.
 
 ## 11. Open decisions for the owner
 
@@ -173,5 +168,5 @@ Acceptance: full suite green (231 passed, 4 e2e skipped) + new regression tests 
 `test_benchmark.py` / `test_ledger.py`; `audit_bench.py` still reproduces docs/42 §A.
 No P3, no Defects4J, no multi-model.
 
-> The companion `DECISIONS_AND_FAILURES.md` (P1-T5) should record the contamination
-> incident this field prevents.
+> The contamination incident this field prevents is recorded in docs/42 §A. The old
+> `DECISIONS_AND_FAILURES.md` file was pruned from the active docs tree.

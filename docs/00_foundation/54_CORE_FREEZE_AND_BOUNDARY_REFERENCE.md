@@ -1,8 +1,8 @@
 # 54 - Core Freeze and Boundary Reference
 
-> Date: 2026-07-03  
-> Nature: design reference and boundary memo.  
-> Input: external knowledge note `D:\AI测试新范式综合总结_结合AI评测项目_v2_2026-07-03.md`, reconciled with the current charter and V2 thesis.  
+> Date: 2026-07-03
+> Nature: design reference and boundary memo.
+> Input: external knowledge note `D:\AI测试新范式综合总结_结合AI评测项目_v2_2026-07-03.md`, reconciled with the current charter and V2 thesis.
 > Status: documentation only. No implementation is implied by this file.
 
 This document records what should be treated as the stable core of TestAgent Lab, what should be
@@ -28,7 +28,9 @@ Candidate
   -> reproducible report
 ```
 
-The product is the judgment layer. Generation is only one upstream producer.
+The product is the judgment layer. Generation is only one upstream producer. The built-in JUnit
+generator is specifically a legacy failed exploration retained because full deletion is costly; it
+must be treated as a removable compatibility producer, not as roadmap center.
 
 ## 1. Why This Boundary Exists
 
@@ -52,7 +54,7 @@ producer-specific optimization.
 
 | Core capability | Role in the thesis | Freeze rule |
 |---|---|---|
-| Repo Import / Maven Judge / Surefire / JaCoCo | Deterministic execution and coverage evidence for Java/Maven unit-test candidates. | Keep as the execution kernel. Prefer correctness, reproducibility, and parser robustness over feature expansion. |
+| Repo Import / Maven Judge / Surefire / JaCoCo | Deterministic execution and coverage evidence for Java/Maven test candidates. | Keep as the execution kernel. Prefer correctness, reproducibility, and parser robustness over feature expansion. |
 | Candidate Submit | Author-agnostic entry for human, platform, Codex, Copilot, EvoSuite, or other producer output. | Treat as a first-class product boundary. Do not couple it back to the built-in generator. |
 | Quality Gate | Detects empty, weak, unsafe, or low-review-value candidates. | Advisory quality judgment only. Never convert gate output into auto-accept. |
 | Preflight | Early candidate sanity and red-line screening before full execution. | Keep as judge-side safety. Add rules only when they prevent false trust, oracle risk, or invalid candidate handling. |
@@ -75,7 +77,7 @@ platform demoable. They are not the product center.
 |---|---|---|
 | LLM Client | One producer adapter among many. | Maintenance, offline test safety, provider isolation, cost controls. No multi-provider platform as a main goal. |
 | Prompt Builder | Producer-side helper. | Only stabilize prompts when needed for demos or bounded experiments. Do not optimize prompt quality as the core metric. |
-| Platform Generator | Built-in producer. | Keep useful as a baseline producer. It should emit candidates into the same judge path as everyone else. |
+| Platform Generator | Legacy failed exploration and built-in producer. | Keep only as removable compatibility/demo support. It should emit candidates into the same judge path as everyone else and must not drive roadmap priority. |
 | Compile Repair | Gated auxiliary repair. | Allow only oracle-safe, evidence-preserving repair. Default should not hide candidate failures, especially for external submissions. |
 | Context Prompt Tuning | Producer-side context packaging. | Maintain bounded context rules, but do not keep iterating prompt/context versions just to raise built-in pass rate. |
 
@@ -161,6 +163,9 @@ S1-S4A status, 2026-07-04: the advisory signal is implemented as
 breakdowns, and `review_summary["test_level_router"]`. It uses existing bundle/report facts plus
 tiny persisted pipeline asset facts from `ContextSnapshot`; it does not persist source excerpts or
 the full snapshot. The router is report-only and owner-gated; this is still not an API harness.
+S5A closeout status, 2026-07-21: focused tests confirm the router remains pure/report-only and
+does not enter benchmark carry, ledger carry, markdown, digest flags, aggregate headlines,
+badcase signatures, executor behavior, recommendations, conclusions, or trusted status.
 
 This is the clean bridge from the current Java/Maven unit-test kernel to future API candidate
 evaluation without becoming an API automation framework.
@@ -324,19 +329,78 @@ attach validated `review_summary["api_evidence"]` when it explicitly carries
 This still does not implement a submit API change, executor, dependency, benchmark/ledger schema
 change, digest severity change, or verdict change.
 
-S7B status, 2026-07-16: submit API exposure of `candidate_kind` and compact `api_evidence` is
-designed in `docs/60_api_candidate/06_S7B_SUBMIT_API_REPORT_ONLY_EXTENSION_DESIGN.md`. The design
+S7B status, 2026-07-20: submit API exposure of `candidate_kind` and compact `api_evidence` is
+live in `app/api/submit_candidate.py` and `app/pipeline/submit_pipeline.py`, following
+`docs/60_api_candidate/06_S7B_SUBMIT_API_REPORT_ONLY_EXTENSION_DESIGN.md`. The implementation
 keeps existing submit callers stable, accepts API evidence only for explicit
 `junit_api_candidate`, requires public-boundary redaction/authority validation, and still does not
-implement an endpoint change, executor, dependency, benchmark/ledger schema change, digest severity
-change, or verdict change.
+implement an executor, dependency, benchmark/ledger schema change, digest severity change, or
+verdict change.
 
 S7C status, 2026-07-16: the first `junit_api_candidate` smoke manifest / exam-bag contract is
-designed in `docs/60_api_candidate/07_S7C_JUNIT_API_SMOKE_MANIFEST_DESIGN.md`. It pins the future
-API smoke denominator, target/assets, execution policy, and compact evidence contract while keeping
-the existing Maven/Surefire judge as the only runner. It still does not implement a manifest
-validator, endpoint change, executor, dependency, service orchestration, external SUT import,
-benchmark/ledger schema change, digest severity change, or verdict change.
+designed in `docs/60_api_candidate/07_S7C_JUNIT_API_SMOKE_MANIFEST_DESIGN.md`, and the V1 pure
+validator is live in `app/report/api_smoke_manifest.py` with tests in
+`tests/test_api_smoke_manifest.py`. It pins the future API smoke denominator, target/assets,
+execution policy, and compact evidence contract while keeping the existing Maven/Surefire judge as
+the only runner. As the S7C slice, it did not implement an endpoint change, executor, dependency,
+service orchestration, external SUT import, benchmark/ledger schema change, digest severity change,
+or verdict change.
+
+S7D1/S7D2 status, 2026-07-20: API smoke manifest carry-through is live from public submit to
+report assembly in `app/api/submit_candidate.py`, `app/pipeline/submit_pipeline.py`, and
+`app/report/generation_report.py`, with tests in `tests/test_submit_candidate.py` and
+`tests/test_generation_report_api_smoke_manifest.py`, following
+`docs/60_api_candidate/08_S7D_API_SMOKE_MANIFEST_CARRY_THROUGH_DESIGN.md`. A validated
+`api_smoke_manifest.v1` may be projected into `review_summary["api_smoke_manifest"]` with
+alignment facts against `candidate_kind`, target, and compact `api_evidence`. It still does not
+implement executor behavior, service orchestration, benchmark/ledger carry, digest severity, or
+verdict change.
+
+S8 status, 2026-07-20: report-only API smoke denominator eligibility is live in
+`app/report/api_smoke_denominator.py` and `app/report/generation_report.py`, with tests in
+`tests/test_api_smoke_denominator.py`, following
+`docs/60_api_candidate/09_S8_API_SMOKE_DENOMINATOR_POLICY.md`. It adds
+`review_summary["api_smoke_denominator"]` and updates
+`review_summary["api_smoke_manifest"]["alignment"]["denominator_ready"]` from policy facts.
+`benchmark_counting_enabled` remains `false`, `unit_headline_eligible` remains `false`, and it
+still does not implement benchmark/ledger carry, markdown sections, digest severity, executor
+behavior, service orchestration, or verdict change.
+
+S9A status, 2026-07-21: pure API smoke benchmark projection is live in
+`app/benchmark/api_smoke_projection.py`, with tests in
+`tests/test_api_smoke_benchmark_projection.py`, following
+`docs/50_benchmark/59_API_SMOKE_BENCHMARK_PROJECTION_DESIGN.md`. It counts only
+`review_summary["api_smoke_denominator"]` rows in a named projection, with RAW all-run-kind
+diagnostics and a separate API-smoke HEADLINE view for S8-eligible `real`/`external` rows. It does
+not implement aggregate-key changes, ledger carry, digest severity, executor behavior, service
+orchestration, or verdict change.
+
+S9B status, 2026-07-21: conditional API smoke benchmark markdown rendering is live in
+`app/benchmark/report_md.py`, with tests in `tests/test_benchmark.py`. It renders separate RAW and
+API-smoke HEADLINE sections only when API smoke source rows exist. It does not change aggregate
+keys, ledger carry, digest severity, executor behavior, service orchestration, or verdict.
+
+S10A/S10B/S10C status, 2026-07-21: compact API smoke ledger JSON carry is live in
+`app/ledger/models.py` and `app/ledger/ingest.py`, with tests in `tests/test_ledger.py`, following
+`docs/50_benchmark/60_API_SMOKE_LEDGER_PROJECTION_DESIGN.md`. It copies valid S8 denominator facts
+into optional `JudgedRecord` JSON fields only. S10B adds
+`app/ledger/api_smoke_projection.py` as a named pure helper with tests in
+`tests/test_api_smoke_ledger_projection.py`. S10C adds
+`app/ledger/api_smoke_report.py` as a conditional Markdown renderer over that named projection. It
+does not add SQLite columns/indexes, badcase signature changes, retrieval changes, existing
+analytics changes, digest severity, executor behavior, service orchestration, or verdict change.
+
+S5B/S5B2 status, 2026-07-21: Golden Set manifest governance is live in
+`app/benchmark/manifest_governance.py` and `app/benchmark/manifest_governance_report.py`, with
+tests in `tests/test_golden_manifest_governance.py` and
+`tests/test_golden_manifest_governance_report.py`, following
+`docs/50_benchmark/62_GOLDEN_SET_MANIFEST_GOVERNANCE.md`. It validates metadata-only
+`manifest_seed` records for future benchmark drafts or the external project/benchmark registry,
+rejects dataset content, authority fields, secret/raw payload fields, artifact drift, duplicate
+seed IDs, and headline-metric claims, summarizes future owner gates, and can render an opt-in
+Markdown audit section. It does not edit current manifest pins, import datasets, launch executors,
+change aggregate headlines, alter ledger/digest behavior, wire default benchmark reports, or
+change recommendations, conclusions, or trusted status.
 
 ## 11. Skill/SOP Reference Boundary
 
@@ -364,8 +428,56 @@ Candidate Skill candidates, if created later:
 
 These should describe how to use the judge. They should not become a new generator roadmap.
 
-For the detailed external lesson mapping, see
-`docs/knowledge/AGENT_HARNESS_EVALUATION_KB.md`. Its lessons are knowledge, not automatic tasks.
+For external lesson mapping, use the curated governance digest and asset matrix. The previous large
+Agent/Harness knowledge pack was pruned on 2026-07-21; recover it from git only for explicit
+archaeology. Its lessons are knowledge, not automatic tasks.
+
+### 11.1 Open Source Reuse Governance Boundary
+
+The 2026-07 open-source reuse note is useful, but it is not a project roadmap. Its tool lists,
+access dates, URL facts, and P0/P1 labels must be filtered through the current boundary.
+
+Use these docs for the reconciled form:
+
+```text
+docs/00_foundation/58_GOVERNANCE_RECOVERY_AND_REUSE_PREP.md
+docs/knowledge/OPEN_SOURCE_REUSE_GOVERNANCE_2026_07.md
+docs/knowledge/EXTERNAL_ASSET_MAPPING_MATRIX.md
+docs/80_sop/00_JUDGE_SKILL_SOP_TEMPLATES.md
+```
+
+Adopted lessons:
+
+- keep Candidate / Evidence / Report contracts local to this repo;
+- separate declared producer evidence from platform-observed evidence;
+- use external tools as producer, executor, SUT, dataset, provenance, isolation, or knowledge
+  inputs only after intake mapping;
+- require compact evidence, redaction, license/runtime notes, and no-verdict-drift tests before
+  integration.
+
+Downgraded lessons:
+
+- Repair Agent, model gateway, observability stack, PR sink, and orchestration ideas are support
+  tracks, not current mainline;
+- external P0/P1 labels do not override this repo's S6/S7 queue;
+- adapter directories or protocols should not be added before a bounded implementation need proves
+  them.
+
+Rejected mainline:
+
+- generic multi-agent workflow platform;
+- API automation framework;
+- external benchmark bulk import;
+- LLM Judge as final scorer;
+- automatic repair/adoption/warehouse/merge.
+
+Every external asset that moves beyond a knowledge mention needs:
+
+```text
+asset -> intake shape -> asset record block -> focused audit -> owner gate -> tests
+```
+
+The asset record is metadata, not approval to clone, install, execute, or vendor.
 
 ## 12. Current Core Map
 
@@ -420,6 +532,9 @@ Any future design that claims to be on-thesis should explicitly state:
 9. If it mentions an external asset, the asset's intake shape from
    `docs/knowledge/EXTERNAL_ASSET_MAPPING_MATRIX.md`, the project artifact it affects, and the red
    lines that prevent copying, vendoring, or premature execution.
+10. Which automation rung it proposes: report-only validation, report carry, existing-runner
+    execution, external executor adapter, repair loop, or adoption sink. Adoption sinks remain out
+    of scope.
 
 If a design cannot answer these, it is probably not ready to implement.
 
@@ -444,7 +559,12 @@ It should not become:
 
 > A prompt playground, provider hub, RAG platform, automation suite, or auto-merge bot.
 
-The strongest next move is a bounded S7C implementation slice only if approved: a pure smoke
-manifest validator with no execution and no schema or verdict drift. Otherwise continue tightening
-API/interface candidate evidence around the existing judge kernel, not another round of generation
-tuning or broad external-tool ingestion.
+S10A compact API smoke `JudgedRecord` JSON carry, S10B pure ledger projection helper, S10C
+conditional projection Markdown, and S5B/S5B2 Golden Set manifest-seed governance are live. Keep
+API smoke rows separate from current unit-test real headlines, and keep external benchmark seeds
+as metadata-only until a later owner-approved slice. Do not add execution, digest, generic
+aggregate changes, SQLite columns/indexes, badcase-signature changes, retrieval scoring, existing
+ledger analytics changes, conclusion, trusted-status changes, dataset materialization, default
+benchmark report wiring for manifest seeds, or headline metric claims without a later
+owner-approved slice. Continue tightening API/interface candidate evidence around the existing
+judge kernel, not another round of generation tuning or broad external-tool ingestion.

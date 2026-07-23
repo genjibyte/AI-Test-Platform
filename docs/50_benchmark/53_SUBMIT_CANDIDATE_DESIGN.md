@@ -34,6 +34,7 @@ POST /jobs/{job_id}/submit_candidate
     test_source:   string (required, raw Java)
     producer_id:   string (required, e.g. "claude-4-7", "codex-cli@2026-06-12", "human:wenchao")
     producer_meta: dict   (optional, free-form caller-declared provenance)
+    java_test_framework: string | null (optional, report-only framework declaration)
     invariants:    list[dict] (optional, docs/48 InvariantDescriptor shapes)
   }
 ```
@@ -81,6 +82,7 @@ existing report assembler ignores them by default — non-breaking):
   run_kind:         "external"        # NEW value alongside real/fake/dryrun/smoke (§3)
   producer_id:      string            # caller-declared, required, non-empty
   producer_meta:    dict              # caller-declared, free-form
+  java_test_framework: string         # optional, normalized report-only declaration
 }
 ```
 
@@ -100,8 +102,8 @@ deterministically from the request:
   external callers cannot self-certify grounding (anti-self-certification, parallel to
   invariant `is_anchoring` in `docs/48`).
 
-The "platform-controlled identity, caller-supplied creativity" split that
-`docs/07 P2` introduced for the generator path is *applied verbatim* to external submits.
+The "platform-controlled identity, caller-supplied creativity" split used by the generator path is
+*applied verbatim* to external submits.
 
 ## 3. `run_kind = "external"` (§5 expansion of docs/43)
 
@@ -185,6 +187,8 @@ in from `DONE`. (If the user wants both, that's two jobs.)
   empty, whitespace-only. Rationale: a misleading `producer_id` is itself a form of
   hallucination; the input grammar resists it.
 - `producer_meta`: dict, JSON-serializable, total serialized size ≤ 16 KB.
+- `java_test_framework`: optional report-only declaration; normalized to `junit4`, `junit5`,
+  `testng`, or `unknown`; unsupported names are rejected and never select a runner.
 - `invariants`: optional list; each item validated by the existing `parse_invariants(...)`
   (docs/48). `is_anchoring` rules apply unchanged — model-declared invariants stay
   non-anchoring even when the producer is external.

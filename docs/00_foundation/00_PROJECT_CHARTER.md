@@ -16,7 +16,11 @@
 
 > 重定位说明（2026-06-08，见 `docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md`）：核心价值是**管理 / 判卷 / 审计比较 / 沉淀**任意来源的单测结果；"生成"是判卷链路中的一个 **producer**，非主卖点。下文"AI 生成"相关措辞按此口径理解（已小幅 sharpen §2 / §3.6 / §6 / §11，保留原意）。
 >
-> V2 拓宽（2026-06-17，owner 指令，见 `40_CORE_THESIS_REPOSITIONING.md` §10 + `CLAUDE.md` Design north-star）：项目是**面向"测试生成类 Agent"的执行型评测平台**——producer 面扩为任意测试生成 agent/工具，测试级别从单测**递进**到接口/API 测试候选；统一抽象为四支柱 **Candidate / Provenance / Badcase / Asset Gate**。**判卷内核不变**；接口测试是 gated 未来级别，非新产品。下文范围按此理解（§1 / §8 已小幅 sharpen，保留原意）。
+> V2 拓宽（2026-06-17，owner 指令，见 `40_CORE_THESIS_REPOSITIONING.md` §10、
+> `AGENTS.md` 和 `54_CORE_FREEZE_AND_BOUNDARY_REFERENCE.md`）：项目是**面向"测试生成类
+> Agent"的执行型评测平台**——producer 面扩为任意测试生成 agent/工具，测试级别从单测**递进**
+> 到接口/API 测试候选；统一抽象为四支柱 **Candidate / Provenance / Badcase / Asset Gate**。
+> **判卷内核不变**；接口/API 是 candidate-evaluation 方向，执行器仍 owner-gated。下文范围按此理解。
 
 ---
 

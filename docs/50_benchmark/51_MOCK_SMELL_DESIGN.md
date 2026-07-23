@@ -1,16 +1,16 @@
-# 51 — Mock / external-dependency smell detection (design, 2026-06-14)
+# 51 — Mock / external-dependency smell detection (live contract, 2026-06-14)
 
-> **Status: S1 in progress.** The **judge-side slice** of roadmap item **#4** of
-> `docs/00_foundation/47` (the generation-side *mock pattern library* stays producer-side and
-> deferred). Advisory: surfaced in `review_summary` only; never feeds `recommend_with_reasons` /
-> `conclusion`; **does NOT modify the quality gate** (red-line: no judging-logic change);
-> `auto_accept` stays blocked; `conclusion` stays `NEED_HUMAN_REVIEW`.
+> **Status: S1 implemented.** The judge-side advisory detector is live in
+> `app/quality/mock_smells.py` and surfaced through `review_summary["mock_smells"]`,
+> review digest flags, and Asset Gate inputs. It changes no quality-gate status,
+> recommendation, conclusion, trusted state, executor, or dependency. The generation-side
+> *mock pattern library* remains producer-side and deferred.
 
 ## 0. Why a SEPARATE detector (not a quality-gate change)
 The quality gate (`app/quality/test_quality_gate.py`) already **blocks** the unstable/external
 smells it owns — `Thread.sleep`, randomness, time (`System.currentTimeMillis`/`Instant.now`/…),
 and IO/network (`new File`/`Paths.get`/`Files.`/`URL`/`URI`/`Socket`/`HttpClient`). We must **not**
-change that judging logic. So #4's judge-side slice is a **separate, advisory** detector covering
+change that judging logic. This judge-side slice is a **separate, advisory** detector covering
 what the gate does *not*:
 
 1. **Mock-framework smells** (Mockito) — a class of AI mistakes the gate ignores.
@@ -58,12 +58,12 @@ or conclusion.
 - No new dependency (stdlib `re`); static-only; never executes the test.
 
 ## 4. Slices
-- **S1 — detector + surface (offline):** the four smells above + `detect_mock_smells` +
-  `review_summary["mock_smells"]` wire-in. Pure, unit-tested. (This doc's focus.)
+- **S1 — detector + surface (offline):** implemented. The four smells above +
+  `detect_mock_smells` + `review_summary["mock_smells"]` wire-in. Pure, unit-tested.
 - **S2 — (optional) deeper mock analysis:** wrong-type stub / unused mock / over-verification —
   harder + noisier; advisory only; needs its own design.
 
-## 5. Acceptance (S1)
+## 5. Acceptance — live
 - `mock(Calc.class)` with `target_class=…Calc` -> `mock_of_target`; `thenReturn(null)` ->
   `stub_returns_null`; `any()` -> `loose_matchers`; `new RestTemplate()` -> `real_dependency`.
 - A clean Mockito test (mocks a *collaborator*, stubs concretely, asserts) -> no smells.

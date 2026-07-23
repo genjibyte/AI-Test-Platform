@@ -1,7 +1,9 @@
 # 核心理念再审计与重定位：判卷场，而非生成器
 
 > 日期：2026-06-08。角色：技术负责人（方向审计）。性质：**理念审计 + 最小重定位设计**。
-> 边界：不写代码、不改生产逻辑、不跑模型、**不新增功能**、**不覆盖既有文档**（本文 sharpen + 交叉引用 Charter，不回写 Charter）。
+> 当前状态：方向已成为项目主线；`submit_candidate`、badcase ledger/retrieval、run_kind
+> hygiene 和多项 advisory 信号已落地。本文仍不批准模型调用、外部资产执行、自动采纳或
+> verdict 变化。
 > 证据规则：每个判断标注代码/文档/commit。
 > 触发：用户指令——平台核心优势是**管理 / 判卷 / 审计比较 / 沉淀（人或 agent 写的单测结果）**，不是"生成单测"本身；把"生成"从主卖点降为链路中的一个普通环节；避免偏离与堆功能。
 
@@ -88,7 +90,7 @@ Candidate
 | **管理 Manage** | 项目/任务/状态机/持久化：`app/models/job.py`、`app/storage/job_repo.py`、`judge_pipeline.py` | 以 **Candidate 为一等公民**的列表/检索（按 target / 按 author / 按结论） |
 | **判卷 Judge** | 执行+质量门+preflight+审查，已基本解耦（§2） | **author-agnostic 入口**（`submit_candidate` / `judge_existing_test`） |
 | **比较 Compare** | benchmark/aggregate 已能对照（按 model/version）：`app/benchmark/` | **按作者对照**（human vs agentA vs agentB vs 本平台）在同一 target/rubric 上——把现有 aggregate 加一个 provenance 维度，**非新系统** |
-| **沉淀 Precipitate** | bench.db + 报告 = 原始沉淀；失败分类已有 | **badcase 库 / 失败归因 / 跨运行·跨作者可复用判定经验**——Charter §7.16-17 **仅文档、未实现**（`docs/13` §2.3） |
+| **沉淀 Precipitate** | `app/ledger/` + badcase analytics + retrieval 已 live；bench/report 仍是原始证据来源 | 后续只补 compact carry、RCA/label、跨作者视图；不做自动采纳或规则引擎 |
 
 > 真正值得投入的核心前沿是**沉淀层**（失败归因 + badcase 库 + 跨作者比较），**不是再调 prompt**。
 
@@ -109,21 +111,22 @@ Candidate
 
 ---
 
-## 6. 最小重定位路线（**设计，不实现**；每步都小、复用优先）
+## 6. 最小重定位路线（当前状态；每步都小、复用优先）
 
-1. **命名/概念解耦（纯文档，零代码，现在即可）**：文档与 API 叙述统一用 Candidate/Submission + provenance，明确"生成器 = 一个 producer"。
-2. **author-agnostic 入口（小代码，未来按需）**：新增 `submit_candidate(judged_job, test_source, provenance)`，**复用**现有 execute → compare → quality → review；`run_generation` 改为"生成 Candidate 后调用统一判卷"。**判卷内核不动。**
-3. **按作者比较（小改 aggregate/report，未来按需）**：benchmark 增 provenance 维度，支持同 target 多作者对照。
-4. **沉淀层（核心前沿，另行先设计后实现）**：失败归因 + badcase 库（SQLite + `difflib`，Charter §7.16-17）。
+1. **命名/概念解耦（文档层 live）**：文档与 API 叙述统一用 Candidate/Submission + provenance，明确"生成器 = 一个 producer"。
+2. **author-agnostic 入口（S1/S2 live）**：`submit_candidate(judged_job, test_source, provenance)` 已复用现有 execute → compare → quality → review；判卷内核不动。
+3. **按作者比较（部分 live / 继续收敛）**：`run_kind="external"` 与 `producer_id` 已区分来源；真正的多作者同 target 对照报告仍是后续小切片。
+4. **沉淀层（P1/P2 live）**：`app/ledger/`、badcase analytics、retrieval 已 live；自动把外部提交 append 到 ledger 仍需单独设计。
 
-> 第 1 步是纯叙述、现在就能做；第 2-4 步都**小**且**先设计后实现**。**本文不实现任何代码。**
+> 已落地部分都保持 advisory。后续只能补更清晰的 evidence/carry/view，不能把 ledger
+> 或 provenance 变成自动接受依据。
 
 ---
 
 ## 7. 对当前未决项的影响（重排，不新增）
 
 - **compile-repair enablement（`docs/39`）**：保持 gated off。它属生成侧，**不再是主线**；oracle-safety 加固已是判卷红线的收尾。除非判卷需要，否则不启用。
-- **coverage 子集恢复（roadmap #11）**：覆盖率是**判卷的 advisory 度量**，属核心层；可在重定位后作为"判卷度量"补回，**优先级高于再调生成**。
+- **coverage 子集恢复**：覆盖率是**判卷的 advisory 度量**，属核心层；可作为"判卷度量"补强，**优先级高于再调生成**。
 - **Context vX**：进入维护模式（§5）。
 
 ---
@@ -140,7 +143,7 @@ Candidate
 
 1. 认可"**生成器 = producer、判卷内核 = 产品**"的重定位与 §5 北极星改述？
 2. ~~是否允许回写 Charter？~~ **已授权并完成**（2026-06-08 小幅 sharpen `docs/00` §0/§2/§3.6/§6/§11，保留原意）。如需进一步调整措辞或扩展到 §1，请指出。
-3. **沉淀层**（badcase / 失败归因 / 跨作者比较）是否作为下一个**功能**投入方向？（设计已起草：`docs/50_benchmark/41_PRECIPITATION_LAYER_DESIGN.md`，仍先设计后实现，待你批准 P1 切片。）
+3. **沉淀层**（badcase / 失败归因 / 跨作者比较）已完成 P1/P2 + retrieval；下一步若继续，应优先补外部提交到 ledger 的 compact carry 或跨作者对照视图，而不是新建平台。
 
 > 一句话：方向没错，错在**重心**。把"判卷/管理/比较/沉淀任意来源测试"重新摆到正中央，生成器退回到"链路中的一个 producer"；而这条路**主要靠解耦与重述，不靠堆功能**。
 
@@ -149,9 +152,10 @@ Candidate
 ## 10. V2 拓宽（2026-06-17，owner 指令 + 外部知识包 ingested）
 
 > 触发：owner 重申——本项目**不只是"AI 单测生成器"，而是面向"测试生成类 Agent"的执行型评测平台**。
-> 外部生态调研已落入 `docs/knowledge/EXTERNAL_ECOSYSTEM_KNOWLEDGE_PACK.md`。本节把 V1（上文，
-> 2026-06-08）沿**两个轴**拓宽，并新增第四支柱 **Asset Gate**。约束性表述同时写入 `CLAUDE.md`
-> 的 **Design north-star**，使每个后续设计都遵循。**本节仍是设计/约束，不实现代码；每个未来级别/阶段 owner-gated。**
+> 外部生态原始知识包已在 2026-07-21 从当前 docs 树中剪除。当前设计只读取 curated digest
+> `docs/knowledge/OPEN_SOURCE_REUSE_GOVERNANCE_2026_07.md` 和 asset matrix
+> `docs/knowledge/EXTERNAL_ASSET_MAPPING_MATRIX.md`。本节保留 V2 thesis 边界：从 V1 沿**两个轴**
+> 拓宽，并新增第四支柱 **Asset Gate**。**本节仍是设计/约束，不实现代码；每个未来级别/阶段 owner-gated。**
 
 ### 10.1 两个拓宽轴（内核不变，只扩输入面）
 1. **Producer 轴**：候选来源从 V1 的"人 / 本平台生成器 / 外部 agent"具体化为**任意测试生成 agent/工具**——

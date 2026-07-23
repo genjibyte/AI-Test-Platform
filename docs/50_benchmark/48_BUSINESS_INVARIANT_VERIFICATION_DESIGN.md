@@ -3,9 +3,9 @@
 > **Status: S1+S2+S3 implemented 2026-06-14, including the live-benchmark wire-in.** The runner
 > runs gated PIT once (per-mutation rows when invariants are declared) and re-scopes the invariant
 > view, so the live benchmark reaches `pinned` automatically (gated; unit-tested). A full
-> end-to-end live run with *real generation* needs a model/API (not run; cost-gated). #1 is
+> end-to-end live run with *real generation* needs a model/API (not run; cost-gated). This slice is
 > functionally complete. Sequel to `45` (invariant *tagging* —
-> declared intent) and `46` (oracle-strength / mutation). Roadmap item **#1** of `docs/00_foundation/47`.
+> declared intent) and `46` (oracle-strength / mutation).
 > Every signal here is **advisory**: it feeds `review_summary` only, never
 > `recommend_with_reasons` / `conclusion`; `auto_accept` stays blocked; `conclusion` stays
 > `NEED_HUMAN_REVIEW`; `trusted=False`. No oracle is ever auto-fixed or weakened.
@@ -22,7 +22,7 @@ So the output is evidence about the *test*, advisory, and it never certifies the
 correct. The invariant statement itself stays **untrusted** (see §2).
 
 ## 1. What a "business invariant" is (the kinds we target)
-The owner's #1: order / coupon / permission / payment logic — the real targets are **state
+The owner-requested business-rule verification direction — order / coupon / permission / payment logic — the real targets are **state
 transitions, boundary conditions, exception paths, side-effects**. We model an invariant as a
 declared descriptor with a `kind`:
 
@@ -65,7 +65,7 @@ advisory facts about the candidate test — none new-from-scratch:
    and compute *killed / total* for just those mutants. High ⇒ the test grips `I`'s logic.
    Needs a small parser extension (see §5). This is the strongest, and it inherits the
    **equivalent-mutant caveat** from `46` §16 — a surviving line-mutant may be *equivalent*, not a
-   gap, so survivors must be *explained* (ties to roadmap #3), never auto-scored as failure.
+   gap, so survivors must be *explained* (see `49`), never auto-scored as failure.
 
 ## 4. Roll-up — advisory `invariant_strength` (mirror `oracle_strength`)
 Deterministic roll-up, same shape as `app/quality/oracle_strength.py`
@@ -88,7 +88,7 @@ invariant_strength ∈ ("unaddressed", "addressed_unasserted", "asserted_unpinne
 decides whether the declared invariant was the *right* property.
 
 ## 5. Where computed / surfaced (no judging-path change)
-- New (when built): `app/quality/invariant_verification.py` →
+- Implemented: `app/quality/invariant_verification.py` →
   `verify_invariant(descriptor, *, coverage, quality_gate, mutation_lines) -> dict`. Pure roll-up
   over inputs the platform already produces; no model, no network.
 - Parser extension: `parse_pit_report` gains an **opt-in** per-mutation list
@@ -124,7 +124,7 @@ decides whether the declared invariant was the *right* property.
   `parse_line_spec` + `scoped_mutation_score` (`app/mutation/pit.py`) restrict the score to an
   invariant's lines/method; `estimate_invariant_strength(..., scoped_mutation_score=)` reaches
   `pinned` ONLY when all invariant-scoped mutants are killed, else stays `asserted_unpinned` +
-  `scoped_mutants_survive` (gap OR equivalent — never auto-condemned; explanation = roadmap #3).
+  `scoped_mutants_survive` (gap OR equivalent — never auto-condemned; explanation comes from `49`).
   `invariant_review_view(..., mutations=)` scopes per invariant. `run_pit(..., include_mutations=)`
   threads rows. A non-anchoring invariant is never `pinned` even with a perfect score (§2).
   **Validated on a real repo** (commons-cli `OptionValidator.validate()`, gated PIT): whole-class
@@ -150,7 +150,7 @@ decides whether the declared invariant was the *right* property.
 - No new dependency: reuses coverage + quality-gate + mutation. Mutation stays gated/opt-in.
 - Historical `bench.db` read-only; no backfill of invariants onto past runs.
 
-## 8. Acceptance (when/if implemented)
+## 8. Acceptance — live
 - A manifest case with a declared `exception`-kind invariant + a candidate test that uses
   `assertThrows` on the right path → `addressed=True, asserted=True`; with mutation on and
   line-mutants killed → `pinned`. The same candidate with the `assertThrows` removed →
@@ -164,7 +164,7 @@ decides whether the declared invariant was the *right* property.
 `45` declares the invariant (intent). `48` (this) asks *did the test pin it?* using `46`'s
 mutation as the semantic core, the quality gate as the structural core, and coverage as the
 reachability core. It is the invariant-scoped, judge-side complement to the class-wide
-`oracle_strength` — and it is where roadmap #1 (verify) and #3 (survivor explanation) meet.
+`oracle_strength` — and it is where invariant verification and survivor explanation meet.
 
 ---
 

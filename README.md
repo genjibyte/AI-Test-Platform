@@ -1,100 +1,132 @@
-# TestAgent Lab — AI 单测生成判卷场
+# TestAgent Lab
 
-面向开源 Java Maven 项目的 AI 单元测试生成、执行判卷、失败修复与质量治理系统。
+Execution-based candidate evaluation for test-generating agents.
 
-> **当前阶段：Phase 2 已验收 — 最小生成器。** 在 Phase 1 判卷场之上，新增"目标选择 → 有界上下文 →
-> LLM 生成 → 写独立测试 → 真实执行 → 覆盖率对比 → 报告"，结论恒为 `NEED_HUMAN_REVIEW`。
-> **仍不做 Fixer（Phase 3）、不做质量门禁（Phase 4）、不自动入仓、不改生产代码。**
-> Phase 1 见 [`docs/05`](/docs/10_phase1/05_PHASE1_BACKLOG.md)，Phase 2 见 [`docs/09`](/docs/20_phase2/09_PHASE2_BACKLOG.md) 与验收 [`docs/11`](/docs/20_phase2/11_PHASE2_ACCEPTANCE_REPORT.md)。
+This project is not a test generator as the product. It is the judge layer:
 
-## 文档
+```text
+candidate -> compile/execute evidence -> quality signals -> review digest -> badcase ledger -> report
+```
 
-| 文档 | 作用 |
-|---|---|
-| [`/docs/README.md`](/docs/README.md) | 分层文档总索引 |
-| [`/docs/00_foundation/00_PROJECT_CHARTER.md`](/docs/00_foundation/00_PROJECT_CHARTER.md) | 最高约束文件 |
-| [`/docs/00_foundation/01_PROJECT_PLAN.md`](/docs/00_foundation/01_PROJECT_PLAN.md) | 里程碑规划 |
-| [`/docs/00_foundation/04_ENV_AND_STACK_DECISION.md`](/docs/00_foundation/04_ENV_AND_STACK_DECISION.md) | 技术栈决策 + 环境前置 |
-| [`/docs/10_phase1/05_PHASE1_BACKLOG.md`](/docs/10_phase1/05_PHASE1_BACKLOG.md) | Phase 1 任务拆解 |
-| [`/docs/20_phase2/09_PHASE2_BACKLOG.md`](/docs/20_phase2/09_PHASE2_BACKLOG.md) | Phase 2 任务拆解 |
-| [`/docs/20_phase2/10_PHASE2_MIDPHASE_AUDIT.md`](/docs/20_phase2/10_PHASE2_MIDPHASE_AUDIT.md) | Phase 2 中期审计 + 后续规划 |
-| [`/docs/20_phase2/11_PHASE2_ACCEPTANCE_REPORT.md`](/docs/20_phase2/11_PHASE2_ACCEPTANCE_REPORT.md) | Phase 2 验收报告 |
+Generated tests, submitted tests, tool-produced tests, and human-written tests are all candidates.
+A candidate is never accepted automatically. Reports keep:
 
-## 技术栈
+```text
+conclusion = NEED_HUMAN_REVIEW
+trusted = False
+```
 
-Python 3.10+ / FastAPI / SQLite。详见环境决策文档。
+## Current Shape
 
-## 环境前置（实跑 Phase 1 判卷前必须）
+Core runtime:
 
-- **Maven**：通过 `mvnw` wrapper / PATH / 或配置 `TESTAGENT_MAVEN_CMD` 指向 `mvn(.cmd)`。
-- **JDK**：JaCoCo/JUnit5 需可用 JDK（本机 JDK 17 已验证）。
+- `app/pipeline/`: orchestrates generation and external candidate submission.
+- `app/report/`: assembles evidence, advisory signals, API report-only facts, and final report.
+- `app/quality/`: pure quality and asset-sufficiency helpers.
+- `app/review/`: advisory recommendation and review digest.
+- `app/benchmark/`: run_kind-aware benchmark aggregates and named projections.
+- `app/ledger/`: judged-record storage, badcase analytics, and retrieval.
+- `app/governance/`: pure design-time policy helpers for external asset phase gates, reuse-check
+  plans, and knowledge embedding destinations.
+- `app/api/`: HTTP entrypoints, including `submit_candidate`.
+
+Current kernel:
+
+- Java/Maven candidate execution through Maven/Surefire/JaCoCo; JUnit stays the thin
+  compatibility path and TestNG is now report-visible.
+- The built-in JUnit generator is a legacy failed exploration retained only as a removable
+  producer/compatibility path, not as product direction.
+- Producer-agnostic `submit_candidate`.
+- Quality gate, preflight, oracle-strength estimate, invariant review, mock smell, review digest.
+- Badcase ledger and retrieval.
+- Human/golden label readiness and Golden Set defect-denominator readiness summaries for
+  real-world validation metrics; still no headline outcome claim without labels/denominators.
+- Asset Gate S1-S4A, including report-only Test-Level Router.
+- Mandatory reuse-check governance for design inputs, with metadata-only validation and plan summary.
+- Knowledge embedding destination routing for new external lessons/audits; still metadata-only.
+- Evaluation Skill/SOP blueprint readiness for reusing judge workflows; still no installed Skill
+  runtime.
+- Advisory project progress snapshot: current weighted estimate is about 71%, not yet 80%.
+- Landing-readiness rollup combines progress, supplied human/golden labels, and supplied Golden
+  Set seed metadata into one planning view; still no release/headline/verdict authority.
+- Optional landing-readiness Markdown rendering for human handoff; still no default report wiring
+  or release authority.
+- Landing-readiness review questions and evidence checklist for human audit; still no evidence
+  collection, dataset/verifier approval, or headline authority.
+- Landing-readiness snapshot validation before Markdown rendering, rejecting forged authority
+  flags instead of displaying them as normal handoff material.
+- Typed landing-readiness validation for percent, stage, source-version, input-count, metric-count,
+  and nested progress consistency.
+- Derived landing-readiness validation for blockers, next steps, input counts, denominator flags,
+  review questions, and evidence-checklist status consistency.
+- Landing-readiness blocker-family summary and Markdown table for human audit navigation; still no
+  workspace scan, evidence collection, release gate, or headline authority.
+- Landing-readiness blocker-summary validation for standalone handoff artifacts; still no source
+  recompute, evidence collection, release gate, or headline authority.
+- Optional landing-readiness blocker-summary Markdown rendering for standalone human handoff;
+  still no source recompute, default report wiring, release gate, or headline authority.
+- S6 landing-readiness governance is now frozen for normal progress work; next progress should
+  come from one joint human-label + Golden Set evidence closure slice. API/interface
+  implementation design is lower priority until that joint slice exposes a concrete need.
+- CI/PR handoff now groups project-progress and human/golden metric readiness changes into a
+  `landing_readiness_snapshots` review batch; still human-only staging/commit/push.
+- Report-only Java test framework facts (`junit4`/`junit5`/`testng`/`mixed`/`unknown`) plus
+  optional `submit_candidate` framework declaration carry, so enterprise TestNG candidates are
+  visible without changing the runner.
+- API/interface reuse-plan sample over active registry/matrix sources; still metadata-only.
+- First P0 external README audit records for Schemathesis/Newman/WireMock; still no install,
+  execution, service orchestration, or adapter.
+- API/interface candidate path through report-only `junit_api_candidate` evidence, smoke manifest,
+  denominator policy, benchmark projection, markdown display, compact ledger JSON carry, and pure
+  ledger projection helper with conditional presentation and cross-layer projection boundary tests.
+
+Not built without explicit approval:
+
+- API/interface executor.
+- New live candidate kinds beyond the report-only path.
+- Existing API smoke ledger analytics changes, retrieval scoring, or signature changes.
+- External database connections, benchmark/dataset downloads, external SUT import, open-source
+  tool execution/vendoring, Docker/service orchestration, model calls, auto-repair/adoption,
+  auto-merge.
+
+## Read First
+
+Use the thin context layer before opening deeper docs:
+
+```text
+docs/WORK_LOG.md
+docs/README.md
+docs/00_foundation/54_CORE_FREEZE_AND_BOUNDARY_REFERENCE.md
+docs/knowledge/README.md
+docs/knowledge/EXTERNAL_ASSET_MAPPING_MATRIX.md
+docs/knowledge/EXTERNAL_ASSET_PHASE_PLAN.md
+```
+
+The active doc index is [docs/README.md](docs/README.md).
+The current docs and architecture audit is
+[docs/00_foundation/61_CURRENT_DOCS_AND_ARCHITECTURE_AUDIT.md](docs/00_foundation/61_CURRENT_DOCS_AND_ARCHITECTURE_AUDIT.md).
+
+## Verify
+
+Use the project venv. Bare `python` may be the Windows Store stub on this machine.
 
 ```powershell
-# 若 mvn 不在 PATH，指定可执行文件
-$env:TESTAGENT_MAVEN_CMD = "C:\path\to\apache-maven\bin\mvn.cmd"
+& "E:\AI-Test-Platform\.venv\Scripts\python.exe" -m pytest
 ```
 
-> 仅运行下方骨架（health 接口）不需要 Maven/JDK。
-> 注意：若宿主机有会加密落盘文件的 DLP/安全代理，git 克隆出的源码可能被篡改，
-> 导致远程仓库无法构建。详见 `/docs/10_phase1/06_PHASE1_GOLDEN_SAMPLE.md`。
+Recent evidence:
 
-## 快速开始
-
-```bash
-python -m venv .venv
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# 启动服务
-uvicorn app.main:app --reload --port 8000
-curl http://localhost:8000/health
-
-# 运行单元/集成测试（快速，无需 Maven）
-pytest
-
-# 端到端真实判卷（需要 Maven）
-$env:TESTAGENT_MAVEN_CMD = "C:\path\to\mvn.cmd"; $env:TESTAGENT_E2E = "1"
-pytest tests/e2e -v
-
-# 对任意开源 Maven 仓库做真实端到端（干净主机）
-python -m scripts.run_judge https://github.com/<org>/<repo>.git main
+```text
+747 passed, 4 skipped, 1 warning in 6.92s
 ```
 
-## 目录结构
+## Guardrails
 
-```
-app/
-├── main.py        # 入口 (P1-T01)
-├── config.py      # 配置：workspace / data / LLM (P1-T01, P2-T03)
-├── api/           # 路由：health/jobs/report/context/generation
-├── common/        # 统一响应体
-├── models/        # 领域模型 (job/coverage/target/context/coverage_delta…)
-├── storage/       # 持久化 SQLite (P1-T02, P2-T10 迁移)
-├── runtime/       # 隔离工作区 + 执行器 (P1-T03)
-├── importer/      # Git 导入 (P1-T04)
-├── detect/        # Maven 识别 (P1-T05)
-├── build/         # mvn test 执行 (P1-T06)
-├── coverage/      # JaCoCo 解析 + 覆盖率对比 (P1-T08, P2-T08)
-├── report/        # Surefire 解析 + 判卷/生成报告 (P1-T07/T10, P2-T09)
-├── pipeline/      # 判卷流水线 + 生成流水线 (P1-T09, P2-T10)
-├── targeting/     # 目标类/方法选择 (P2-T01)
-├── context/       # 有界上下文收集 + Java 轻量解析 (P2-T02)
-├── llm/           # LLM 隔离层：fake / openai / deepseek (P2-T03)
-└── generate/      # prompt / 生成编排 / 写文件 / 执行 (P2-T04..T07)
-```
-
-Phase 1（判卷场）与 Phase 2（最小生成器）均已验收。生成流程示例：
-
-```bash
-# 1) 导入并判卷一个 Maven 仓库（得到基线覆盖率，Job 进入 DONE）
-curl -X POST localhost:8000/jobs -d '{"git_url":"<repo>.git","branch":"main"}'
-
-# 2) 对已判卷 Job 的某个目标类/方法生成测试（默认离线 fake 客户端）
-curl -X POST localhost:8000/jobs/<id>/generate -d '{"target_class":"com.example.Calc","target_method":"max"}'
-
-# 3) 查看生成报告（事实 + 覆盖率 delta + patch 预览 + NEED_HUMAN_REVIEW）
-curl localhost:8000/jobs/<id>/generation
-
-# 接入真实模型：设置 TESTAGENT_LLM_PROVIDER=openai|deepseek、TESTAGENT_LLM_MODEL、TESTAGENT_LLM_API_KEY
-```
+- Never read, print, summarize, or commit `.env`.
+- No real model/API calls without explicit approval and cost disclosure.
+- No auto-accept, auto-merge, or `trusted=True`.
+- No headline metrics over fake/dryrun/smoke/external/historical unknown rows.
+- No external asset execution, dataset download, external DB connection, code vendoring, or new
+  dependency without an owner-approved design.
+- Do not let legacy JUnit generation work drive roadmap priority; judge/harness evidence is the
+  product center.

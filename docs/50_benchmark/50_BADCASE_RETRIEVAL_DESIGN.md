@@ -2,14 +2,14 @@
 
 > **Status: S1+S2+S3 implemented 2026-06-14** (S3 = the no-dependency lexical layer; true
 > embedding retrieval is deferred — it needs a new dependency or an embedding API and the owner's
-> explicit approval). Roadmap item **#6** of `docs/00_foundation/47`. Builds on the
+> explicit approval). Builds on the
 > precipitation ledger (`41`, `app/ledger/`). Every output is **advisory**: retrieval surfaces
 > real past records as priors for human review only — it never feeds `recommend_with_reasons` /
 > `conclusion`, never auto-accepts, and `conclusion` stays `NEED_HUMAN_REVIEW`.
 
 ## 0. The reframing that keeps this on-thesis
 The ledger already **stores + aggregates** judged candidate tests (`store.py`, `analytics.py`).
-#6 adds a **retrieval** layer: *given a new target (and optional failure signature), find the most
+This slice adds a **retrieval** layer: *given a new target (and optional failure signature), find the most
 relevant past judged records and surface them as advisory precedent for the reviewer* — "on this
 target / failure-type, here's what happened before". It is judge-side **memory**, not a generator
 crutch.
@@ -18,7 +18,7 @@ crutch.
 - Retrieval returns **only real stored records** — it never fabricates a precedent.
 - Priors are **advisory**: they inform the human review, never decide; `conclusion` stays
   `NEED_HUMAN_REVIEW`, `auto_accept` stays blocked.
-- Using precedent to *hint generation* is producer-side and out of scope here; #6 serves the
+- Using precedent to *hint generation* is producer-side and out of scope here; this slice serves the
   **judge/reviewer**, with precedent that is itself the (already-judged) evidence.
 - Historical data is **read-only** — retrieval never writes/backfills (`docs/42` §A).
 
@@ -59,13 +59,13 @@ pre-filtered `store.by_target(...)`), so it is fully testable offline. Each resu
 Plus a thin store-backed convenience `find_similar_in_store(store, **query)` = `find_similar(
 store.all(), **query)`. Never raises; empty ledger -> `[]`.
 
-## 3. Where consumed (later slices; S1 is the engine only)
+## 3. Where consumed
 - A reviewer-facing "prior cases" view (advisory) when judging a new candidate.
-- NOT wired into the verdict. S1 ships the retrieval engine + tests; surfacing is a follow-up.
+- NOT wired into the verdict. Retrieval ships as an advisory engine plus compact precedent facts.
 
 ## 4. Slices
-- **S1 — retrieval engine (offline):** `find_similar` + explainable scoring + store convenience.
-  Pure, unit-tested. (This doc's focus.)
+- **S1 — retrieval engine (offline) — DONE:** `find_similar` + explainable scoring + store
+  convenience. Pure, unit-tested.
 - **S2 — richer precedent schema — DONE 2026-06-14:** `JudgedRecord` gains DECLARED
   `root_cause` + `fix_note` (advisory, human/external-author set, default None, never
   platform-fabricated). `find_similar` results now carry the derived `signature`
@@ -87,7 +87,7 @@ store.all(), **query)`. Never raises; empty ledger -> `[]`.
 - Not a generator feed (judge-side only); historical data read-only; no new dependency (SQLite +
   pure Python, like `store.py`); no embeddings in S1.
 
-## 6. Acceptance (S1)
+## 6. Acceptance — live
 - A record on the same `target_class.target_method` ranks first and its `reasons` include
   `same_target_method`; a same-`test_fingerprint` record is flagged `duplicate_fingerprint`.
 - Querying with a `failure_type` boosts same-failure precedents (`same_failure_type`).
@@ -96,7 +96,7 @@ store.all(), **query)`. Never raises; empty ledger -> `[]`.
 ## 7. Relationship to siblings
 `41` precipitates judged records; `43/45/46/48/49` enrich each record with provenance + advisory
 value signals; `50` (this) **retrieves** the most relevant of them as advisory precedent — the
-"badcase memory" the owner's #6 asks for, judge-side and never auto-accepting.
+"badcase memory" judge-side and never auto-accepting.
 
 ---
 

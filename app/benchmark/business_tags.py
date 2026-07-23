@@ -1,16 +1,16 @@
-"""Business-invariant tag vocabulary (docs/45 S1).
+"""Business-invariant tag vocabulary (docs/50_benchmark/45 S1).
 
 Advisory taxonomy: these tags ORGANIZE human review of a candidate test's business
-value (KB docs/knowledge/INTERNET_TECH_BUSINESS_KB.md). They are **declared intent,
-never verified value** (docs/45 §2) -- a tag never asserts the test is correct or
-strong, only what business risk it is *supposed* to protect. The vocab is **non-
-blocking**: an unknown value is allowed and must never fail generation or judging.
+value. They are **declared intent, never verified value**; a tag never asserts the
+test is correct or strong, only what business risk it is *supposed* to protect. The
+vocab is **non-blocking**: an unknown value is allowed and must never fail generation
+or judging.
 """
 from __future__ import annotations
 
 from typing import Optional
 
-# docs/45 §6 -- initial controlled vocab (extensible; "other"/"unknown" always allowed).
+# docs/50_benchmark/45 S6 -- initial controlled vocab (extensible; "other"/"unknown" always allowed).
 BUSINESS_DOMAINS = (
     "payments", "search", "recommendation", "ads", "ecommerce_marketplace",
     "logistics", "subscriptions", "trust_safety", "identity_access",
@@ -54,12 +54,13 @@ def business_review_rubric(
     risk_level: Optional[str] = None,
     declared_invariant: Optional[str] = None,
 ) -> dict:
-    """docs/45 S3: an ADVISORY human-review rubric (KB §20.4).
+    """docs/50_benchmark/45 S3: an ADVISORY human-review rubric.
 
     Surfaces the case-level (authoritative) business invariant a candidate is *supposed*
     to protect, an explicitly-UNTRUSTED model-declared invariant, and the fields a human
     reviewer fills in. It is NOT a verdict: it never accepts/scores a candidate and never
-    changes the recommendation/conclusion (auto_accept stays blocked; docs/45 §2/§10).
+    changes the recommendation/conclusion (auto_accept stays blocked; docs/50_benchmark/45
+    S2/S10).
     """
     return {
         # authoritative (manifest/human): what risk the target is supposed to protect

@@ -1,10 +1,7 @@
-"""Application entrypoint (P1-T01, extended P2-T10).
+"""Application entrypoint.
 
-Phase 1: 判卷场 (the judging arena) — import / detect / run / parse / report.
-Phase 2: minimal generator — target / context / LLM generate / execute / compare.
-Phase 2.5/3: real-repo benchmark, opt-in compile repair, and minimal quality gate.
-Still NO broad Fixer, NO auto-accept, NO complex frontend.
-See docs/10_phase1/05_PHASE1_BACKLOG.md and docs/20_phase2/09_PHASE2_BACKLOG.md.
+The app exposes the current judge/report API surface. See docs/WORK_LOG.md and
+docs/README.md for the active architecture map and routed documentation index.
 
 Run locally::
 

@@ -1,16 +1,13 @@
-# Oracle-strength signal — design
+# Oracle-strength signal — design and live contract
 
-> Date: 2026-06-12. **DESIGN ONLY. NOT implemented.** No code, no model, no benchmark,
-> no data mutation, **no new dependency**. Follow-up to the business-tag rubric
-> (`docs/50_benchmark/45_BUSINESS_INVARIANT_TAGGING_DESIGN.md` §15, which left the rubric's
-> `oracle_strength` field for a human to fill) and the gap named in
-> `docs/00_foundation/42_AI_TEST_FAILURE_EMPIRICAL_AUDIT.md` / `44_DECISIONS_AND_FAILURES.md`
-> ("semantic oracle strength is not measured; stays NEED_HUMAN_REVIEW").
+> Date: 2026-06-12. Status: S1/S2 structural oracle-strength estimate and descriptive
+> benchmark/ledger summaries are live; a gated PIT mutation subsystem exists but remains
+> off by default. No auto-accept, recommendation/verdict change, model call, historical
+> backfill, or ungated dependency use is implied.
 >
-> Upstream: the existing quality gate `app/quality/test_quality_gate.py`;
-> `docs/30_phase2_5_quality/19_MINIMAL_TEST_QUALITY_GATE.md`;
-> `docs/knowledge/EXTERNAL_AGENT_AND_TESTGEN_KB.md` (§2.2 mutation-guided generation;
-> test-smell / fake-green patterns); thesis `docs/00_foundation/40_…`.
+> Upstream: the existing quality gate `app/quality/test_quality_gate.py`; historical external
+> agent/testgen knowledge pack, pruned on 2026-07-21; thesis
+> `docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md`.
 
 ## 0. Why
 
@@ -32,14 +29,14 @@ dimension honestly — **without inventing a fake "this test is valuable" verdic
 
 - **Structural strength** — deterministic, offline, cheap, **mostly already exists**.
   Assertion presence / weakness / tautology / test-smells (assertion roulette, duplicate
-  assertions, no behavioral oracle — KB test-smell list). The quality gate gates the
+  assertions, no behavioral oracle — historical test-smell list). The quality gate gates the
   worst; the rest is a roll-up.
 - **Semantic / fault-detection strength** — the *real* signal: does the test **kill
-  mutants**? **Mutation score** (KB §2.2: "stronger than line coverage because it asks
+  mutants**? **Mutation score** ("stronger than line coverage because it asks
   whether a test can catch a meaningful behavioral regression"). This is the only
   automatic thing that actually evidences a meaningful oracle. Deterministic but
   **expensive** and needs a mutation tool (PIT for Java/Maven) → a new dependency →
-  **deferred, owner-approved** (future `app/mutation/`).
+  **gated/off-by-default** (`app/mutation/`).
 - **The human rubric (docs/45 S3)** ties them to the business invariant: `expected_invariant`
   says *what* should be caught; structural says *is the assertion non-trivial*; mutation
   says *does it actually catch faults*; the human decides.
@@ -75,17 +72,16 @@ oracle_strength_estimate ∈ { none, weak, mixed, structural_ok, unknown }   # S
 Reuse the gate's `metrics` (`assertions`, `weak_assertions`, `tautological_assertions`) and
 issue codes — **no new parser, no duplication.** Optionally extend with a few more
 deterministic test-smell reasons (assertion roulette, duplicate assertions, no-behavioral-
-oracle — KB) as **advisory reasons only** (not gate blockers). Output also carries an
+oracle) as **advisory reasons only** (not gate blockers). Output also carries an
 explicit `semantic_strength: "human_review"` until mutation evidence exists.
 
-## 4. Deferred — semantic/fault evidence via mutation (the real signal)
+## 4. Gated — semantic/fault evidence via mutation (the real signal)
 
 Integrate a mutation tool (PIT for Java/Maven) to compute a **mutation score /
 `mutation_killed_delta`** for the target — real evidence that the candidate's oracle
-catches injected faults (KB §2.2 backlog: "Add `mutation_killed_delta` … to candidate
-verdicts", future `app/mutation/`). It is the strongest semantic-strength signal and the
-honest answer to docs/42/44's gap. **Heavy** (runs the suite against mutants) and needs a
-**new dependency** → a separate, owner-approved slice. Still **advisory** (informs review;
+catches injected faults. It is the strongest semantic-strength signal and the honest
+answer to the docs/42 gap. **Heavy** (runs the suite against mutants) and dependency-sensitive
+→ kept behind an explicit owner-gated runtime switch. Still **advisory** (informs review;
 never auto-accepts; never rewrites oracles).
 
 ## 5. Where it is computed / surfaced
@@ -120,11 +116,11 @@ candidates → `unknown`. Group-by views count only analyzed rows; the rest go t
   `conclusion` stays `NEED_HUMAN_REVIEW`.
 - **Never rewrite/weaken/delete an assertion**, and never "repair" an oracle.
 - **No claim that `structural_ok` = valuable / correct.** Structural ≠ semantic.
-- **No new dependency in v1** (mutation/PIT is the deferred slice, owner-approved).
+- **No ungated dependency use in v1** (mutation/PIT is gated and owner-approved).
 - The pipeline must not infer semantic strength from source text; only mutation (real) or a
   clearly-untrusted LLM-judged path may estimate semantics, and the latter is never trusted.
 
-## 9. Files likely touched (when implemented — NOT now)
+## 9. Implemented files and gated mutation files
 
 - v1 (structural): `app/quality/oracle_strength.py` (roll-up over `QualityGateResult`); wire
   the hint into the docs/45 S3 rubric (`app/benchmark/runner.py` / `app/report/generation_report.py`);
@@ -140,9 +136,9 @@ candidates → `unknown`. Group-by views count only analyzed rows; the rest go t
 - **S3 (deferred, owner-approved, NEW DEP)** — mutation evidence (`mutation_killed_delta`)
   as the real semantic signal.
 
-Each slice is small and paused until approved.
+S1/S2 and the gated mutation subsystem are live; any ungated mutation use remains owner-gated.
 
-## 11. Acceptance (when implemented)
+## 11. Acceptance — live
 
 `pytest` green incl. new tests; the estimate is **advisory** — no change to gate verdicts,
 recommendation, `conclusion`, `trusted`, or `accept_rate`; it **reuses** the gate's facts
@@ -157,14 +153,14 @@ added) is advisory and never auto-accepts.
 2. **May a `weak`/`mixed` estimate feed a CONSERVATIVE downgrade (STRONG→REVIEW)?** A
    downgrade never accepts, so it is safe — but it acts on a heuristic. Recommend: **No** in
    v1 (advisory only); revisit once **mutation** (real) evidence exists.
-3. **Approve a mutation dependency (PIT) for the deferred semantic slice?** Recommend: defer;
-   decide when v1 has landed and `run_kind`/tags are stable (KB §2.2 sequencing).
+3. **Approve ungated mutation dependency/use beyond the current PIT gate?** Recommend: defer;
+   decide only after stable owner review of the gated evidence path.
 4. **Capture an LLM-judged oracle strength (untrusted `*_declared`) at all?** Recommend: not
    in v1; if ever, only as an explicitly-untrusted rubric hint.
 
 ## 13. Relationship to the deferred / sibling work
 
-This closes the honest version of the docs/42/44 gap: **structural** strength is
+This closes the honest version of the docs/42 gap: **structural** strength is
 consolidated + surfaced (cheap), and **semantic** strength is correctly attributed to
 **mutation evidence** (real, deferred) or **human review** — never to a heuristic dressed up
 as a verdict. Together with `run_kind` (real-only headlines) and business tags (what risk a

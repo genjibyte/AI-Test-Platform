@@ -1,13 +1,13 @@
 # 49 — Survived-mutant classification (design, 2026-06-14)
 
-> **Status: S1+S2 implemented 2026-06-14.** Roadmap item **#3** of `docs/00_foundation/47`. Builds on `46` (mutation)
+> **Status: S1+S2 implemented 2026-06-14.** Builds on `46` (mutation)
 > and `48` (the `scoped_mutants_survive` reason). Every output here is **advisory**: it feeds
 > `review_summary` / the report only, never `recommend_with_reasons` / `conclusion`;
 > `auto_accept` stays blocked; `conclusion` stays `NEED_HUMAN_REVIEW`; `trusted=False`.
 
 ## 0. The honest limit (what keeps this on-thesis)
 **Equivalent-mutant detection is undecidable in general** — we cannot *prove* a surviving mutant
-is equivalent. So #3 does NOT label mutants "equivalent" with authority and NEVER concludes a test
+is equivalent. So this slice does NOT label mutants "equivalent" with authority and NEVER concludes a test
 is bad because a mutant survived. It only:
 
 1. separates the **decidable** facts (a mutant was *not covered* vs *covered-but-survived*), and
@@ -66,7 +66,7 @@ The table is **non-blocking and extensible**; an unknown mutator is allowed. An
   `scoped_mutants_survive`, attach the classified survivors *for that invariant's scope* so the
   reason is explained, not bare. (Enriches `review_summary["invariant_review"]`.)
 - **Report (`report_md.py`):** a new advisory "Survived mutants" section (counts + top survivors
-  with explanations) — the user's #3 ("survived mutation 解释都要进入报告"). Rendered only when
+  with explanations) — survived mutation explanations enter the report. Rendered only when
   per-mutation rows exist (i.e. a gated run with `include_mutations`); otherwise omitted.
 
 ## 5. Slices
@@ -86,7 +86,7 @@ The table is **non-blocking and extensible**; an unknown mutator is allowed. An
 - No new dependency; consumes the existing PIT rows. Mutation stays gated/opt-in.
 - Read-only over historical data; no backfill.
 
-## 7. Acceptance (when implemented)
+## 7. Acceptance — live
 - A `NO_COVERAGE` row → `not_covered`; a `SURVIVED` `MathMutator` → `survived_weak_oracle`; a
   `SURVIVED` `ConditionalsBoundaryMutator` → `survived_maybe_equivalent`; an unknown mutator →
   `survived_unclassified`. `KILLED`/`TIMED_OUT` are not survivors.
@@ -97,7 +97,7 @@ The table is **non-blocking and extensible**; an unknown mutator is allowed. An
 
 ## 8. Relationship to siblings
 `46` produces the mutants; `48` line-scopes them to an invariant and flags survivors; `49` (this)
-*explains* those survivors so review is guided. Together they answer the user's #3: assertion
+*explains* those survivors so review is guided. Together they connect assertion
 strength + mutation + survived-mutant explanation, all in the report, all advisory.
 
 ---

@@ -2,7 +2,8 @@
 
 > Date: 2026-06-07 (v1); enriched 2026-06-20 (v2). Nature: **measurement instrument**.
 > This is the benchmark we hold fixed so context/model changes can be compared apples-to-apples.
-> Upstream: `docs/14` (Phase 2.5 benchmark), `docs/21` (pro quality run), `docs/22` (review policy).
+> Upstream: historical Phase 2 benchmark/pro-quality/review-policy notes, pruned from the active
+> docs tree. This file is now the self-contained benchmark manifest contract.
 > Boundary (user roadmap step 2): build the manifest, **freeze the 3 cases, expand to 8–12**. No model run here.
 > **v2 (§5):** same 10 pins, ENRICHED with business-invariant tags (docs/45) + anchoring
 > invariant descriptors (docs/48). See `benchmarks/manifest.v2.json`.
@@ -67,7 +68,7 @@ lang `598dfc1` = `rel/commons-lang-3.20.0` (a clean release tag, no prior baseli
 
 **Bucket balance** (deliberate): exception-semantics ×5, pure-function ×3,
 api-contract ×2. The exception-semantics cases are where pro v2 failed in
-`docs/21` (CSVRecord guessed the wrong exception type; Option misused an internal
+the historical pro-quality run (CSVRecord guessed the wrong exception type; Option misused an internal
 API). They are exactly what v3 grounding must move from `TEST_FAILURE`/`NEEDS_REVISION`
 toward `STRONG_REVIEW_CANDIDATE`. The pure-function cases are PASS baselines that
 must **not** regress.
@@ -80,7 +81,7 @@ must **not** regress.
 - **Controlled delta** on the 3 frozen cases: v2 = `v2-pro-quality-final` (same
   exact commits, no re-run) vs v3 = the new run. Compare `gen_outcome`,
   `quality_gate_status`, `review_recommendation`, and the expected/actual the
-  review summary extracts (docs/22).
+  review summary extracts.
 - **Broader coverage** on the other 7: absolute v3 performance across the buckets.
 - Headline metrics: `gen_test_pass_rate`, `recommendation_distribution`,
   `top_failure_types`. Red-line unchanged: `conclusion` stays `NEED_HUMAN_REVIEW`.
@@ -92,7 +93,7 @@ cost + expectation stated first).
 
 ## 4. Reproducibility & run commands
 
-Skip the policy plugins + the conflicting JaCoCo agent (docs/14 F1/F2); coverage
+Skip the policy plugins + the conflicting JaCoCo agent; coverage
 is advisory and reported `unavailable`:
 
 ```powershell
@@ -165,10 +166,9 @@ left empty:
 **Why a new file, not an edit to v1:** v1 stays the frozen reproducibility pin (its
 `v2-pro-quality-final` baseline comparison is untouched). v2 only adds **advisory** metadata
 — it changes no verdict (`conclusion` stays `NEED_HUMAN_REVIEW`, `auto_accept` blocked). The
-statements are **grounded** in the documented behavior captured in
-`docs/60_context_v3/CONTEXT_V3_EVOLUTION_DIGEST.md` (e.g. `Option.addValue` always throws;
-`Option.getValues()` returns `null` not `[]`; `CSVRecord.get` throws on bad key/index;
-`Validate.notNull`→NPE / `isTrue`→IAE).
+statements are **grounded** in the benchmark manifest's pinned target facts and prior judge
+evidence. The historical context evolution digest was pruned on 2026-07-21; recover it from git
+only for explicit archaeology.
 
 **What v2 activates** that v1 left dormant for the benchmark: the docs/45 business rubric, the
 docs/48 invariant-verification view (`asserted`/`addressed`/`pinned`), docs/49 scoped survivor
@@ -181,3 +181,19 @@ accepts).
 **Next enrichment (breadth, deferred):** adding NEW (repo, commit, target) cases needs commit
 SHAs verified against the real repos — not inventable offline — so it stays a separate,
 network-gated step. v2 enriches **depth** (the verifiable, on-thesis move) now.
+
+---
+
+## 7. S5B Golden Set Governance (2026-07-21)
+
+The current `manifest.v1.json` and `manifest.v2.json` files remain frozen. S5B does not edit pins
+or add external rows in place.
+
+Future Golden Set expansion must pass through
+`docs/50_benchmark/62_GOLDEN_SET_MANIFEST_GOVERNANCE.md` first. The live helper
+`app/benchmark/manifest_governance.py` accepts only `manifest_seed` metadata for a future
+benchmark draft or the external project/benchmark registry. It rejects dataset content, authority
+fields, secret/raw payload fields, artifact drift, duplicate seed IDs, and headline-metric claims.
+
+This is still not a dataset slice, executor, real-model run, benchmark headline, ledger schema
+change, digest signal, recommendation change, conclusion change, or trusted-status change.

@@ -1,6 +1,8 @@
-# 沉淀层设计（Precipitation / Accumulation Layer）
+# 沉淀层设计（Precipitation / Accumulation Layer）- live contract
 
-> 日期：2026-06-08。性质：**设计（design-first）**。**不写代码、不跑模型、不建表、不新增功能**——本文只定模型与切片。
+> 日期：2026-06-08。状态：P1/P2 已落地，`app/ledger/` 提供 judged-record 存储、
+> badcase 聚合和只读查询；后续 `docs/50` 增加 retrieval。本文现在是 live contract +
+> 历史设计记录，不批准新模型调用、新表扩张、自动采纳、自动修复或 verdict 变化。
 > 上级：`docs/00`（Charter §5.2-9、§7.16-17）、`docs/00_foundation/40_CORE_THESIS_REPOSITIONING.md`（§4 把"沉淀"列为核心前沿）。
 > 红线：复用优先、最小新增；不做 KG / 复杂 RAG / 规则引擎（Charter §8）；不自动采纳、不自动改 oracle。
 > 触发：用户"继续"——落地 doc 40 §6.4 / §9-3 提出的、design-first 的沉淀层。
@@ -22,7 +24,9 @@
 | `aggregate(cases)` | 跨 case 指标：`top_failure_types`、`recommendation_distribution`、compile/pass/coverage 率 | `app/benchmark/models.py:152` |
 | `bench.db` `jobs.generation_json` | 每个 job 持久化完整 bundle（含 `test_source`、execution、`review_summary`） | `app/storage/db.py`、`app/storage/job_repo.py` |
 
-> 结论：判卷事实的**原始沉淀已存在**。`badcase`/`ledger`/`provenance` 在代码中**零实现**（仅文档计划，`docs/13` §2.3）。缺的是把这些事实**跨 run、跨作者**统一成账本 + 失败签名聚合 + 比较视图。
+> 结论：判卷事实的**原始沉淀已存在**。早期缺口是把这些事实**跨 run、跨作者**
+> 统一成账本 + 失败签名聚合 + 比较视图；这个 P1/P2 缺口已由 `app/ledger/`
+> 和相关测试覆盖。后续只允许在不改 verdict 的前提下补 compact carry 或只读视图。
 
 ---
 
@@ -63,7 +67,7 @@ JudgedRecord = {
   - 主桶：`failure_type`（`FAILURE_TYPES`）。
   - 细化：
     - `TEST_FAILURE` → 取 `review_summary.failures` 的 `{type(failure|error), 归一化的 expected/actual 类名 或 异常类型}`；
-    - `COMPILE_FAILURE` → 编译错误类（`cannot_find_symbol` / `overload_ambiguous` / `incompatible_types`，复用 `docs/38` 归类）；
+    - `COMPILE_FAILURE` → 编译错误类（`cannot_find_symbol` / `overload_ambiguous` / `incompatible_types`，复用当前 failure taxonomy 的粗分类）；
     - `preflight` → blocker code。
   - 例：`TEST_FAILURE/error/exception=ArrayIndexOutOfBoundsException @ CSVRecord#getInt`、`COMPILE_FAILURE/overload_ambiguous @ BooleanUtils#toBoolean`。
 - **Badcase 记录**：`{signature, count, first_seen, last_seen, examples[record_id], authors_affected[], targets_affected[]}`。
@@ -90,14 +94,14 @@ JudgedRecord = {
 
 ---
 
-## 7. 最小落地切片（每片小、可独立交付、可停；**本文不实现**）
+## 7. 最小落地切片（每片小、可独立交付、可停；状态截至 2026-07-21）
 
 | 片 | 内容 | 代码量 |
 |---|---|---|
 | **P0** | 定 `JudgedRecord` schema + 签名规则（**本文**） | 纯文档 |
 | **P1** | `app/ledger/`：一张表 + `append(record)` + `from_bench_case_result(r, provenance)` 适配器；benchmark 跑完 append。**零判卷逻辑改动** | 小 |
 | **P2** | badcase 聚合 + §5 的几个只读查询 | 小 |
-| **P3** | author-agnostic 提交入口（doc 40 §6.2 `submit_candidate`）直接 append 账本——人/外部 agent 测试也进沉淀 | 小 |
+| **P3** | author-agnostic 提交入口（doc 40 §6.2 `submit_candidate`）已由 docs/53 落地；**直接 append 账本**仍未自动化 | 小 |
 
 顺序与 doc 40 §6 对齐。每片先有测试、离线可验。
 
@@ -109,14 +113,14 @@ JudgedRecord = {
 - 不自动采纳、不自动改 oracle；badcase 仅记录 + 检索。
 - 不把"生成量 / 生成质量"当账本 KPI；账本度量**判卷结果**，按作者中立比较。
 - 不引新存储技术：复用 SQLite + pydantic。
-- 本文 **design-only**：不写代码、不跑模型、不建表。
+- 不跑模型、不引新存储技术；已落地 ledger 仍保持只读聚合 / append-only 语义。
 
 ---
 
 ## 9. 待你拍板
 
 1. 账本用**独立 durable 库**（`var/ledger.db`）还是扩展 `bench.db`？（建议**独立库**，跨 run 更清晰。）
-2. ~~P1（表 + append）/ P2（badcase 聚合 + 查询）~~ **P1 + P2 已落地**（见 §10）。是否进 **P3**（author-agnostic `submit_candidate`：让人/外部 agent 测试进同一判卷链路并沉淀）？
+2. ~~P1（表 + append）/ P2（badcase 聚合 + 查询）~~ **P1 + P2 已落地**（见 §10）。`submit_candidate` 入口已由 docs/53 落地；是否增加“外部提交自动 append 到 ledger”仍需单独设计。
 3. badcase 签名粒度：**先粗**（`failure_type` + 目标）还是直接细（含 expected/actual 类名）？（建议**先粗**，避免过拟合，复发数据足够后再细化。）
 
 ---
@@ -132,7 +136,7 @@ JudgedRecord = {
 - `app/benchmark/runner.py`：跑完后 `_precipitate(report, workdir)` **best-effort** append（`$TESTAGENT_LEDGER_DB` 或 `<workdir>/../ledger.db`，即 `var/benchmark/ledger.db`，跨 run 共享）；**ledger 失败绝不影响 benchmark**。
 - **P2（analytics）**：新增 `app/ledger/analytics.py`——`badcase_signature`（粗粒度 `failure_type@target`，PASS 返回 `None`）、`aggregate_badcases`（按签名分组排名：count / first·last_seen / authors / targets / examples）、`author_profile`（compile/pass 率 + recommendation 分布 + top badcase）、`compare_authors_on_target`（跨作者同 target 对照——"谁判得更好，而非谁生成得多"）、`ledger_summary`。**纯函数、读侧、确定性；不判卷、不生成规则**。结构审理结论：P1 内核（models/store）benchmark-free，coarse 签名由现成字段派生，**P2 零 P1/schema 改动**。
 - 测试：`tests/test_ledger.py` 共 **10**（P1 5 + P2 5：签名、聚合排序、author 画像、跨作者对照、digest）；`tests/test_benchmark.py` 增 ledger 接线断言。全量 **225 passed, 4 skipped**。
-- **未做（设计在案）**：author-agnostic `submit_candidate`（P3）；真实 `test_source` 指纹接线（benchmark 记录暂 `None`，适配器已支持并测试，待 P3 提交入口接通）；细粒度 badcase 签名（expected/actual 类名，§4，无需改 schema）。
+- **未做（设计在案）**：`submit_candidate` 自动 append 到 ledger；真实 `test_source` 指纹自动接线（benchmark 记录暂 `None`，适配器已支持并测试，待提交/ingest 桥接）；细粒度 badcase 签名（expected/actual 类名，§4，无需改 schema）。
 
 > 红线保持：判卷内核未改、账本独立库、不判卷 / 不采纳 / 不改 oracle / 不引新存储技术。
 
