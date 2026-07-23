@@ -1,7 +1,11 @@
 """Real-world validation-line metrics (docs/56). Offline and pure."""
 
 from app.benchmark.models import BenchCaseResult, aggregate
-from app.benchmark.validation_line import validation_line_summary
+from app.benchmark.validation_line import (
+    HUMAN_LABEL_READINESS_VERSION,
+    human_label_metric_readiness,
+    validation_line_summary,
+)
 
 
 def _case(name: str, **overrides) -> BenchCaseResult:
@@ -139,3 +143,124 @@ def test_validation_line_does_not_change_aggregate_headline_shape():
 
     assert set(aggregate(cases).keys()) == before_keys
     assert "first_compile_pass_rate" not in aggregate(cases)
+
+
+def _human_label(**overrides):
+    label = {
+        "record_ref": "bench:case-1",
+        "candidate_ref": "job:1",
+        "reviewer_ref": "reviewer:local",
+        "review_started_at": "2026-07-23T10:00:00Z",
+        "review_completed_at": "2026-07-23T10:05:00Z",
+        "disposition": "kept",
+        "disposition_reason": "usable as-is",
+        "manual_revision_count": 0,
+        "manual_revision_kinds": [],
+        "misjudgment": {
+            "kind": "none",
+            "misled_human": False,
+        },
+    }
+    label.update(overrides)
+    return label
+
+
+def test_human_label_metric_readiness_marks_empty_input_not_ready():
+    summary = human_label_metric_readiness([])
+
+    assert summary["schema_version"] == HUMAN_LABEL_READINESS_VERSION
+    assert summary["advisory"] is True
+    assert summary["report_only"] is True
+    assert summary["total_label_rows"] == 0
+    assert summary["metrics"]["usable_test_rate"] == {
+        "status": "requires_human_disposition_labels",
+        "denominator": 0,
+        "numerator": 0,
+        "value": None,
+        "headline_allowed_now": False,
+    }
+    assert "human_disposition_labels_missing" in summary["not_ready_reasons"]
+    assert summary["headline_metric_authority"] is False
+    assert summary["verdict_authority"] is False
+    assert summary["trusted_authority"] is False
+
+
+def test_human_label_metric_readiness_projects_available_human_metrics():
+    labels = [
+        _human_label(),
+        _human_label(
+            record_ref="bench:case-2",
+            disposition="kept_with_edits",
+            disposition_reason="kept after assertion rewrite",
+            manual_revision_count=2,
+            manual_revision_kinds=["assertion"],
+            review_completed_at="2026-07-23T10:10:00Z",
+            root_cause={
+                "family": "oracle",
+                "code": "oracle_weak_or_missing",
+                "confidence": "human_confirmed",
+                "recorded_at": "2026-07-23T10:09:00Z",
+                "evidence_refs": ["report.quality.blockers:no_assertions"],
+            },
+        ),
+        _human_label(
+            record_ref="bench:case-3",
+            disposition="rejected",
+            disposition_reason="candidate revealed a confirmed product bug",
+            root_cause={
+                "family": "product",
+                "code": "product_bug_confirmed",
+                "confidence": "verifier_confirmed",
+                "recorded_at": "2026-07-23T10:04:00Z",
+                "evidence_refs": ["verifier:defect-seed-1"],
+            },
+            misjudgment={
+                "kind": "false_negative",
+                "platform_signal": "review_digest",
+                "human_verdict": "digest missed confirmed product-bug evidence",
+                "misled_human": False,
+            },
+        ),
+        {"record_ref": "bench:not-reviewed-yet"},
+    ]
+
+    summary = human_label_metric_readiness(labels)
+    metrics = summary["metrics"]
+
+    assert summary["total_label_rows"] == 4
+    assert summary["human_reviewed_rows"] == 3
+    assert metrics["usable_test_rate"]["denominator"] == 3
+    assert metrics["usable_test_rate"]["numerator"] == 2
+    assert metrics["usable_test_rate"]["value"] == 0.6667
+    assert metrics["human_edit_count"]["average_manual_revision_count"] == 0.6667
+    assert metrics["human_handling_time"]["average_seconds"] == 400
+    assert metrics["misjudgment_rate"]["denominator"] == 3
+    assert metrics["misjudgment_rate"]["numerator"] == 1
+    assert metrics["misjudgment_rate"]["value"] == 0.3333
+    assert metrics["defect_discovery_rate"]["defect_discovery_label_count"] == 1
+    assert metrics["defect_discovery_rate"]["value"] is None
+    assert "pinned_defect_denominator_missing" in summary["not_ready_reasons"]
+    assert summary["headline_metric_authority"] is False
+
+
+def test_human_label_metric_readiness_accepts_existing_metric_projections():
+    projection = {
+        "schema_version": "human_review_metric_projection.v1",
+        "human_reviewed": True,
+        "disposition": "kept",
+        "usable_test": True,
+        "manual_revision_count": 0,
+        "manual_revision_kinds": [],
+        "human_handling_time_seconds": 300,
+        "root_cause_recorded": False,
+        "defect_discovery_label": False,
+        "misjudgment_kind": "none",
+        "advisory_only": True,
+        "conclusion": "NEED_HUMAN_REVIEW",
+        "trusted": False,
+    }
+
+    summary = human_label_metric_readiness([projection])
+
+    assert summary["metrics"]["usable_test_rate"]["value"] == 1.0
+    assert summary["metrics"]["human_handling_time"]["average_seconds"] == 300

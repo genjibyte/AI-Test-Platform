@@ -5,9 +5,15 @@ recommendations, aggregate headline keys, ledger schema, or report conclusions.
 """
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from typing import Any, Iterable, Mapping, Optional
 
 from app.benchmark.models import BenchCaseResult
+from app.review.human_labels import (
+    METRIC_PROJECTION_VERSION,
+    label_metric_projection,
+)
+
+HUMAN_LABEL_READINESS_VERSION = "human_label_metric_readiness.v1"
 
 FIRST_COMPILED_OUTCOMES = {"PASS", "TEST_FAILURE", "NO_TESTS"}
 WEAK_QUALITY_CODES = {
@@ -169,3 +175,176 @@ def validation_line_summary(
             "diagnosis/misjudgment metrics require human or golden labels."
         ),
     }
+
+
+def human_label_metric_readiness(
+    labels_or_projections: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Summarize whether human/golden labels are sufficient for landing metrics.
+
+    This helper is pure and non-persistent. It does not compute benchmark
+    headline metrics, change aggregates, or treat labels as acceptance commands.
+    """
+    projections = [_as_metric_projection(item) for item in labels_or_projections]
+    reviewed = [item for item in projections if item.get("human_reviewed") is True]
+    dispositions = [
+        item for item in reviewed if item.get("disposition") is not None
+    ]
+    timed = [
+        item for item in reviewed
+        if item.get("human_handling_time_seconds") is not None
+    ]
+    root_cause_recorded = [
+        item for item in reviewed if item.get("root_cause_recorded") is True
+    ]
+    misjudgment_labeled = [
+        item for item in reviewed if item.get("misjudgment_kind") is not None
+    ]
+    defect_labels = [
+        item for item in reviewed if item.get("defect_discovery_label") is True
+    ]
+
+    usable_count = sum(1 for item in dispositions if item.get("usable_test") is True)
+    revision_counts = [
+        int(item.get("manual_revision_count") or 0)
+        for item in dispositions
+    ]
+    misjudgment_count = sum(
+        1
+        for item in misjudgment_labeled
+        if item.get("misjudgment_kind") not in (None, "none")
+    )
+
+    return {
+        "schema_version": HUMAN_LABEL_READINESS_VERSION,
+        "advisory": True,
+        "report_only": True,
+        "total_label_rows": len(projections),
+        "human_reviewed_rows": len(reviewed),
+        "metrics": {
+            "usable_test_rate": {
+                "status": _available_if(dispositions, "requires_human_disposition_labels"),
+                "denominator": len(dispositions),
+                "numerator": usable_count,
+                "value": _rate(len(dispositions), usable_count),
+                "headline_allowed_now": False,
+            },
+            "human_edit_count": {
+                "status": _available_if(dispositions, "requires_human_review_edit_annotations"),
+                "denominator": len(dispositions),
+                "average_manual_revision_count": _average(revision_counts),
+                "headline_allowed_now": False,
+            },
+            "human_handling_time": {
+                "status": _available_if(timed, "requires_human_review_timestamps"),
+                "denominator": len(timed),
+                "average_seconds": _average([
+                    int(item["human_handling_time_seconds"])
+                    for item in timed
+                ]),
+                "headline_allowed_now": False,
+            },
+            "diagnosis_time": {
+                "status": (
+                    "rca_labels_present_but_requires_failure_first_surfaced_timestamp"
+                    if root_cause_recorded
+                    else "requires_human_or_verifier_rca_timestamps"
+                ),
+                "root_cause_recorded_rows": len(root_cause_recorded),
+                "value": None,
+                "headline_allowed_now": False,
+            },
+            "misjudgment_rate": {
+                "status": _available_if(
+                    misjudgment_labeled,
+                    "requires_human_or_golden_reference_labels",
+                ),
+                "denominator": len(misjudgment_labeled),
+                "numerator": misjudgment_count,
+                "value": _rate(len(misjudgment_labeled), misjudgment_count),
+                "headline_allowed_now": False,
+            },
+            "defect_discovery_rate": {
+                "status": (
+                    "defect_labels_present_but_requires_pinned_defect_denominator"
+                    if defect_labels
+                    else "requires_pinned_defect_or_seeded_defect_verifier"
+                ),
+                "defect_discovery_label_count": len(defect_labels),
+                "value": None,
+                "headline_allowed_now": False,
+            },
+        },
+        "ready_metric_count": sum(
+            1
+            for metric in ("usable_test_rate", "human_edit_count", "human_handling_time", "misjudgment_rate")
+            if (
+                (metric == "usable_test_rate" and dispositions)
+                or (metric == "human_edit_count" and dispositions)
+                or (metric == "human_handling_time" and timed)
+                or (metric == "misjudgment_rate" and misjudgment_labeled)
+            )
+        ),
+        "not_ready_reasons": _label_not_ready_reasons(
+            dispositions=dispositions,
+            timed=timed,
+            root_cause_recorded=root_cause_recorded,
+            misjudgment_labeled=misjudgment_labeled,
+            defect_labels=defect_labels,
+        ),
+        "runtime_authority": False,
+        "persistence_authority": False,
+        "headline_metric_authority": False,
+        "digest_authority": False,
+        "verdict_authority": False,
+        "trusted_authority": False,
+        "note": (
+            "Human/golden labels can make landing metrics computable, but this "
+            "readiness summary does not approve headline claims, persistence, "
+            "verdict changes, or trusted=True."
+        ),
+    }
+
+
+def _as_metric_projection(item: Mapping[str, Any]) -> dict[str, Any]:
+    if not isinstance(item, Mapping):
+        raise TypeError("label rows must be mappings")
+    if item.get("schema_version") == METRIC_PROJECTION_VERSION:
+        return dict(item)
+    return label_metric_projection(dict(item))
+
+
+def _available_if(rows: list[dict[str, Any]], unavailable_status: str) -> str:
+    return "available_from_supplied_labels" if rows else unavailable_status
+
+
+def _average(values: list[int]) -> float | None:
+    if not values:
+        return None
+    return round(sum(values) / len(values), 4)
+
+
+def _label_not_ready_reasons(
+    *,
+    dispositions: list[dict[str, Any]],
+    timed: list[dict[str, Any]],
+    root_cause_recorded: list[dict[str, Any]],
+    misjudgment_labeled: list[dict[str, Any]],
+    defect_labels: list[dict[str, Any]],
+) -> list[str]:
+    reasons: list[str] = []
+    if not dispositions:
+        reasons.append("human_disposition_labels_missing")
+    if not timed:
+        reasons.append("human_review_timestamps_missing")
+    if not root_cause_recorded:
+        reasons.append("root_cause_timestamps_missing")
+    else:
+        reasons.append("failure_first_surfaced_timestamp_missing_for_diagnosis_time")
+    if not misjudgment_labeled:
+        reasons.append("misjudgment_reference_labels_missing")
+    if defect_labels:
+        reasons.append("pinned_defect_denominator_missing")
+    else:
+        reasons.append("defect_verifier_or_product_bug_labels_missing")
+    return reasons

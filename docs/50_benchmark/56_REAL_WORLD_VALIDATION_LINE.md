@@ -1,6 +1,6 @@
 # 56 - Real-World Validation Line
 
-> Date: 2026-07-11  
+> Date: 2026-07-11
 > Status: active design reference. V1 automated evidence projection is live; no schema change,
 > ledger change, UI change, model run, external dataset import, human-label workflow, or API
 > executor is implied.
@@ -313,6 +313,147 @@ V1 did not change:
 - SQLite indexes;
 - recommendations, conclusions, trust, or digest severity;
 - human/golden metrics, which still require labels or verifiers.
+
+### 4.2 Human/Golden Label Readiness - Live
+
+Implemented on 2026-07-23 as a pure readiness slice:
+
+```text
+app/benchmark/validation_line.py
+  human_label_metric_readiness(...)
+```
+
+This consumes validated `HumanReviewLabel` rows or compact
+`human_review_metric_projection.v1` rows and reports which human/golden metrics are computable
+from the supplied labels:
+
+- usable test rate;
+- average human edit count;
+- average human handling time;
+- diagnosis-time readiness;
+- misjudgment rate;
+- defect-discovery label presence.
+
+It still does not create headline claims. `defect_discovery_rate` remains unavailable as a rate
+until a pinned defect or seeded-defect denominator exists. `diagnosis_time` remains unavailable as
+a duration until `failure_first_surfaced_at` is supplied by a future workflow.
+
+The helper does not change:
+
+- benchmark aggregate keys;
+- benchmark/ledger schemas;
+- SQLite indexes;
+- digest severity;
+- recommendation, conclusion, or trust;
+- persistence or human-label workflow.
+
+### 4.3 Golden Set Defect Denominator Readiness - Live
+
+Implemented on 2026-07-23 as metadata-only Golden Set planning:
+
+```text
+app/benchmark/manifest_governance.py
+  golden_defect_denominator_readiness(...)
+```
+
+This consumes `manifest_seed` metadata and identifies seeds that look like future
+bug/defect/verifier denominator candidates. It can count requested tasks and pinned task ids, but
+it still returns:
+
+```text
+defect_denominator_ready_now = False
+defect_discovery_rate_value = None
+```
+
+Required before a real `defect_discovery_rate`:
+
+- owner-gated dataset slice materialization;
+- pinned defect or seeded-defect denominator;
+- verifier execution or human-confirmed product-bug evidence;
+- run_kind-aware reporting that does not pollute current headlines.
+
+No benchmark headline, aggregate key, dataset download, external execution, verdict, or trust
+authority is granted by this readiness helper.
+
+### 4.4 Landing Readiness Rollup - Live
+
+Implemented on 2026-07-23 as a pure planning rollup:
+
+```text
+app/governance/landing_readiness.py
+  landing_readiness_snapshot(...)
+  validate_landing_readiness_snapshot(...)
+app/governance/landing_readiness_report.py
+  render_landing_readiness_markdown(...)
+```
+
+This combines:
+
+- `project_progress_snapshot(...)`;
+- `human_label_metric_readiness(...)`;
+- `golden_defect_denominator_readiness(...)`.
+
+The rollup is useful for answering "why are we still around 71% and not 80%" with concrete
+blockers: project completion below 80, missing human/golden label fields, and missing owner-gated
+defect denominators or verifier evidence.
+
+It does not introduce a new metric, aggregate key, label workflow, dataset slice, verifier,
+executor, release gate, headline claim, recommendation, conclusion, or trust authority.
+
+The optional Markdown renderer takes an existing `landing_readiness_snapshot.v1` mapping and
+renders a human handoff section. It returns an empty string for absent/wrong-version snapshots and
+does not recompute readiness or wire anything into default reports.
+
+S6K extends the snapshot and Markdown with:
+
+- `review_questions`: owner/human review prompts triggered by current blockers;
+- `evidence_checklist`: required evidence items and their current readiness status.
+
+These fields are review aids only. They do not execute evidence collection, promote metric
+readiness to a headline claim, approve dataset/verifier work, or change recommendation,
+conclusion, or trust.
+
+S6L adds `validate_landing_readiness_snapshot(...)`, a pure boundary validator used by the
+Markdown renderer. It rejects malformed v1 snapshots and any top-level or nested authority drift,
+including headline metric, dataset materialization, verifier execution, verdict, or trust flags.
+It does not recompute readiness or collect new evidence.
+
+S6M tightens this validation for typed planning fields and consistency:
+
+- `overall_completion_percent` and nested progress percent must be integers in 0..100;
+- `project_stage`, `completion_band`, and `landing_stage` must be known planning enum values;
+- `source_versions` must match nested schema versions;
+- `inputs` and `human_ready_metric_count` must be non-negative integers;
+- nested progress percent/stage/band must match the top-level snapshot.
+
+This prevents malformed handoff material from masquerading as a valid readiness view, but still
+does not compute new metrics or approve any release/headline claim.
+
+S6N adds derived-field consistency checks. The validator now requires blockers, next steps,
+landing stage, `ready_for_80_stage`, input counts, human-ready metric names/counts,
+defect-denominator flags, review questions, and evidence-checklist statuses to match the nested
+progress, human-label readiness, Golden Set denominator readiness, and blocker families. This is
+still a pure guard for handoff material: no workspace scan, label persistence, dataset
+materialization, verifier execution, headline metric, recommendation, conclusion, or trust
+authority is introduced.
+
+S6O adds a blocker-family summary over a validated landing-readiness snapshot. It groups remaining
+gaps by project progress, human labels, Golden Set defect denominator, and change-batch review,
+then surfaces the same grouping in the optional Markdown handoff. This is a review-navigation aid
+only: it does not compute a new metric, collect or persist evidence, materialize datasets, execute
+verifiers, change benchmark headlines, or alter recommendation, conclusion, or trust.
+
+S6P validates that blocker-family summary when it is used as a standalone handoff artifact. The
+validator rejects schema drift, authority drift, mismatched family counts, mismatched
+`total_blockers`, inconsistent `next_clearance_family`, and clearance statuses that do not match
+blockers/evidence. It still does not recompute readiness from the source snapshot, collect labels,
+persist data, execute verifiers, create metrics, or change recommendation, conclusion, or trust.
+
+S6Q adds an optional Markdown renderer for a standalone blocker-family summary. The renderer
+validates the summary before presentation and returns empty output for absent or wrong-version
+inputs. It keeps the same validation-line boundary: no source recomputation, label persistence,
+dataset materialization, verifier execution, default benchmark/report wiring, headline metric,
+recommendation, conclusion, or trust change.
 
 ## 5. Mapping To Current Project
 

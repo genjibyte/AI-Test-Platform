@@ -1,7 +1,8 @@
 # External Asset Mapping Matrix
 
-> Date: 2026-07-11  
-> Source: user-provided external asset list.  
+> Date: 2026-07-20
+> Source: user-provided external asset lists, including
+> `D:\AI_TEST_AGENT_OPEN_SOURCE_KNOWLEDGE_BASE_2026-07.md`.
 > Status: design rule. This file maps assets to project intake shapes; it does not mean any asset
 > is installed, cloned, copied, executed, or implemented.
 
@@ -31,6 +32,17 @@ Default rule: no vendoring external repos, no direct code copy, no new dependenc
 or model call, and no executor until an owner-approved design identifies the exact candidate kind,
 evidence contract, isolation boundary, and tests.
 
+External notes may use different labels. Normalize them before design:
+
+| External/source label | Project handling |
+|---|---|
+| `repair_adapter` | Not an allowed current intake shape. Treat as `support_only` until an owner-approved repair-candidate design treats repair output as a new `producer_adapter` candidate. |
+| `knowledge_reference` | Use `knowledge_note`. |
+| `benchmark_contract_reference` | Use `knowledge_note` plus possible future `manifest_seed`. |
+| `CandidateEnvelope` | Map to current submit request / future `JudgeCase` vocabulary. |
+| `ObservedEvidence` | Map to `JudgeEvidence` / report evidence projection. |
+| external P0/P1 roadmap | Treat as source priority only, not project implementation priority. |
+
 ## 0.1 Intake Workflow
 
 Use this order for external assets:
@@ -38,6 +50,7 @@ Use this order for external assets:
 ```text
 external asset
   -> intake shape from this matrix
+  -> phase gate from EXTERNAL_ASSET_PHASE_PLAN.md
   -> small README/design audit when the shape requires it
   -> one of: knowledge note, manifest seed, dataset slice, adapter design, SUT target, or defer
 ```
@@ -86,6 +99,50 @@ fit for project:
 risks:
 next action:
 ```
+
+## 0.2.1 Asset Record Block
+
+Any external asset that moves beyond a casual knowledge mention must include this block in the
+design or README audit:
+
+```text
+asset_id:
+source_url:
+intake_shape:
+project_artifact:
+pinned_version_or_commit:
+license_spdx:
+license_verified_at:
+runtime_language:
+requires_network:
+requires_docker:
+writes_workspace:
+secrets_or_payload_risk:
+expected_evidence:
+red_lines:
+next_action:
+```
+
+This block is documentation metadata. It is not approval to clone, install, execute, vendor, or
+ship the asset.
+
+The pure validator for this block is:
+
+```text
+app/governance/external_assets.py::validate_external_asset_record
+app/governance/external_assets.py::external_asset_intake_plan
+app/governance/external_readme_audit.py::validate_external_repo_readme_audit
+app/benchmark/manifest_governance.py::validate_golden_manifest_seed
+app/benchmark/manifest_governance.py::golden_manifest_governance_plan
+app/benchmark/manifest_governance_report.py::render_golden_manifest_governance_markdown
+```
+
+The first validates one metadata record and attaches phase policy. The second validates a batch,
+rejects duplicate `asset_id` values, and summarizes current-stage blockers. The third validates a
+focused README/license/runtime audit record. The Golden Set helpers validate metadata-only
+`manifest_seed` records, summarize future owner gates, and render optional audit Markdown. All
+still set runtime/download/install authority to false, and Golden Set helpers also keep benchmark
+headline authority false.
 
 ## 0.3 First README Audit List
 
@@ -208,6 +265,11 @@ Stop after these. Do not let indexes recursively expand the scope.
 |---|---|---|---|
 | EvoSuite | `producer_adapter` | External producer for JUnit candidates. | Design producer adapter; output enters `submit_candidate`. |
 | Randoop | `producer_adapter` | External producer for JUnit candidates. | Design producer adapter; output enters `submit_candidate`. |
+| ChatUniTest | `producer_adapter` + `readme_audit` | Java LLM test producer candidate; output only becomes submitted candidates. | Defer until producer comparison design; no generator race. |
+| TestSpark | `knowledge_note` + possible `producer_adapter` | Java IDE/generator reference. | Defer; audit license/runtime before any adapter. |
+| Pynguin | `support_only` + possible future `producer_adapter` | Python unit-test producer; useful for multi-language lessons, not current Java mainline. | Defer until multi-language candidate design exists. |
+| CoverUp | `support_only` + possible future `producer_adapter` | Python coverage-oriented test producer. | Defer; avoid coverage-only drift. |
+| Qodo Cover / Cover-Agent | `support_only` | External generator/repair reference with license/maintenance risk to audit. | Do not add dependency; no mainline adoption. |
 | PIT / Pitest | `executor_adapter` already partly represented by gated mutation subsystem | Mutation evidence for weak oracle tests. | Keep gated; no product reroute around PIT. |
 | JaCoCo | `executor_adapter` already live in judge kernel | Coverage delta evidence. | Keep core; improve parser robustness only. |
 | TackleTest CLI | `producer_adapter` | Enterprise Java test producer baseline. | Read README before adapter; do not import now. |
@@ -278,9 +340,28 @@ Stop after these. Do not let indexes recursively expand the scope.
 | Langfuse 官网 | `knowledge_note` | Trace/dataset/eval vocabulary. | Read only if provenance design needs it. |
 | Phoenix | `provenance_support` | Producer trace/debug metadata only. | Downgrade; no verdict source. |
 | Phoenix 官网 | `knowledge_note` | Observability vocabulary. | Read only if selected. |
+| OpenTelemetry | `provenance_support` | Future trace/span vocabulary for producer or runner metadata. | Design only; no telemetry stack before provenance design. |
 | promptfoo | `provenance_support` + `support_only` | Prompt/version eval support; not judge runtime. | Downgrade. |
 | DeepEval | `support_only` | LLM-app evaluation; may help explanation quality only. | Defer; no LLM Judge verdict. |
 | OpenAI Evals | `knowledge_note` | Eval packaging vocabulary. | Read only if eval-harness design needs it. |
+
+## 9.1 Orchestration, Repair, Model, And Report-Sink Support
+
+These assets appear in external reuse notes but are not mainline. They may be useful later only as
+outer adapters or support surfaces after the judge/report contract is stable.
+
+| Asset | Intake shape | Project mapping | Next action |
+|---|---|---|---|
+| LangGraph | `support_only` | Optional outer orchestration vocabulary; must not contain judge semantics. | Do not rewrite pipeline into LangGraph. |
+| PydanticAI | `support_only` | Possible typed worker pattern for future advisory agents. | No runtime adoption without owner gate. |
+| mini-SWE-agent / SWE-agent | `support_only` + future `producer_adapter` concept | Future repairer may output a new candidate, never mutate old evidence. | Defer until repair-candidate contract. |
+| OpenHands SDK | `support_only` + future `producer_adapter` concept | Coding-agent producer/repair reference. | Do not build agent platform. |
+| AutoCodeRover | `support_only` | Repair-agent reference only. | Defer; no production-code repair path. |
+| RepairAgent | `support_only` | Repair-agent reference only. | Defer; assertion/expected rewrite remains forbidden. |
+| LiteLLM | `support_only` + `provenance_support` | Producer-side model gateway vocabulary. | No provider platform mainline. |
+| vLLM / SGLang / Ollama / llama.cpp | `support_only` | Local inference references for producers only. | No serving stack in judge core. |
+| reviewdog | `support_only` | Possible future report sink. | No PR comment publisher or auto-adoption path now. |
+| PR-Agent | `support_only` | Code-review agent reference. | Do not turn project into code-review platform. |
 
 ## 10. Indexes, Forums, And Tracking Sources
 
