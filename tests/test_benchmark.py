@@ -76,6 +76,51 @@ def _pass(name="p", **kw):
     return BenchCaseResult(**base)
 
 
+def _api_smoke_review_summary(
+    *,
+    run_kind="external",
+    eligible=True,
+    smoke_id="s7c-junit-api-001",
+    reasons=None,
+    redline_flags=None,
+    redlines_satisfied=True,
+):
+    summary = {
+        "api_smoke_denominator": {
+            "policy_version": "api_smoke_denominator.v1",
+            "scope": "separate_api_smoke_denominator",
+            "smoke_id": smoke_id,
+            "candidate_kind": "junit_api_candidate",
+            "run_kind": run_kind,
+            "eligible_for_api_smoke_denominator": eligible,
+            "benchmark_counting_enabled": False,
+            "unit_headline_eligible": False,
+            "not_eligible_reasons": reasons or [],
+            "requirements": {
+                "manifest_status_allowed": eligible,
+                "candidate_kind_matches": True,
+                "target_matches_generation": True,
+                "api_evidence_present": eligible,
+                "runner_tool_matches": True if eligible else None,
+                "redaction_contract_satisfied": True if eligible else None,
+                "maven_judge_evidence_present": True,
+                "conclusion_needs_review": True,
+                "trusted_false": True,
+            },
+        }
+    }
+    if redline_flags is not None:
+        summary["api_smoke_redlines"] = {
+            "summary_version": "api_smoke_redline_summary.v1",
+            "review_flags": redline_flags,
+            "redlines_satisfied": redlines_satisfied,
+            "digest_signal": False,
+            "verdict_authority": False,
+            "trusted_authority": False,
+        }
+    return summary
+
+
 def test_aggregate_rates_over_attempted():
     cases = [
         _pass("a"),
@@ -304,6 +349,123 @@ def test_render_markdown_includes_validation_line_without_aggregate_drift():
     assert "human/golden metrics remain unavailable" in headline
     assert set(aggregate(cases).keys()) == before_keys
     assert "first_compile_pass_rate" not in aggregate(cases)
+
+
+def test_render_markdown_omits_api_smoke_sections_without_source_rows():
+    cases = [_pass("unit_only", run_kind="real")]
+
+    md = render_markdown(BenchReport(cases=cases, aggregate=aggregate(cases)))
+
+    assert "API smoke denominator" not in md
+
+
+def test_render_markdown_includes_api_smoke_projection_without_headline_drift():
+    cases = [
+        _pass(
+            "real_api",
+            run_kind="real",
+            review_summary=_api_smoke_review_summary(
+                run_kind="real",
+                smoke_id="real-smoke",
+                redline_flags=[],
+            ),
+        ),
+        _pass(
+            "external_api",
+            run_kind="external",
+            review_summary=_api_smoke_review_summary(
+                run_kind="external",
+                smoke_id="external-smoke",
+                redline_flags=["runner_tool_mismatch"],
+                redlines_satisfied=False,
+            ),
+        ),
+        _pass(
+            "fake_api",
+            run_kind="fake",
+            review_summary=_api_smoke_review_summary(
+                run_kind="fake",
+                redline_flags=["fake_only"],
+                redlines_satisfied=False,
+            ),
+        ),
+        _pass(
+            "external_ineligible",
+            run_kind="external",
+            gen_outcome="TEST_FAILURE",
+            passed=False,
+            failure_type="TEST_FAILURE",
+            quality_gate_status="FAIL",
+            review_recommendation="REJECT_CANDIDATE",
+            review_summary=_api_smoke_review_summary(
+                run_kind="external",
+                eligible=False,
+                reasons=["api_evidence_absent"],
+                redline_flags=["api_evidence_absent"],
+                redlines_satisfied=False,
+            ),
+        ),
+        _pass("real_unit", run_kind="real"),
+    ]
+    before_keys = set(aggregate(cases).keys())
+
+    md = render_markdown(BenchReport(cases=cases, aggregate=aggregate(cases)))
+
+    assert "## API smoke denominator - RAW (all run_kinds)" in md
+    assert "## API smoke denominator - HEADLINE (S8 eligible; real/external only)" in md
+    raw = md.split(
+        "## API smoke denominator - RAW (all run_kinds)", 1
+    )[1].split("##", 1)[0]
+    headline = md.split(
+        "## API smoke denominator - HEADLINE (S8 eligible; real/external only)", 1
+    )[1].split("##", 1)[0]
+    aggregate_headline = md.split(
+        "HEADLINE (real only; fake/dryrun/smoke/external/unknown excluded)", 1
+    )[1].split("##", 1)[0]
+
+    assert "source_rows: 4  projected_rows: 4" in raw
+    assert "eligible_source_rows: 3  ineligible_source_rows: 1" in raw
+    assert "'external': 2" in raw and "'real': 1" in raw and "'fake': 1" in raw
+    assert "api_evidence_absent" in raw
+    assert "redline_flag_counts: {'runner_tool_mismatch': 1" in raw
+    assert "'fake_only': 1" in raw
+    assert "redlines_satisfied_distribution: {'false': 3, 'true': 1}" in raw
+    assert "source_rows: 4  projected_rows: 2" in headline
+    assert "'external': 1" in headline and "'real': 1" in headline
+    assert "'fake'" not in headline
+    assert "redline_flag_counts: {'runner_tool_mismatch': 1}" in headline
+    assert "redlines_satisfied_distribution: {'true': 1, 'false': 1}" in headline
+    assert "fake_only" not in headline
+    assert "api_evidence_absent" not in headline
+    assert "accept_rate" not in raw and "accept_rate" not in headline
+    assert "- total_cases: 2" in aggregate_headline
+    assert set(aggregate(cases).keys()) == before_keys
+    assert "api_smoke_denominator" not in aggregate(cases)
+
+
+def test_render_markdown_places_api_smoke_after_validation_before_survivors():
+    review_summary = _api_smoke_review_summary(run_kind="external")
+    review_summary["mutation_survivors"] = {
+        "total_survivors": 1,
+        "counts": {"survived_weak_oracle": 1},
+    }
+    cases = [
+        _pass(
+            "external_api_with_survivor",
+            run_kind="external",
+            review_summary=review_summary,
+        )
+    ]
+
+    md = render_markdown(BenchReport(cases=cases, aggregate=aggregate(cases)))
+
+    assert (
+        md.index("## Real-world validation line - HEADLINE (real only)")
+        < md.index("## API smoke denominator - RAW (all run_kinds)")
+        < md.index("## API smoke denominator - HEADLINE (S8 eligible; real/external only)")
+        < md.index("## Survived mutants")
+        < md.index("## Per-case")
+    )
 
 
 def test_completed_result_carries_review_summary_failures():

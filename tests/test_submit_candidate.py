@@ -35,6 +35,7 @@ from app.models.job import Job, JobStatus, can_transition
 from app.pipeline.submit_pipeline import (
     _result_for_submit,
     _submit_class_name,
+    normalize_submit_candidate_carry,
     run_external_candidate,
 )
 from app.report.generation_report import CONCLUSION, assemble_generation_report
@@ -123,6 +124,89 @@ _SRC = (
 )
 
 
+def _api_evidence(**overrides):
+    block = {
+        "candidate_kind": "junit_api_candidate",
+        "asset_refs": {
+            "schema_ref_present": False,
+            "collection_ref_present": False,
+            "base_url_ref_present": True,
+            "auth_requirement": "not_required",
+            "fixture_requirement": "present",
+            "mock_requirement": "missing",
+        },
+        "environment": {
+            "service_start": "passed",
+            "base_url_available": True,
+            "network_scope": "local",
+        },
+        "execution": {
+            "runner_tool": "maven_surefire_jacoco",
+            "command_summary": "mvn -B test",
+            "duration_ms": 500,
+            "log_path": "var/jobs/job-api/mvn.log",
+        },
+        "traffic": {
+            "request_count": 1,
+            "operation_count": 1,
+            "status_summary": [{"class": "2xx", "count": 1}],
+            "method_path_summary": [
+                {"method": "GET", "path_template": "/owners/{id}", "count": 1}
+            ],
+        },
+        "checks": {
+            "schema_failures": 0,
+            "assertion_failures": 0,
+            "auth_failures": 0,
+            "fixture_failures": 0,
+            "mock_misses": 1,
+            "service_start_failures": 0,
+            "runner_errors": 0,
+            "timeouts": 0,
+        },
+        "failures": [{
+            "code": "api_mock_missing",
+            "severity": "warning",
+            "evidence": "notification dependency mock was not declared",
+        }],
+        "redaction": {
+            "request_body_persisted": False,
+            "response_body_persisted": False,
+            "secrets_persisted": False,
+        },
+    }
+    block.update(overrides)
+    return block
+
+
+def _api_smoke_manifest(**overrides):
+    manifest = {
+        "schema_version": "api_smoke_manifest.v1",
+        "smoke_id": "s7c-junit-api-001",
+        "candidate_kind": "junit_api_candidate",
+        "status": "approved",
+        "target": {
+            "target_class": "com.example.Calc",
+            "target_method": "max",
+            "api_style": "mockmvc",
+            "sut_ref": {
+                "intake_shape": "none",
+                "name": "project-under-judge",
+            },
+        },
+        "asset_requirements": {
+            "service_start_requirement": "not_required",
+            "base_url_requirement": "not_required",
+            "auth_requirement": "not_required",
+            "fixture_requirement": "required",
+            "mock_requirement": "unknown",
+            "business_oracle_ref_requirement": "present",
+        },
+    }
+    manifest.update(overrides)
+    return manifest
+
+
 def test_submit_requires_judged_job(repo):
     job = Job(git_url="https://example.com/x.git")  # status CREATED
     repo.create(job)
@@ -144,6 +228,82 @@ def test_submit_fails_when_workspace_missing(repo):
     assert out.status == JobStatus.SUBMIT_FAILED
     assert "workspace" in (out.error or "")
     assert out.generation["producer_id"] == "claude-4-7"
+
+
+def test_submit_pipeline_carries_report_only_api_fields_on_failure(repo):
+    job = Job(git_url="https://example.com/x.git", status=JobStatus.DONE)
+    repo.create(job)
+
+    out = run_external_candidate(
+        job,
+        repo,
+        "com.example.Calc",
+        "max",
+        _SRC,
+        producer_id="claude-4-7",
+        candidate_kind="junit_api_candidate",
+        api_evidence=_api_evidence(),
+        api_smoke_manifest=_api_smoke_manifest(),
+        java_test_framework="test-ng",
+    )
+
+    assert out.status == JobStatus.SUBMIT_FAILED
+    assert "workspace" in (out.error or "")
+    assert out.generation["run_kind"] == "external"
+    assert out.generation["candidate_kind"] == "junit_api_candidate"
+    assert out.generation["java_test_framework"] == "testng"
+    assert out.generation["api_evidence"]["execution"]["runner_tool"] == (
+        "maven_surefire_jacoco"
+    )
+    assert "trusted" not in out.generation["api_evidence"]
+    assert "conclusion" not in out.generation["api_evidence"]
+    assert out.generation["api_smoke_manifest"]["target"]["target_class"] == (
+        "com.example.Calc"
+    )
+    assert out.generation["api_smoke_manifest"]["execution_policy"][
+        "runner_tool"
+    ] == "maven_surefire_jacoco"
+
+
+def test_submit_carry_validation_rejects_unsupported_or_misaligned_fields():
+    with pytest.raises(ValueError, match="candidate_kind"):
+        normalize_submit_candidate_carry(
+            candidate_kind="api_schema_candidate",
+            target_class="com.example.Calc",
+            target_method="max",
+        )
+
+    with pytest.raises(ValueError, match="api_evidence requires"):
+        normalize_submit_candidate_carry(
+            api_evidence=_api_evidence(),
+            target_class="com.example.Calc",
+            target_method="max",
+        )
+
+    with pytest.raises(ValueError, match="api_smoke_manifest requires"):
+        normalize_submit_candidate_carry(
+            candidate_kind="junit_unit_candidate",
+            api_smoke_manifest=_api_smoke_manifest(),
+            target_class="com.example.Calc",
+            target_method="max",
+        )
+
+    with pytest.raises(ValueError, match="target_class"):
+        normalize_submit_candidate_carry(
+            candidate_kind="junit_api_candidate",
+            api_smoke_manifest=_api_smoke_manifest(
+                target={"target_class": "com.example.OtherCalc"},
+            ),
+            target_class="com.example.Calc",
+            target_method="max",
+        )
+
+    with pytest.raises(ValueError, match="unknown declared_framework"):
+        normalize_submit_candidate_carry(
+            java_test_framework="spock",
+            target_class="com.example.Calc",
+            target_method="max",
+        )
 
 
 def test_submit_pipeline_persists_asset_facts_before_preflight_reject(repo, tmp_path, monkeypatch):
@@ -291,6 +451,7 @@ def test_assemble_generation_report_on_submit_bundle_holds_invariants():
         "run_kind": "external",
         "producer_id": "claude-4-7",
         "producer_meta": {},
+        "java_test_framework": "testng",
     }
     report = assemble_generation_report(bundle)
     assert report["conclusion"] == CONCLUSION == "NEED_HUMAN_REVIEW"
@@ -302,6 +463,12 @@ def test_assemble_generation_report_on_submit_bundle_holds_invariants():
     # Asset Gate is producer-agnostic: submitted candidates get the same advisory block.
     assert "asset_sufficiency" in report["review_summary"]
     assert report["review_summary"]["asset_sufficiency"]["advisory"] is True
+    framework = report["review_summary"]["java_test_framework"]
+    assert framework["framework"] == "testng"
+    assert framework["declared_framework"] == "testng"
+    assert framework["runtime_actions_allowed_now"] is False
+    assert framework["verdict_authority"] is False
+    assert framework["trusted_authority"] is False
 
 
 # ---------- API validation -----------------------------------------------------
@@ -370,6 +537,111 @@ def test_api_unjudged_job_returns_409(api_client):
     repo.create(job)
     r = _post(api_client, job.id)
     assert r.status_code == 409
+
+
+def test_api_rejects_unsupported_candidate_kind_before_job_lookup(api_client):
+    r = _post(api_client, "does-not-exist", candidate_kind="api_schema_candidate")
+
+    assert r.status_code == 422
+    assert "candidate_kind" in r.json()["detail"]
+
+
+def test_api_rejects_unknown_java_test_framework_before_job_lookup(api_client):
+    r = _post(api_client, "does-not-exist", java_test_framework="spock")
+
+    assert r.status_code == 422
+    assert "unknown declared_framework" in r.json()["detail"]
+
+
+def test_api_rejects_api_evidence_without_junit_api_candidate(api_client):
+    r = _post(api_client, "does-not-exist", api_evidence=_api_evidence())
+
+    assert r.status_code == 422
+    assert "api_evidence requires" in r.json()["detail"]
+
+
+def test_api_rejects_api_smoke_manifest_without_junit_api_candidate(api_client):
+    r = _post(
+        api_client,
+        "does-not-exist",
+        candidate_kind="junit_unit_candidate",
+        api_smoke_manifest=_api_smoke_manifest(),
+    )
+
+    assert r.status_code == 422
+    assert "api_smoke_manifest requires" in r.json()["detail"]
+
+
+def test_api_rejects_unsafe_api_evidence(api_client):
+    r = _post(
+        api_client,
+        "does-not-exist",
+        candidate_kind="junit_api_candidate",
+        api_evidence=_api_evidence(trusted=True),
+    )
+
+    assert r.status_code == 422
+    assert "authority field" in r.json()["detail"]
+
+
+def test_api_rejects_manifest_target_drift(api_client):
+    r = _post(
+        api_client,
+        "does-not-exist",
+        candidate_kind="junit_api_candidate",
+        api_smoke_manifest=_api_smoke_manifest(
+            target={"target_class": "com.example.OtherCalc"},
+        ),
+    )
+
+    assert r.status_code == 422
+    assert "target_class" in r.json()["detail"]
+
+
+def test_api_passes_report_only_api_fields_to_pipeline(api_client, monkeypatch):
+    repo = JobRepo()
+    job = Job(git_url="https://example.com/x.git", status=JobStatus.DONE)
+    repo.create(job)
+    captured = {}
+
+    def fake_run_external_candidate(job_arg, repo_arg, **kwargs):
+        captured.update(kwargs)
+        job_arg.status = JobStatus.SUBMIT_DONE
+        job_arg.generation = {
+            "run_kind": "external",
+            "candidate_kind": kwargs["candidate_kind"],
+            "api_evidence": kwargs["api_evidence"],
+            "api_smoke_manifest": kwargs["api_smoke_manifest"],
+            "java_test_framework": kwargs["java_test_framework"],
+        }
+        return job_arg
+
+    monkeypatch.setattr(
+        "app.api.submit_candidate.run_external_candidate",
+        fake_run_external_candidate,
+    )
+
+    r = _post(
+        api_client,
+        job.id,
+        candidate_kind="junit_api_candidate",
+        api_evidence=_api_evidence(),
+        api_smoke_manifest=_api_smoke_manifest(),
+        java_test_framework="test-ng",
+    )
+
+    assert r.status_code == 200
+    assert captured["candidate_kind"] == "junit_api_candidate"
+    assert captured["api_evidence"]["execution"]["runner_tool"] == (
+        "maven_surefire_jacoco"
+    )
+    assert "trusted" not in captured["api_evidence"]
+    assert "conclusion" not in captured["api_evidence"]
+    assert captured["api_smoke_manifest"]["target"]["target_class"] == (
+        "com.example.Calc"
+    )
+    assert captured["java_test_framework"] == "testng"
+    assert "run_kind" not in captured
 
 
 # ---------- producer_id regex sanity (docs/53 §6) ------------------------------

@@ -1,6 +1,7 @@
 """Render a BenchReport to Markdown (docs/07 §8 style). Pure formatting."""
 from __future__ import annotations
 
+from app.benchmark.api_smoke_projection import api_smoke_benchmark_projection
 from app.benchmark.models import (
     BenchReport,
     aggregate,
@@ -118,6 +119,58 @@ def _validation_lines(summary: dict, title: str) -> list:
     ]
 
 
+def _api_smoke_lines(summary: dict, title: str, footer: str) -> list:
+    """API smoke denominator projection (docs/59 S9B). Advisory counts only."""
+    return [
+        f"## {title}",
+        "",
+        f"- source_rows: {summary.get('api_smoke_source_rows')}  "
+        f"projected_rows: {summary.get('projected_rows')}  "
+        f"(run_kind_filter: {summary.get('run_kind_filter')})",
+        f"- eligible_source_rows: {summary.get('eligible_source_rows')}  "
+        f"ineligible_source_rows: {summary.get('ineligible_source_rows')}",
+        f"- by_run_kind: {summary.get('by_run_kind')}",
+        f"- by_smoke_id: {summary.get('by_smoke_id')}",
+        f"- by_candidate_kind: {summary.get('by_candidate_kind')}",
+        f"- not_eligible_reason_counts: {summary.get('not_eligible_reason_counts')}",
+        f"- requirement_failure_counts: {summary.get('requirement_failure_counts')}",
+        f"- redline_flag_counts: {summary.get('redline_flag_counts')}",
+        f"- redlines_satisfied_distribution: "
+        f"{summary.get('redlines_satisfied_distribution')}",
+        f"- gen_outcome_distribution: {summary.get('gen_outcome_distribution')}",
+        f"- quality_gate_distribution: {summary.get('quality_gate_distribution')}",
+        "- review_recommendation_distribution: "
+        f"{summary.get('review_recommendation_distribution')}",
+        f"- need_human_review_cases: {summary.get('need_human_review_cases')}  "
+        f"trusted_true_cases: {summary.get('trusted_true_cases')}  "
+        f"unit_headline_eligible_cases: {summary.get('unit_headline_eligible_cases')}",
+        f"- invariant_warnings: {summary.get('invariant_warnings')}",
+        f"  ({footer})",
+        "",
+    ]
+
+
+def _api_smoke_sections(report: BenchReport) -> list:
+    """Render nothing for ordinary unit-test benchmark reports with no API smoke rows."""
+    raw = api_smoke_benchmark_projection(report.cases)
+    if raw.get("api_smoke_source_rows", 0) <= 0:
+        return []
+    headline = api_smoke_benchmark_projection(report.cases, view="headline")
+    return (
+        _api_smoke_lines(
+            raw,
+            "API smoke denominator - RAW (all run_kinds)",
+            "advisory; API smoke projection does not affect aggregate headlines "
+            "or review conclusion",
+        )
+        + _api_smoke_lines(
+            headline,
+            "API smoke denominator - HEADLINE (S8 eligible; real/external only)",
+            "candidate-evaluation view; not a model-quality or auto-accept metric",
+        )
+    )
+
+
 def _survivor_lines(report: BenchReport) -> list:
     """Aggregate survived-mutant classification across cases (docs/49 S2). Advisory: explains
     survivors (coverage gap vs weak oracle vs maybe-equivalent); never a verdict. Rendered only
@@ -188,6 +241,7 @@ def render_markdown(report: BenchReport) -> str:
         validation_line_summary(report.cases, run_kind="real"),
         "Real-world validation line - HEADLINE (real only)",
     )
+    lines += _api_smoke_sections(report)
     lines += _survivor_lines(report)
     lines += [
         "## Per-case",

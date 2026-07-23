@@ -77,6 +77,48 @@ def test_v2_grounding_metadata_surfaces_for_human_review():
     assert r["grounding"]["dependency_assumptions"] == ["JUnit5 assertions"]
 
 
+def test_report_surfaces_testng_framework_facts_without_verdict_authority():
+    source = (
+        "package com.example;\n"
+        "import org.testng.annotations.Test;\n"
+        "import static org.testng.Assert.assertEquals;\n\n"
+        "class CalcEnterpriseNgTest {\n"
+        "  @Test public void maxReturnsLargerInput() {\n"
+        "    assertEquals(new Calc().max(2, 9), 9);\n"
+        "  }\n"
+        "}\n"
+    )
+    bundle = _bundle(
+        java_test_framework="testng",
+        result={
+            **_bundle()["result"],
+            "test_source": source,
+            "behavior_sources": ["Calc.max returns the larger input"],
+        },
+        write={
+            **_bundle()["write"],
+            "file_path": "src/test/java/com/example/CalcEnterpriseNgTest.java",
+            "content": source,
+        },
+    )
+
+    report = assemble_generation_report(bundle)
+    facts = report["review_summary"]["java_test_framework"]
+    digest = report["review_summary"]["digest"]
+
+    assert facts["framework"] == "testng"
+    assert facts["declared_framework"] == "testng"
+    assert facts["detected_frameworks"] == ["testng"]
+    assert facts["support_status"] == "recognized_report_only_enterprise_java_framework"
+    assert facts["runner_family"] == "maven_surefire_jacoco"
+    assert facts["runtime_actions_allowed_now"] is False
+    assert facts["verdict_authority"] is False
+    assert facts["trusted_authority"] is False
+    assert not any(flag["signal"] == "java_test_framework" for flag in digest["flags"])
+    assert report["conclusion"] == CONCLUSION
+    assert report["trusted"] is False
+
+
 def test_phase3_repair_trace_surfaces_for_human_review():
     bundle = _bundle()
     bundle["repair"] = {

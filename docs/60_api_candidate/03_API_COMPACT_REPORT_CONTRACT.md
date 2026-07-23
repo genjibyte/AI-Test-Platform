@@ -200,7 +200,7 @@ Future S7 policy should be separate from unit-test headline metrics:
 
 ```text
 unit headline metrics  -> current Java/Maven real rows only
-api smoke evidence     -> separate report/benchmark section when implemented
+api smoke evidence     -> separate report/benchmark projection section when explicit smoke facts exist
 external rows          -> advisory provenance context, never real-model headline
 historical unknown     -> read-only heuristic labels
 ```

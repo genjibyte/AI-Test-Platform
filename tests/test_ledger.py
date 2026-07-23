@@ -1,4 +1,5 @@
 """Precipitation-layer (ledger) tests (docs/41 P1+P2). Offline: no model, no pipeline."""
+import sqlite3
 import uuid
 
 from app.benchmark.models import BenchCaseResult, BenchReport
@@ -24,6 +25,37 @@ def _case(name, **kw):
     )
     base.update(kw)
     return BenchCaseResult(**base)
+
+
+def _api_smoke_denominator(**overrides):
+    block = {
+        "advisory": True,
+        "report_only": True,
+        "policy_version": "api_smoke_denominator.v1",
+        "scope": "separate_api_smoke_denominator",
+        "smoke_id": "s7c-junit-api-001",
+        "candidate_kind": "junit_api_candidate",
+        "run_kind": "fake",
+        "eligible_for_api_smoke_denominator": False,
+        "benchmark_counting_enabled": False,
+        "unit_headline_eligible": False,
+        "not_eligible_reasons": ["api_evidence_absent"],
+        "requirements": {
+            "manifest_present": True,
+            "manifest_status_allowed": True,
+            "candidate_kind_matches": True,
+            "target_matches_generation": True,
+            "api_evidence_present": False,
+            "api_evidence_candidate_kind_matches": None,
+            "runner_tool_matches": None,
+            "redaction_contract_satisfied": None,
+            "maven_judge_evidence_present": True,
+            "conclusion_needs_review": True,
+            "trusted_false": True,
+        },
+    }
+    block.update(overrides)
+    return block
 
 
 def test_fingerprint_normalizes_whitespace_and_handles_none():
@@ -75,6 +107,106 @@ def test_record_from_bench_case_carries_asset_gate_fields_without_changing_signa
     assert store.by_fingerprint(fingerprint_source(src))[0].record_id == rec.record_id
     got = store.all()[0]
     assert got.model_dump() == rec.model_dump()
+
+
+def test_record_from_bench_case_carries_compact_api_smoke_denominator_fields(tmp_path):
+    prov = Provenance(author_type="external_agent", author_id="codex")
+    result = _case(
+        "api-smoke",
+        run_kind="external",
+        failure_type="TEST_FAILURE",
+        review_summary={
+            "api_smoke_denominator": _api_smoke_denominator(),
+        },
+    )
+    rec = record_from_bench_case(result, prov)
+
+    assert rec.run_kind == "external"  # top-level authority; denominator run_kind is not copied
+    assert rec.api_smoke_policy_version == "api_smoke_denominator.v1"
+    assert rec.api_smoke_scope == "separate_api_smoke_denominator"
+    assert rec.api_smoke_smoke_id == "s7c-junit-api-001"
+    assert rec.api_smoke_candidate_kind == "junit_api_candidate"
+    assert rec.api_smoke_denominator_eligible is False
+    assert rec.api_smoke_not_eligible_reasons == ["api_evidence_absent"]
+    assert rec.api_smoke_requirement_failures == [
+        "api_evidence_present",
+        "api_evidence_candidate_kind_matches",
+        "runner_tool_matches",
+        "redaction_contract_satisfied",
+    ]
+    assert rec.api_smoke_benchmark_counting_enabled is False
+    assert rec.api_smoke_unit_headline_eligible is False
+    assert badcase_signature(rec) == "TEST_FAILURE@com.x.C#m"
+    assert rec.conclusion == "NEED_HUMAN_REVIEW"
+
+    store = LedgerStore(tmp_path / "ledger.db")
+    store.append(rec)
+    assert store.all()[0].model_dump() == rec.model_dump()
+
+    with sqlite3.connect(store.db_path) as conn:
+        columns = [
+            row[1] for row in conn.execute("PRAGMA table_info(judged_records)")
+        ]
+    assert columns == [
+        "record_id",
+        "created_at",
+        "repo_url",
+        "target_class",
+        "target_method",
+        "author_type",
+        "author_id",
+        "test_fingerprint",
+        "gen_outcome",
+        "passed",
+        "failure_type",
+        "conclusion",
+        "record_json",
+    ]
+
+
+def test_record_from_bench_case_defaults_api_smoke_fields_for_absent_or_wrong_block():
+    prov = Provenance(author_type="platform_generator", author_id="deepseek-x")
+
+    no_block = record_from_bench_case(_case("no-block"), prov)
+    assert no_block.api_smoke_policy_version is None
+    assert no_block.api_smoke_scope is None
+    assert no_block.api_smoke_denominator_eligible is None
+    assert no_block.api_smoke_not_eligible_reasons == []
+    assert no_block.api_smoke_requirement_failures == []
+
+    wrong_policy = record_from_bench_case(
+        _case(
+            "wrong-policy",
+            review_summary={
+                "api_smoke_denominator": _api_smoke_denominator(
+                    policy_version="api_smoke_denominator.v2"
+                )
+            },
+        ),
+        prov,
+    )
+    wrong_scope = record_from_bench_case(
+        _case(
+            "wrong-scope",
+            review_summary={
+                "api_smoke_denominator": _api_smoke_denominator(
+                    scope="unit_headline"
+                )
+            },
+        ),
+        prov,
+    )
+
+    for rec in (wrong_policy, wrong_scope):
+        assert rec.api_smoke_policy_version is None
+        assert rec.api_smoke_scope is None
+        assert rec.api_smoke_smoke_id is None
+        assert rec.api_smoke_candidate_kind is None
+        assert rec.api_smoke_denominator_eligible is None
+        assert rec.api_smoke_not_eligible_reasons == []
+        assert rec.api_smoke_requirement_failures == []
+        assert rec.api_smoke_benchmark_counting_enabled is None
+        assert rec.api_smoke_unit_headline_eligible is None
 
 
 def test_store_append_query_and_roundtrip(tmp_path):

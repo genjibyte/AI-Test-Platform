@@ -12,12 +12,14 @@ The project should not stay unit-test-only. The mainline is:
 candidate -> isolated execution evidence -> advisory signals -> digest -> ledger -> report
 ```
 
-Unit tests are the current kernel, not the product boundary. API/interface candidate evaluation is
-a near-term mainline expansion when it reuses the same judge discipline.
+Unit tests are the current kernel, not the product boundary. The Java framework inside that kernel
+should stay thin: JUnit is the existing compatibility path, and TestNG should be visible as a Java
+test framework fact when candidates use it. API/interface candidate evaluation is a near-term
+mainline expansion when it reuses the same judge discipline.
 
 This direction can expand beyond one fixed path. Interface tests, generated automation tests,
-JUnit API tests, schema-based cases, collections, or human-authored cases may all be candidates if
-they enter the same platform form:
+JUnit/TestNG API tests, schema-based cases, collections, or human-authored cases may all be
+candidates if they enter the same platform form:
 
 ```text
 execute -> judge -> attribute -> precipitate badcase -> report

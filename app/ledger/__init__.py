@@ -23,6 +23,8 @@ from app.ledger.analytics import (
     ledger_summary,
     oracle_strength_summary,
 )
+from app.ledger.api_smoke_projection import api_smoke_ledger_projection
+from app.ledger.api_smoke_report import render_api_smoke_ledger_markdown
 from app.ledger.retrieval import find_similar, find_similar_in_store
 
 __all__ = [
@@ -42,6 +44,10 @@ __all__ = [
     "compare_authors_on_target",
     "ledger_summary",
     "oracle_strength_summary",
+    # S10B named projection; not wired into existing analytics summaries
+    "api_smoke_ledger_projection",
+    # S10C presentation helper; still not wired into existing analytics summaries
+    "render_api_smoke_ledger_markdown",
     # retrieval (#6 S1, docs/50)
     "find_similar",
     "find_similar_in_store",

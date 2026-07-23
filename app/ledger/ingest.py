@@ -8,11 +8,90 @@ logic runs here -- it only copies facts the pipeline already computed.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from typing import Optional
 
 from app.benchmark.models import BenchCaseResult, BenchReport
 from app.ledger.models import JudgedRecord, Provenance, fingerprint_source
 from app.ledger.store import LedgerStore
+
+
+_API_SMOKE_POLICY_VERSION = "api_smoke_denominator.v1"
+_API_SMOKE_SCOPE = "separate_api_smoke_denominator"
+
+
+def _as_str_list(value) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def _api_smoke_carry(review_summary: Optional[dict]) -> dict:
+    """Project S8 denominator facts into compact S10A ledger fields.
+
+    This intentionally copies an already-emitted report block instead of
+    recomputing API smoke policy in the ledger ingest path.
+    """
+    defaults = {
+        "api_smoke_policy_version": None,
+        "api_smoke_scope": None,
+        "api_smoke_smoke_id": None,
+        "api_smoke_candidate_kind": None,
+        "api_smoke_denominator_eligible": None,
+        "api_smoke_not_eligible_reasons": [],
+        "api_smoke_requirement_failures": [],
+        "api_smoke_benchmark_counting_enabled": None,
+        "api_smoke_unit_headline_eligible": None,
+    }
+    if not isinstance(review_summary, Mapping):
+        return defaults
+    denominator = review_summary.get("api_smoke_denominator")
+    if not isinstance(denominator, Mapping):
+        return defaults
+    if denominator.get("policy_version") != _API_SMOKE_POLICY_VERSION:
+        return defaults
+    if denominator.get("scope") != _API_SMOKE_SCOPE:
+        return defaults
+
+    requirements = denominator.get("requirements")
+    if isinstance(requirements, Mapping):
+        requirement_failures = [
+            name for name, satisfied in requirements.items()
+            if isinstance(name, str) and satisfied is not True
+        ]
+    else:
+        requirement_failures = []
+
+    eligible = denominator.get("eligible_for_api_smoke_denominator")
+    benchmark_counting = denominator.get("benchmark_counting_enabled")
+    unit_headline = denominator.get("unit_headline_eligible")
+    return {
+        "api_smoke_policy_version": _API_SMOKE_POLICY_VERSION,
+        "api_smoke_scope": _API_SMOKE_SCOPE,
+        "api_smoke_smoke_id": (
+            denominator.get("smoke_id")
+            if isinstance(denominator.get("smoke_id"), str)
+            else None
+        ),
+        "api_smoke_candidate_kind": (
+            denominator.get("candidate_kind")
+            if isinstance(denominator.get("candidate_kind"), str)
+            else None
+        ),
+        "api_smoke_denominator_eligible": (
+            eligible if isinstance(eligible, bool) else None
+        ),
+        "api_smoke_not_eligible_reasons": _as_str_list(
+            denominator.get("not_eligible_reasons")
+        ),
+        "api_smoke_requirement_failures": requirement_failures,
+        "api_smoke_benchmark_counting_enabled": (
+            benchmark_counting if isinstance(benchmark_counting, bool) else None
+        ),
+        "api_smoke_unit_headline_eligible": (
+            unit_headline if isinstance(unit_headline, bool) else None
+        ),
+    }
 
 
 def record_from_bench_case(
@@ -21,6 +100,7 @@ def record_from_bench_case(
     test_source: Optional[str] = None,
 ) -> JudgedRecord:
     """Project one BenchCaseResult onto a JudgedRecord (judging facts only)."""
+    api_smoke_fields = _api_smoke_carry(result.review_summary)
     return JudgedRecord(
         record_id=str(uuid.uuid4()),
         repo_url=result.repo_url,
@@ -40,6 +120,7 @@ def record_from_bench_case(
         asset_test_level_recommendation=result.asset_test_level_recommendation,
         asset_missing_count=result.asset_missing_count,
         asset_partial_count=result.asset_partial_count,
+        **api_smoke_fields,
         gen_outcome=result.gen_outcome,
         compiled=result.compiled,
         executed=result.executed,

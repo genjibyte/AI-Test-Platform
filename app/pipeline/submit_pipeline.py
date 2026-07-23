@@ -17,7 +17,9 @@ Reuses ``resolve_target`` / ``build_snapshot`` / ``evaluate_generated_test_prefl
 """
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any, Optional, Sequence
 
 from app.context.context_collector import ContextError, build_snapshot
 from app.coverage.coverage_compare import compare
@@ -34,9 +36,21 @@ from app.llm.schema import TestGenerationResult
 from app.models.job import Job, JobStatus
 from app.quality.asset_sufficiency import asset_facts_from_snapshot
 from app.quality.generated_test_preflight import evaluate_generated_test_preflight
+from app.report.api_evidence import (
+    JUNIT_API_CANDIDATE,
+    validate_api_evidence_block,
+)
+from app.report.api_smoke_manifest import validate_api_smoke_manifest
+from app.report.java_test_framework import (
+    JavaTestFrameworkFactsValidationError,
+    normalize_java_test_framework_declaration,
+)
 from app.runtime.workspace import Workspace
 from app.storage.job_repo import JobRepo
 from app.targeting.target_selector import resolve_target
+
+JUNIT_UNIT_CANDIDATE = "junit_unit_candidate"
+ALLOWED_SUBMIT_CANDIDATE_KINDS = (JUNIT_UNIT_CANDIDATE, JUNIT_API_CANDIDATE)
 
 
 def _empty_bundle() -> dict:
@@ -97,6 +111,97 @@ def _submit_file_name(target_class: str) -> str:
     return f"{_submit_class_name(target_class)}.java"
 
 
+def _normalize_candidate_kind(candidate_kind: Optional[str]) -> str | None:
+    if candidate_kind is None:
+        return None
+    if not isinstance(candidate_kind, str):
+        raise ValueError("candidate_kind must be a string")
+    normalized = candidate_kind.strip() or None
+    if normalized is None:
+        return None
+    if normalized not in ALLOWED_SUBMIT_CANDIDATE_KINDS:
+        allowed = ", ".join(ALLOWED_SUBMIT_CANDIDATE_KINDS)
+        raise ValueError(f"candidate_kind must be one of: {allowed}")
+    return normalized
+
+
+def normalize_submit_candidate_carry(
+    *,
+    candidate_kind: Optional[str] = None,
+    api_evidence: Optional[Mapping[str, Any]] = None,
+    api_smoke_manifest: Optional[Mapping[str, Any]] = None,
+    java_test_framework: Optional[str] = None,
+    target_class: str,
+    target_method: Optional[str],
+) -> tuple[str | None, dict[str, Any] | None, dict[str, Any] | None, str | None]:
+    """Validate optional report-only submit facts and return bundle-safe copies.
+
+    This is not an execution selector. It only protects the submit boundary from
+    unsupported candidate kinds, unsafe compact evidence, and manifest/target
+    drift before the normal Maven/Surefire judge path runs.
+    """
+    normalized_kind = _normalize_candidate_kind(candidate_kind)
+    try:
+        normalized_java_test_framework = normalize_java_test_framework_declaration(
+            java_test_framework
+        )
+    except JavaTestFrameworkFactsValidationError as exc:
+        raise ValueError(str(exc)) from exc
+
+    normalized_api_evidence = None
+    api_evidence_for_bundle = None
+    if api_evidence is not None:
+        if normalized_kind != JUNIT_API_CANDIDATE:
+            raise ValueError("api_evidence requires candidate_kind=junit_api_candidate")
+        if not isinstance(api_evidence, Mapping):
+            raise ValueError("api_evidence must be a mapping")
+        normalized_api_evidence = validate_api_evidence_block(api_evidence)
+        if normalized_api_evidence["candidate_kind"] != JUNIT_API_CANDIDATE:
+            raise ValueError(
+                "api_evidence.candidate_kind must be junit_api_candidate"
+            )
+        # Store the caller-supplied compact block, not the validator output that
+        # includes report-only conclusion/trusted fields; report assembly
+        # normalizes it again as the second defense line.
+        api_evidence_for_bundle = deepcopy(dict(api_evidence))
+
+    api_smoke_manifest_for_bundle = None
+    if api_smoke_manifest is not None:
+        if normalized_kind != JUNIT_API_CANDIDATE:
+            raise ValueError(
+                "api_smoke_manifest requires candidate_kind=junit_api_candidate"
+            )
+        if not isinstance(api_smoke_manifest, Mapping):
+            raise ValueError("api_smoke_manifest must be a mapping")
+        normalized_manifest = validate_api_smoke_manifest(api_smoke_manifest)
+        manifest_target = normalized_manifest["target"]
+        if manifest_target["target_class"] != target_class:
+            raise ValueError(
+                "api_smoke_manifest.target.target_class must match target_class"
+            )
+        manifest_method = manifest_target["target_method"]
+        if manifest_method is not None and manifest_method != target_method:
+            raise ValueError(
+                "api_smoke_manifest.target.target_method must match target_method"
+            )
+        if normalized_api_evidence is not None:
+            evidence_runner = normalized_api_evidence["execution"]["runner_tool"]
+            manifest_runner = normalized_manifest["execution_policy"]["runner_tool"]
+            if evidence_runner != manifest_runner:
+                raise ValueError(
+                    "api_evidence.execution.runner_tool must match "
+                    "api_smoke_manifest.execution_policy.runner_tool"
+                )
+        api_smoke_manifest_for_bundle = normalized_manifest
+
+    return (
+        normalized_kind,
+        api_evidence_for_bundle,
+        api_smoke_manifest_for_bundle,
+        normalized_java_test_framework,
+    )
+
+
 def _result_for_submit(
     target_class: str,
     target_method: Optional[str],
@@ -120,7 +225,7 @@ def _result_for_submit(
         mocks=[],
         notes=None,
         model=producer_id,       # surfaces in headline/group_by analytics
-        trusted=False,           # invariant, docs/07 P2 + docs/53 §4
+        trusted=False,           # invariant: producer identity is not a quality warrant
         producer_id=producer_id, # docs/53
     )
 
@@ -134,6 +239,10 @@ def run_external_candidate(
     producer_id: str,
     *,
     producer_meta: Optional[dict] = None,
+    candidate_kind: Optional[str] = None,
+    api_evidence: Optional[dict] = None,
+    api_smoke_manifest: Optional[dict] = None,
+    java_test_framework: Optional[str] = None,
     maven_extra_args: Optional[Sequence[str]] = None,
 ) -> Job:
     """Run the submit_candidate pipeline on a judged job (docs/53 S1).
@@ -148,6 +257,27 @@ def run_external_candidate(
     bundle["run_kind"] = resolve_run_kind_for_submit()
     bundle["producer_id"] = producer_id
     bundle["producer_meta"] = dict(producer_meta or {})
+    (
+        normalized_candidate_kind,
+        api_evidence_for_bundle,
+        api_smoke_manifest_for_bundle,
+        java_test_framework_for_bundle,
+    ) = normalize_submit_candidate_carry(
+        candidate_kind=candidate_kind,
+        api_evidence=api_evidence,
+        api_smoke_manifest=api_smoke_manifest,
+        java_test_framework=java_test_framework,
+        target_class=target_class,
+        target_method=target_method,
+    )
+    if normalized_candidate_kind is not None:
+        bundle["candidate_kind"] = normalized_candidate_kind
+    if api_evidence_for_bundle is not None:
+        bundle["api_evidence"] = api_evidence_for_bundle
+    if api_smoke_manifest_for_bundle is not None:
+        bundle["api_smoke_manifest"] = api_smoke_manifest_for_bundle
+    if java_test_framework_for_bundle is not None:
+        bundle["java_test_framework"] = java_test_framework_for_bundle
 
     if job.status != JobStatus.DONE:
         return _submit_fail(

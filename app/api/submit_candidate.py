@@ -16,14 +16,17 @@ them, but a malformed request is rejected at the boundary):
 from __future__ import annotations
 
 import re
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.common.response import ApiResponse
 from app.models.job import JobStatus
-from app.pipeline.submit_pipeline import run_external_candidate
+from app.pipeline.submit_pipeline import (
+    normalize_submit_candidate_carry,
+    run_external_candidate,
+)
 from app.storage.job_repo import JobRepo
 
 router = APIRouter(tags=["submit_candidate"])
@@ -41,6 +44,10 @@ class SubmitCandidateRequest(BaseModel):
     test_source: str
     producer_id: str
     producer_meta: dict = Field(default_factory=dict)
+    candidate_kind: Optional[str] = None
+    api_evidence: Optional[dict[str, Any]] = None
+    api_smoke_manifest: Optional[dict[str, Any]] = None
+    java_test_framework: Optional[str] = None
 
 
 def _validate(req: SubmitCandidateRequest) -> None:
@@ -71,6 +78,24 @@ def _validate(req: SubmitCandidateRequest) -> None:
 @router.post("/jobs/{job_id}/submit_candidate")
 def post_submit_candidate(job_id: str, req: SubmitCandidateRequest) -> ApiResponse:
     _validate(req)
+    method = (req.target_method or "").strip() or None  # whitespace-only -> None
+    try:
+        (
+            candidate_kind,
+            api_evidence,
+            api_smoke_manifest,
+            java_test_framework,
+        ) = normalize_submit_candidate_carry(
+            candidate_kind=req.candidate_kind,
+            api_evidence=req.api_evidence,
+            api_smoke_manifest=req.api_smoke_manifest,
+            java_test_framework=req.java_test_framework,
+            target_class=req.target_class.strip(),
+            target_method=method,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     repo = JobRepo()
     job = repo.get(job_id)
     if job is None:
@@ -80,7 +105,6 @@ def post_submit_candidate(job_id: str, req: SubmitCandidateRequest) -> ApiRespon
             status_code=409,
             detail=f"job must be judged (DONE) before submit_candidate; got {job.status.value}",
         )
-    method = (req.target_method or "").strip() or None  # whitespace-only -> None
     job = run_external_candidate(
         job, repo,
         target_class=req.target_class.strip(),
@@ -88,5 +112,9 @@ def post_submit_candidate(job_id: str, req: SubmitCandidateRequest) -> ApiRespon
         test_source=req.test_source,
         producer_id=req.producer_id.strip(),
         producer_meta=req.producer_meta,
+        candidate_kind=candidate_kind,
+        api_evidence=api_evidence,
+        api_smoke_manifest=api_smoke_manifest,
+        java_test_framework=java_test_framework,
     )
     return ApiResponse.ok(data=job.model_dump())

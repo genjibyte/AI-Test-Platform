@@ -73,6 +73,18 @@ class JudgedRecord(BaseModel):
     asset_test_level_recommendation: Optional[str] = None
     asset_missing_count: int = 0
     asset_partial_count: int = 0
+    # docs/60 S10A: compact API smoke denominator carry, projected from
+    # review_summary["api_smoke_denominator"] only. These are denominator
+    # readiness facts, not quality scores, and they are stored only in record_json.
+    api_smoke_policy_version: Optional[str] = None
+    api_smoke_scope: Optional[str] = None
+    api_smoke_smoke_id: Optional[str] = None
+    api_smoke_candidate_kind: Optional[str] = None
+    api_smoke_denominator_eligible: Optional[bool] = None
+    api_smoke_not_eligible_reasons: list[str] = Field(default_factory=list)
+    api_smoke_requirement_failures: list[str] = Field(default_factory=list)
+    api_smoke_benchmark_counting_enabled: Optional[bool] = None
+    api_smoke_unit_headline_eligible: Optional[bool] = None
     # docs/50 S2: actionable precedent -- DECLARED by a human/external author (advisory, NEVER
     # platform-fabricated; default None). Retrieval surfaces these next to the derived signature.
     root_cause: Optional[str] = None

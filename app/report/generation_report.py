@@ -31,6 +31,14 @@ from app.report.api_evidence import (
     JUNIT_API_CANDIDATE,
     validate_api_evidence_block,
 )
+from app.report.api_smoke_denominator import evaluate_api_smoke_denominator
+from app.report.api_smoke_manifest import (
+    REPORT_PATH as API_SMOKE_MANIFEST_REPORT_PATH,
+    ApiSmokeManifestValidationError,
+    validate_api_smoke_manifest,
+)
+from app.report.api_smoke_redlines import summarize_api_smoke_redlines
+from app.report.java_test_framework import detect_java_test_framework
 from app.review.review_digest import build_review_digest
 from app.review.review_policy import build_review_summary, recommend_with_reasons
 
@@ -120,6 +128,131 @@ def _attach_api_evidence_if_present(review_summary: dict, generation: dict) -> N
     review_summary["api_evidence"] = normalized
 
 
+def _attach_api_smoke_manifest_if_present(
+    review_summary: dict,
+    generation: dict,
+    *,
+    target_class: str | None,
+    target_method: str | None,
+) -> None:
+    """Attach the S7D report-only API smoke manifest projection.
+
+    The manifest is an exam-bag denominator for review. It is validated and
+    aligned against the current bundle, but it never chooses a runner, changes
+    verdicts, writes benchmark rows, or grants trust.
+    """
+    manifest = generation.get("api_smoke_manifest")
+    if manifest is None:
+        return
+
+    candidate_kind = generation.get("candidate_kind")
+    if candidate_kind != JUNIT_API_CANDIDATE:
+        raise ApiSmokeManifestValidationError(
+            "api_smoke_manifest requires generation.candidate_kind="
+            "junit_api_candidate"
+        )
+
+    normalized = validate_api_smoke_manifest(manifest)
+    manifest_target = normalized["target"]
+    manifest_target_class = manifest_target["target_class"]
+    manifest_target_method = manifest_target["target_method"]
+    if manifest_target_class != target_class:
+        raise ApiSmokeManifestValidationError(
+            "api_smoke_manifest.target.target_class must match generation target"
+        )
+    if (
+        manifest_target_method is not None
+        and manifest_target_method != target_method
+    ):
+        raise ApiSmokeManifestValidationError(
+            "api_smoke_manifest.target.target_method must match generation target"
+        )
+
+    api_evidence_present = generation.get("api_evidence") is not None
+    api_evidence_candidate_kind_matches = None
+    runner_tool_matches = None
+    redaction_contract_satisfied = None
+    not_ready_reasons = []
+
+    if api_evidence_present:
+        api_evidence = review_summary.get("api_evidence")
+        if not isinstance(api_evidence, Mapping):
+            raise ApiSmokeManifestValidationError(
+                "api_smoke_manifest requires normalized api_evidence"
+            )
+        api_evidence_candidate_kind_matches = (
+            api_evidence.get("candidate_kind") == normalized["candidate_kind"]
+        )
+        if not api_evidence_candidate_kind_matches:
+            raise ApiSmokeManifestValidationError(
+                "api_evidence.candidate_kind must match api_smoke_manifest"
+            )
+
+        runner_tool_matches = (
+            (api_evidence.get("execution") or {}).get("runner_tool")
+            == normalized["execution_policy"]["runner_tool"]
+        )
+        if not runner_tool_matches:
+            raise ApiSmokeManifestValidationError(
+                "api_evidence.execution.runner_tool must match api_smoke_manifest"
+            )
+
+        redaction = api_evidence.get("redaction") or {}
+        redaction_contract_satisfied = (
+            redaction.get("request_body_persisted") is False
+            and redaction.get("response_body_persisted") is False
+            and redaction.get("secrets_persisted") is False
+        )
+        if not redaction_contract_satisfied:
+            raise ApiSmokeManifestValidationError(
+                "api_evidence.redaction must satisfy api_smoke_manifest"
+            )
+    else:
+        not_ready_reasons.append("api_evidence_absent")
+
+    review_summary["api_smoke_manifest"] = {
+        "advisory": True,
+        "report_only": True,
+        "schema_version": normalized["schema_version"],
+        "smoke_id": normalized["smoke_id"],
+        "candidate_kind": normalized["candidate_kind"],
+        "status": normalized["status"],
+        "target": normalized["target"],
+        "asset_requirements": normalized["asset_requirements"],
+        "execution_policy": {
+            "runner_tool": normalized["execution_policy"]["runner_tool"],
+            "allowed_network_scope": normalized["execution_policy"][
+                "allowed_network_scope"
+            ],
+            "external_network_allowed": normalized["execution_policy"][
+                "external_network_allowed"
+            ],
+            "docker_required": normalized["execution_policy"]["docker_required"],
+            "real_model_allowed": normalized["execution_policy"][
+                "real_model_allowed"
+            ],
+        },
+        "evidence_contract": {
+            "report_path": API_SMOKE_MANIFEST_REPORT_PATH,
+            "minimum_api_evidence": dict(
+                normalized["evidence_contract"]["minimum_api_evidence"]
+            ),
+        },
+        "alignment": {
+            "target_matches_generation": True,
+            "candidate_kind_matches": True,
+            "api_evidence_present": api_evidence_present,
+            "api_evidence_candidate_kind_matches": (
+                api_evidence_candidate_kind_matches
+            ),
+            "runner_tool_matches": runner_tool_matches,
+            "redaction_contract_satisfied": redaction_contract_satisfied,
+            "denominator_ready": False,
+            "not_ready_reasons": not_ready_reasons,
+        },
+    }
+
+
 def assemble_generation_report(generation: dict) -> dict:
     target = generation.get("target") or {}
     result = generation.get("result") or {}
@@ -206,10 +339,52 @@ def assemble_generation_report(generation: dict) -> dict:
         run_kind=generation.get("run_kind"),
         producer_id=result.get("producer_id") or generation.get("producer_id"),
     )
+    # Report-only Java framework facts. JUnit is kept as a thin compatibility path while
+    # TestNG is made visible for enterprise Java review. This does not choose a runner,
+    # install dependencies, mutate POMs, or affect digest/recommendation/conclusion/trust.
+    review_summary["java_test_framework"] = detect_java_test_framework(
+        test_source=test_source,
+        dependency_assumptions=grounding.get("dependency_assumptions"),
+        asset_facts=generation.get("asset_facts"),
+        declared_framework=generation.get("java_test_framework"),
+    )
     # docs/60_api_candidate/05 S7A: report-only API evidence for the first
     # junit_api_candidate path. This validates compact supplied facts, never starts
     # an executor, and does not feed digest/recommendation/conclusion/trusted.
     _attach_api_evidence_if_present(review_summary, generation)
+    # docs/60_api_candidate/08 S7D1: report-only API smoke manifest carry-through.
+    # The manifest is validated and aligned against the bundle and optional compact
+    # api_evidence, but it remains advisory and never creates denominator eligibility.
+    _attach_api_smoke_manifest_if_present(
+        review_summary,
+        generation,
+        target_class=target_class,
+        target_method=target.get("target_method") or result.get("target_method"),
+    )
+    # docs/60_api_candidate/09 S8: report-only API smoke denominator policy.
+    # This computes future-denominator eligibility facts only; benchmark counting
+    # remains disabled and no aggregate/ledger/digest behavior changes.
+    api_smoke_denominator = evaluate_api_smoke_denominator(
+        review_summary,
+        run_kind=generation.get("run_kind"),
+        execution=execution,
+        conclusion=CONCLUSION,
+        trusted=bool(result.get("trusted", False)),
+    )
+    if api_smoke_denominator is not None:
+        review_summary["api_smoke_denominator"] = api_smoke_denominator
+        alignment = review_summary["api_smoke_manifest"]["alignment"]
+        alignment["denominator_ready"] = api_smoke_denominator[
+            "eligible_for_api_smoke_denominator"
+        ]
+        alignment["not_ready_reasons"] = list(
+            api_smoke_denominator["not_eligible_reasons"]
+        )
+    # Reviewer-facing red-line summary over the API smoke facts above. It is
+    # report-only and intentionally excluded from digest/recommendation inputs.
+    api_smoke_redlines = summarize_api_smoke_redlines(review_summary)
+    if api_smoke_redlines is not None:
+        review_summary["api_smoke_redlines"] = api_smoke_redlines
     # docs/52: advisory review digest -- a prioritized roll-up of the signals above for the
     # reviewer. Built last; reads only what's present; changes no recommendation/conclusion.
     review_summary["digest"] = build_review_digest(review_summary)

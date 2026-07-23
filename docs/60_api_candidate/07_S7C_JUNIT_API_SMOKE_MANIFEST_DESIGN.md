@@ -1,9 +1,10 @@
 # 07 - S7C JUnit API Smoke Manifest Design
 
 > Date: 2026-07-16  
-> Status: S7C design. Documentation only; no manifest validator, submit endpoint change, API
-> executor, dependency, service orchestration, Docker path, external repo clone, benchmark schema
-> change, ledger schema change, digest severity change, or verdict change is implied.
+> Status: S7C design plus V1 pure validator live. S7D1/S7D2 provide report-only carry-through
+> from submit to report. No API executor, dependency, service orchestration, Docker path, external
+> repo clone, benchmark schema change, ledger schema change, digest severity change, or verdict
+> change is implied.
 
 ## 0. Purpose
 
@@ -41,7 +42,7 @@ S7C keeps the abstraction concrete by binding every field to an already-known ar
 
 | Concept | S7C artifact | Current boundary |
 |---|---|---|
-| Exam bag | `api_smoke_manifest.v1` row | design doc first, future pure validator |
+| Exam bag | `api_smoke_manifest.v1` row | pure validator live; S7D1 report carry only |
 | Invigilation interface | existing Maven/Surefire judge call | no API executor |
 | Evidence format | `JudgeEvidence` plus compact `api_evidence` | report-only facts |
 | Grade sheet | existing generation report / benchmark markdown | advisory, no auto-accept |
@@ -121,8 +122,8 @@ evidence_contract:
     - auto_accept
 ```
 
-This is a design contract, not a live schema. A later code slice may implement a pure validator
-only after owner approval.
+This is a design contract. V1 implements only a pure validator for this contract; it does not wire
+the manifest into submit, report, benchmark, or ledger.
 
 ## 3. First Smoke Target Bias
 
@@ -224,10 +225,13 @@ Future smoke targets or support tools must keep the intake shape explicit:
 
 If a future design mentions any of these, it must first perform the focused README audit described
 in `docs/knowledge/EXTERNAL_ASSET_MAPPING_MATRIX.md` and record facts before implementation.
+It must also include the asset record block defined in
+`docs/00_foundation/58_GOVERNANCE_RECOVERY_AND_REUSE_PREP.md`; a future `sut_ref` is not valid if
+it only says the target is "useful."
 
-## 8. Future Pure Validator Slice
+## 8. V1 Pure Validator Slice - Live
 
-If S7C is approved for implementation, the next code slice should still be non-executing:
+S7C V1 is live as a non-executing validator:
 
 ```text
 app/report/api_smoke_manifest.py
@@ -242,8 +246,14 @@ tests/test_api_smoke_manifest.py
   proves runner_tool remains maven_surefire_jacoco
 ```
 
-This validator should not wire into submit, benchmark, ledger, or report until a later bounded
-design says where the manifest id is carried.
+This validator is wired only into report assembly by S7D1. It is still not wired into submit,
+benchmark, or ledger. A later bounded design must say how the public submit path carries the
+manifest before any integration occurs.
+
+That bounded design is
+`docs/60_api_candidate/08_S7D_API_SMOKE_MANIFEST_CARRY_THROUGH_DESIGN.md`. Its S7D1 slice is live:
+report-only manifest projection and alignment facts. It still does not approve submit endpoint
+changes, executors, benchmark carry, ledger carry, digest severity, or verdict changes.
 
 ## 9. Definition Of Done
 
